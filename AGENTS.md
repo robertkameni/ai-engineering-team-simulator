@@ -3,3 +3,22 @@
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
+
+## Stack (keep current)
+
+| Layer | Version / choice |
+|-------|------------------|
+| Next.js | 16 App Router, `src/app` |
+| React | 19 — use `React.SubmitEvent`, not deprecated `FormEvent` |
+| AI | Vercel AI SDK 6 + `@ai-sdk/deepseek`, `streamText`, `maxOutputTokens` |
+| DB | **Prisma 7** + `prisma.config.ts` + `@prisma/adapter-neon` |
+| Prisma client | Generated to `src/generated/prisma` — import from `@/generated/prisma/client` |
+| DB access | `src/lib/prisma.ts` (`server-only`) + `src/lib/db/*` helpers |
+| Styling | Tailwind 4, shadcn, `tw-animate-css`, dark-first tokens |
+
+## Conventions
+
+- Env: `.env.local` at repo root (Prisma CLI loads it via `prisma.config.ts`).
+- Do not import `@/lib/prisma` or `@/generated/prisma` in client components.
+- API routes: `export const runtime = "nodejs"`, `maxDuration` for multi-agent runs.
+- Prefer Server Components; client only for stream UI, sidebar pathname, forms.
