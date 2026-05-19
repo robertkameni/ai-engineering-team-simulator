@@ -31,6 +31,8 @@ export function MessageThread({ messages, empty }: MessageThreadProps) {
       <div
         className="flex flex-col gap-8 py-4"
         aria-label="Engineering team discussion"
+        aria-live="polite"
+        aria-busy={messages.some((m) => m.isStreaming)}
       >
         {messages.map((message) => (
           <AgentMessage key={message.id} message={message} />

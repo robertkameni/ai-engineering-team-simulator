@@ -13,6 +13,8 @@ interface PromptComposerProps {
   placeholder?: string;
   className?: string;
   defaultValue?: string;
+  /** When set, runs live simulation instead of navigating with ?prompt= */
+  onSimulate?: (prompt: string) => void | Promise<void>;
 }
 
 export function PromptComposer({
@@ -20,14 +22,20 @@ export function PromptComposer({
   placeholder = "Build a food delivery app for students on campus…",
   className,
   defaultValue = "",
+  onSimulate,
 }: PromptComposerProps) {
   const router = useRouter();
   const [value, setValue] = useState(defaultValue);
 
-  function handleSubmit(event: React.SubmitEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
+
+    if (onSimulate) {
+      await onSimulate(trimmed);
+      return;
+    }
 
     router.push(`/workspace?prompt=${encodeURIComponent(trimmed)}`);
   }
@@ -67,7 +75,7 @@ export function PromptComposer({
               size="icon"
               disabled={disabled || !value.trim()}
               className="size-8 rounded-md"
-              aria-label="Start simulation"
+              aria-label={onSimulate ? "Run simulation" : "Start simulation"}
             >
               <ArrowUp />
             </Button>
@@ -76,7 +84,9 @@ export function PromptComposer({
         <p className="text-xs text-muted-foreground" aria-live="polite">
           {disabled
             ? "Team is discussing…"
-            : "Press ⌘ Enter to start the simulation"}
+            : onSimulate
+              ? "Press ⌘ Enter to run again"
+              : "Press ⌘ Enter to start the simulation"}
         </p>
       </div>
     </form>

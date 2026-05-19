@@ -1,0 +1,39 @@
+import type { AgentRole } from "@/features/agents/types";
+
+/** Shared SSE event shapes (client + server). */
+export type SimulationStreamEvent =
+  | {
+      type: "agent_start";
+      role: AgentRole;
+      name: string;
+      title: string;
+    }
+  | {
+      type: "text-delta";
+      role: AgentRole;
+      delta: string;
+    }
+  | {
+      type: "agent_end";
+      role: AgentRole;
+    }
+  | {
+      type: "done";
+    }
+  | {
+      type: "error";
+      message: string;
+    };
+
+export function encodeSimulationEvent(event: SimulationStreamEvent): string {
+  return `data: ${JSON.stringify(event)}\n\n`;
+}
+
+export function parseSimulationEvent(line: string): SimulationStreamEvent | null {
+  if (!line.startsWith("data: ")) return null;
+  try {
+    return JSON.parse(line.slice(6)) as SimulationStreamEvent;
+  } catch {
+    return null;
+  }
+}

@@ -1,3 +1,4 @@
+import { SimulationWorkspace } from "@/features/workspace/simulation-workspace";
 import { WorkspaceView } from "@/features/workspace/workspace-view";
 import { MOCK_ACTIVE_RUN } from "@/features/simulation/mock-data";
 
@@ -11,17 +12,18 @@ export default async function WorkspacePage({
   const params = await searchParams;
   const prompt = params.prompt?.trim();
 
-  const run = prompt
-    ? { ...MOCK_ACTIVE_RUN, title: truncateTitle(prompt), userPrompt: prompt }
-    : MOCK_ACTIVE_RUN;
+  if (prompt) {
+    return (
+      <SimulationWorkspace
+        userPrompt={prompt}
+        title={truncateTitle(prompt)}
+      />
+    );
+  }
 
-  return (
-    <WorkspaceView
-      run={run}
-      showEmptyThread={Boolean(prompt)}
-      initialPrompt={prompt}
-    />
-  );
+  const run = MOCK_ACTIVE_RUN;
+
+  return <WorkspaceView run={run} />;
 }
 
 function truncateTitle(prompt: string, max = 48) {
