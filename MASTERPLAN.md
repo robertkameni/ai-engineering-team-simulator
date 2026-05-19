@@ -8,9 +8,9 @@ Living roadmap for the product, architecture, and implementation phases. Update 
 
 ## Vision
 
-A **multi-agent engineering simulator**: the user describes a product idea; AI teammates debate it in real time (requirements, architecture, implementation, review). Runs are **persisted**, **replayable**, and eventually surfaced as structured **artifacts** (requirements, architecture, review).
+A **multi-agent engineering simulator**: the user describes a product idea; AI teammates debate it in real time (requirements, architecture, implementation, review). Runs are **persisted**, **replayable** from the sidebar, and summarized as structured **artifacts** (requirements, architecture, implementation, review) in the right panel.
 
-**Target experience:** Premium dark UI, streaming debate in the center, artifacts on the right, run history in the sidebar.
+**Target experience:** Premium dark UI, streaming debate in the center, artifacts on the right (`lg+`), run history in the sidebar with delete.
 
 ---
 
@@ -20,7 +20,7 @@ A **multi-agent engineering simulator**: the user describes a product idea; AI t
 |-------|--------|
 | Framework | Next.js 16 App Router (`src/app`) |
 | UI | React 19, Tailwind 4, shadcn-style components |
-| AI | Vercel AI SDK 6, `@ai-sdk/deepseek`, `streamText` |
+| AI | Vercel AI SDK 6, `@ai-sdk/deepseek`, `streamText`, `generateText` + `Output.object` |
 | Models | DeepSeek v4 — [API docs](https://api-docs.deepseek.com) |
 | Database | Prisma 7 + `prisma.config.ts` + `@prisma/adapter-neon` (Neon Postgres) |
 | Deploy target | Vercel (not wired yet) |
@@ -29,17 +29,21 @@ A **multi-agent engineering simulator**: the user describes a product idea; AI t
 
 Order: **PM → Architect → Backend Developer → Frontend Developer → Reviewer**
 
-| Role | Model | Thinking |
-|------|--------|----------|
-| PM | `deepseek-v4-flash` | Off |
-| Architect | `deepseek-v4-pro` | On (`reasoningEffort: high`) |
-| Backend | `deepseek-v4-pro` | Off |
-| Frontend | `deepseek-v4-flash` | Off |
-| Reviewer | `deepseek-v4-flash` | Off |
+| Role | Model | Thinking | Max output tokens |
+|------|--------|----------|-------------------|
+| PM | `deepseek-v4-flash` | Off | 450 |
+| Architect | `deepseek-v4-pro` | Off (chat only — visible stream) | 650 |
+| Backend | `deepseek-v4-pro` | Off | 500 |
+| Frontend | `deepseek-v4-flash` | Off | 500 |
+| Reviewer | `deepseek-v4-flash` | Off | 450 |
 
-**Output token caps (tunable in `src/ai/agents/config.ts`):** PM 1600, Architect 2200, Backend/Frontend 1800, Reviewer 1600.
+Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` (`thinking: disabled`) so tokens go to visible debate text, not hidden reasoning.
+
+**Debate style:** Short Slack-like turns (~80–140 words), no markdown tables — see `src/ai/prompts/shared.ts`. Full detail lives in post-debate artifacts.
 
 **Team names:** Randomized per run via `createSimulationRoster()`; stored as `team-roster` artifact + `Message.agentName`.
+
+**Resilience:** Empty agent stream → one retry with doubled token budget (`run-simulation.ts`).
 
 ---
 
@@ -69,6 +73,7 @@ Order: **PM → Architect → Backend Developer → Frontend Developer → Revie
 - [x] shadcn-style UI primitives (`src/components/ui/`)
 - [x] `src/` layout: `app`, `features`, `ai`, `lib`
 - [x] Agent accent colors per role
+- [x] Global `cursor-pointer` on buttons / tab triggers
 
 ---
 
@@ -80,8 +85,9 @@ Order: **PM → Architect → Backend Developer → Frontend Developer → Revie
 - [x] Migrations + Neon `DATABASE_URL`
 - [x] Prisma 7 + `prisma.config.ts` + Neon adapter
 - [x] Generated client at `src/generated/prisma`
-- [x] DB helpers: `src/lib/db/runs.ts`, `projects.ts`, `team-roster.ts`
+- [x] DB helpers: `src/lib/db/runs.ts`, `projects.ts`, `team-roster.ts`, `artifacts.ts`
 - [x] `Message.agentName` for dynamic roster display
+- [x] Cascade delete: run → messages + artifacts
 
 ---
 
@@ -93,6 +99,7 @@ Order: **PM → Architect → Backend Developer → Frontend Developer → Revie
 - [x] Workspace shell: sidebar, header, thread, composer, artifact panel
 - [x] Agent message components, avatars, status pill
 - [x] Empty workspace state (no mock debate in main thread)
+- [x] App shell layout: sidebar | main | artifacts (`lg+`)
 
 ---
 
@@ -111,21 +118,26 @@ Order: **PM → Architect → Backend Developer → Frontend Developer → Revie
 **Goal:** Full team debate, save to DB, browse runs.
 
 - [x] Sequential orchestration (`src/ai/orchestration/run-simulation.ts`)
-- [x] Shared transcript context (`build-messages.ts`, role prompts)
-- [x] SSE: `run_started`, `agent_start`, `text-delta`, `agent_end`, `done`, `error`
-- [x] `GET /api/runs` for sidebar
-- [x] `/runs/[id]` loads messages from DB
+- [x] Shared transcript context (`build-messages.ts`, role prompts per agent)
+- [x] SSE: `run_started`, `agent_start`, `text-delta`, `agent_end`, `artifacts_*`, `done`, `error`
+- [x] `GET /api/runs` for sidebar recent list
+- [x] `DELETE /api/runs/[id]` — delete run from sidebar
+- [x] `/runs/[id]` loads messages + artifacts from DB
 - [x] Navigate to run page when simulation completes
-- [x] Scrollable message thread (flex + `min-h-0` layout)
+- [x] Scrollable message thread (flex + `min-h-0`, auto-scroll)
 - [x] Dynamic team roster per run
-- [x] DeepSeek v4 + mixed reasoning on architect
+- [x] DeepSeek v4 models
+- [x] Concise debate prompts (not long PRD-style dumps)
+- [x] Sidebar: full prompt titles (2-line clamp), per-run delete control
+- [x] `SidebarRecentRuns` + `SidebarRunItem` components
 
 **Demo flow (today):**
 
 1. `/` → enter idea → `/workspace?prompt=...`
-2. Watch 5 agents stream in order
-3. Land on `/runs/[id]` with persisted thread
-4. Sidebar shows recent runs
+2. Watch 5 agents stream in order (short messages)
+3. Artifact panel shows “Synthesizing…” then four tabs when ready
+4. Land on `/runs/[id]` with persisted thread + artifacts
+5. Sidebar lists recent runs; hover delete (×) to remove
 
 ---
 
@@ -133,13 +145,19 @@ Order: **PM → Architect → Backend Developer → Frontend Developer → Revie
 
 **Goal:** Right panel shows real extracted deliverables, not mocks.
 
-- [x] Define artifact schemas (requirements, architecture, implementation, review) — Zod in `src/features/artifacts/schemas.ts`
-- [x] Generate with `generateText` + `Output.object` (AI SDK v6) after debate — `src/ai/artifacts/generate-run-artifacts.ts`
-- [x] Persist to `Artifact` table (`type` + JSON `data`)
-- [x] Wire `ArtifactPanel` to run data (4 tabs incl. Implementation)
-- [x] SSE `artifacts_start` / `artifacts_ready` / `artifacts_failed` + `GET /api/runs/[id]/artifacts`
+- [x] Zod schemas — requirements, architecture, implementation, review (`src/features/artifacts/schemas.ts`)
+- [x] Generate after debate — one artifact type at a time (`generate-run-artifacts.ts`)
+- [x] Structured output via `generateText` + `Output.object`; JSON fallback per type if schema fails
+- [x] Section templates per tab (`artifact-templates.ts`)
+- [x] Persist to `Artifact` table; `saveSingleArtifact` per type
+- [x] `ArtifactPanel` — four tabs, card sections, normalized bullets (`format-artifact.ts`)
+- [x] Tab UX — role-colored active state, press scale, content fade-in (`artifact-tab-styles.ts`, `globals.css`)
+- [x] Responsive tabs — 4 columns in one row; 2×2 grid when panel container is narrow (`@container/artifact-panel`)
+- [x] SSE `artifacts_start` / `artifacts_ready` / `artifacts_failed`
+- [x] `GET /api/runs/[id]/artifacts`
+- [x] Live workspace derives `generating` when debate ends before SSE
 
-**Files to touch:** `src/features/artifacts/`, `src/ai/orchestration/`, `src/lib/db/artifacts.ts`
+**Note:** Runs created before Phase 5 or failed generation show `unavailable` — start a new simulation to populate artifacts.
 
 ---
 
@@ -147,15 +165,25 @@ Order: **PM → Architect → Backend Developer → Frontend Developer → Revie
 
 **Goal:** Production-quality UX and resilience.
 
-- [ ] Parse reviewer quotes into `QuotedBlock` UI
-- [ ] Show architect “thinking” state (optional reasoning preview)
-- [ ] Copy / export run as Markdown
-- [ ] Replay mode (read-only, no re-fetch AI)
-- [ ] Better error messages (surface API/DB errors cleanly)
-- [ ] Loading skeletons, empty states, mobile layout pass
-- [ ] Optional: continue truncated turns if `maxOutputTokens` hit
+- [ ] Parse reviewer quotes into `QuotedBlock` UI (component exists, not wired to parser)
+- [ ] Copy / export run as Markdown (thread + artifacts)
+- [ ] Regenerate artifacts for an existing run (API + UI)
+- [ ] Loading skeletons for thread / artifact panel
+- [ ] Broader mobile layout pass (artifact panel hidden below `lg`)
+- [ ] Optional: architect reasoning preview (disabled intentionally — consumed token budget with no visible text)
 
-**Partially done:** error banner, typing indicators, auto-scroll thread.
+**Done (partial phase):**
+
+- [x] Simulation error banner + retry
+- [x] Agent typing indicators + handoff labels
+- [x] Auto-scroll message thread
+- [x] Artifact generation reliability (sequential + JSON fallback)
+- [x] Artifact panel visual feedback on tab click
+- [x] Sidebar delete + improved title visibility
+- [x] Prompt composer sync via `key` (no effect setState)
+- [x] ESLint clean (`react-hooks/set-state-in-effect` addressed)
+
+**Replay today:** `/runs/[id]` is read-only DB replay (no re-call to AI). Not a dedicated “replay mode” UX.
 
 ---
 
@@ -189,20 +217,40 @@ Order: **PM → Architect → Backend Developer → Frontend Developer → Revie
 - [ ] User-selectable team size / agents
 - [ ] Share run via public link
 - [ ] Cost / token usage display per run
-- [ ] Premium UI motion (from UI design plan)
 - [ ] E2E tests (Playwright) for critical path
 
 ---
 
 ## Key routes & APIs
 
-| Path | Purpose |
-|------|---------|
-| `/` | Landing + prompt |
-| `/workspace` | Empty workspace or `?prompt=` live simulation |
-| `/runs/[id]` | Persisted run detail |
-| `POST /api/simulate` | Start multi-agent SSE stream |
-| `GET /api/runs` | Recent runs for sidebar |
+| Path | Method | Purpose |
+|------|--------|---------|
+| `/` | — | Landing + prompt |
+| `/workspace` | — | Live simulation (`?prompt=`) or empty workspace |
+| `/runs/[id]` | — | Persisted run (thread + artifacts) |
+| `/api/simulate` | POST | Multi-agent SSE stream |
+| `/api/runs` | GET | Recent runs for sidebar |
+| `/api/runs/[id]` | DELETE | Delete run and related rows |
+| `/api/runs/[id]/artifacts` | GET | Artifact bundle for a run |
+
+---
+
+## Key source layout
+
+```
+src/
+  app/                    # Routes, API handlers
+  ai/
+    agents/               # config, roster
+    artifacts/            # generate-run-artifacts, templates, transcript
+    orchestration/        # run-simulation.ts
+    prompts/              # per-role system + turn prompts
+  features/
+    artifacts/            # panel, schemas, tab styles
+    simulation/           # stream hook, thread, composer
+    workspace/            # shell, sidebar, run/simulation views
+  lib/db/                 # Prisma helpers
+```
 
 ---
 
@@ -221,14 +269,14 @@ npm run db:migrate      # first time / after schema changes
 npm run dev
 ```
 
-After Prisma schema changes: run `npm run db:generate` and **restart** `npm run dev` (stale client cache).
+After Prisma schema changes: run `npm run db:generate` and **restart** `npm run dev` (stale client cache — see `PRISMA_CLIENT_EPOCH` in `src/lib/prisma.ts`).
 
 ---
 
 ## Suggested implementation order
 
 ```
-Phase 5 (artifacts) → Phase 6 (polish) → Phase 7 (deploy) → Phase 8 (auth, if needed)
+Finish Phase 6 (export, regenerate artifacts, skeletons) → Phase 7 (deploy) → Phase 8 (auth, if needed)
 ```
 
 ---
@@ -237,9 +285,11 @@ Phase 5 (artifacts) → Phase 6 (polish) → Phase 7 (deploy) → Phase 8 (auth,
 
 | Date | Change |
 |------|--------|
-| 2026-05-20 | Master plan document created; Phases 0–4 marked complete; 5-agent roster + v4 models documented |
-| 2026-05-20 | Added `Message.agentName`, dynamic roster, scroll layout fix |
-| 2026-05-20 | Phase 5: structured artifacts via `generateText` + `Output.object`, live panel + API |
+| 2026-05-20 | Master plan created; Phases 0–4 complete; 5-agent roster + DeepSeek v4 |
+| 2026-05-20 | `Message.agentName`, dynamic roster, scroll layout fix |
+| 2026-05-20 | Phase 5: structured artifacts, SSE + API + live panel |
+| 2026-05-20 | Phase 6 (partial): concise prompts, artifact UX, sidebar delete, tab effects, ESLint fixes |
+| 2026-05-20 | Architect uses chat-only stream; sequential artifact gen + JSON fallback; `DELETE /api/runs/[id]` |
 
 ---
 
