@@ -45,6 +45,7 @@ model Message {
   id        String   @id @default(cuid())
   runId     String
   agentRole String
+  agentName String?
   content   String   @db.Text
   order     Int
   createdAt DateTime @default(now())

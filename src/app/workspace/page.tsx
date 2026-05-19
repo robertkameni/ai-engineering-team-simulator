@@ -1,6 +1,5 @@
 import { SimulationWorkspace } from "@/features/workspace/simulation-workspace";
 import { WorkspaceView } from "@/features/workspace/workspace-view";
-import { MOCK_ACTIVE_RUN } from "@/features/simulation/mock-data";
 
 interface WorkspacePageProps {
   searchParams: Promise<{ prompt?: string }>;
@@ -21,9 +20,19 @@ export default async function WorkspacePage({
     );
   }
 
-  const run = MOCK_ACTIVE_RUN;
-
-  return <WorkspaceView run={run} />;
+  return (
+    <WorkspaceView
+      showEmptyThread
+      run={{
+        id: "new",
+        title: "New simulation",
+        userPrompt: "",
+        status: "idle",
+        updatedAt: new Date().toISOString(),
+        messages: [],
+      }}
+    />
+  );
 }
 
 function truncateTitle(prompt: string, max = 48) {

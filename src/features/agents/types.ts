@@ -20,6 +20,8 @@ export interface AgentPersona {
 export interface SimulationMessage {
   id: string;
   role: AgentRole;
+  agentName?: string;
+  agentTitle?: string;
   content: string;
   quote?: {
     agentName: string;

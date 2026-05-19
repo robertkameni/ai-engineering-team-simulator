@@ -1,18 +1,13 @@
-import { streamText } from "ai";
 import { z } from "zod";
 
-import { getAgentConfig } from "@/ai/agents/config";
-import { buildPmUserPrompt, PM_SYSTEM_PROMPT } from "@/ai/prompts/pm";
-import { getDeepSeekModel } from "@/ai/providers";
-import { getPersona } from "@/features/agents/personas";
-import type { AgentRole } from "@/features/agents/types";
+import { runSimulation } from "@/ai/orchestration/run-simulation";
 import {
   encodeSimulationEvent,
   type SimulationStreamEvent,
 } from "@/lib/simulation-stream";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const requestSchema = z.object({
   prompt: z.string().trim().min(1).max(4000),
@@ -45,8 +40,7 @@ export async function POST(request: Request) {
       };
 
       try {
-        await runPmAgent(prompt, send);
-        send({ type: "done" });
+        await runSimulation(prompt, send);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Simulation failed";
@@ -64,34 +58,4 @@ export async function POST(request: Request) {
       Connection: "keep-alive",
     },
   });
-}
-
-async function runPmAgent(
-  productIdea: string,
-  send: (event: SimulationStreamEvent) => void,
-) {
-  const role: AgentRole = "pm";
-  const config = getAgentConfig(role);
-  const persona = getPersona(role);
-
-  send({
-    type: "agent_start",
-    role,
-    name: persona.name,
-    title: persona.title,
-  });
-
-  const result = streamText({
-    model: getDeepSeekModel(config.model),
-    system: PM_SYSTEM_PROMPT,
-    prompt: buildPmUserPrompt(productIdea),
-    maxOutputTokens: config.maxOutputTokens,
-    temperature: config.temperature,
-  });
-
-  for await (const delta of result.textStream) {
-    send({ type: "text-delta", role, delta });
-  }
-
-  send({ type: "agent_end", role });
 }

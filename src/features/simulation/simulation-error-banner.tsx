@@ -14,7 +14,7 @@ export function SimulationErrorBanner({
   return (
     <div
       role="alert"
-      className="mx-4 mt-3 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3"
+      className="mx-4 mt-3 flex shrink-0 items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3"
     >
       <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
       <div className="min-w-0 flex-1">

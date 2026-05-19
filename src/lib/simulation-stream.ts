@@ -3,6 +3,10 @@ import type { AgentRole } from "@/features/agents/types";
 /** Shared SSE event shapes (client + server). */
 export type SimulationStreamEvent =
   | {
+      type: "run_started";
+      runId: string;
+    }
+  | {
       type: "agent_start";
       role: AgentRole;
       name: string;
@@ -19,6 +23,7 @@ export type SimulationStreamEvent =
     }
   | {
       type: "done";
+      runId: string;
     }
   | {
       type: "error";

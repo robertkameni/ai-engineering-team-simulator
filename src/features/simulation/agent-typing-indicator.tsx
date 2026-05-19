@@ -15,7 +15,7 @@ export function AgentTypingIndicator({
   const persona = getPersona(role);
 
   return (
-    <div className="flex gap-3 px-4 py-2" aria-live="polite">
+    <div className="flex shrink-0 gap-3 px-4 py-2" aria-live="polite">
       <AgentAvatar role={role} />
       <div className="flex items-center gap-2">
         <span className="text-sm font-semibold text-foreground">

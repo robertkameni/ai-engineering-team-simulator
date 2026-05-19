@@ -20,7 +20,7 @@ export const AGENT_PERSONAS: Record<AgentRole, AgentPersona> = {
   frontend: {
     role: "frontend",
     name: "Jordan",
-    title: "Frontend",
+    title: "Frontend Developer",
     initials: "FE",
     accentClass: "text-agent-frontend",
     borderClass: "border-l-agent-frontend",
@@ -28,7 +28,7 @@ export const AGENT_PERSONAS: Record<AgentRole, AgentPersona> = {
   backend: {
     role: "backend",
     name: "Riley",
-    title: "Backend",
+    title: "Backend Developer",
     initials: "BE",
     accentClass: "text-agent-backend",
     borderClass: "border-l-agent-backend",
@@ -53,4 +53,17 @@ export const AGENT_PERSONAS: Record<AgentRole, AgentPersona> = {
 
 export function getPersona(role: AgentRole): AgentPersona {
   return AGENT_PERSONAS[role];
+}
+
+export function getPersonaWithName(
+  role: AgentRole,
+  name: string,
+  title?: string,
+): AgentPersona {
+  const base = AGENT_PERSONAS[role];
+  return {
+    ...base,
+    name,
+    title: title ?? base.title,
+  };
 }

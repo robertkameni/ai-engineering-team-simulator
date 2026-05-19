@@ -1,20 +1,22 @@
 import { AppShell } from "@/features/workspace/app-shell";
+import { WorkspaceMain } from "@/features/workspace/workspace-main";
 import { WorkspaceHeader } from "@/features/workspace/workspace-header";
 import { MessageThread } from "@/features/simulation/message-thread";
 import { PromptComposer } from "@/features/simulation/prompt-composer";
-import { MOCK_ACTIVE_RUN } from "@/features/simulation/mock-data";
 import type { MockRun } from "@/features/agents/types";
 
 interface WorkspaceViewProps {
-  run?: MockRun;
+  run: MockRun;
   showEmptyThread?: boolean;
   initialPrompt?: string;
+  onSimulate?: (prompt: string) => void | Promise<void>;
 }
 
 export function WorkspaceView({
-  run = MOCK_ACTIVE_RUN,
+  run,
   showEmptyThread = false,
   initialPrompt,
+  onSimulate,
 }: WorkspaceViewProps) {
   return (
     <AppShell>
@@ -23,14 +25,17 @@ export function WorkspaceView({
         status={run.status}
         subtitle={run.userPrompt}
       />
-      <MessageThread
-        messages={showEmptyThread ? [] : run.messages}
-        empty={showEmptyThread}
-      />
+      <WorkspaceMain>
+        <MessageThread
+          messages={showEmptyThread ? [] : run.messages}
+          empty={showEmptyThread}
+        />
+      </WorkspaceMain>
       <PromptComposer
         key={initialPrompt ?? "empty"}
         disabled={run.status === "running"}
         defaultValue={initialPrompt ?? ""}
+        onSimulate={onSimulate}
       />
     </AppShell>
   );

@@ -1,7 +1,11 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { Users } from "lucide-react";
+
 import { AgentMessage } from "@/features/simulation/agent-message";
 import type { SimulationMessage } from "@/features/agents/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users } from "lucide-react";
 
 interface MessageThreadProps {
   messages: SimulationMessage[];
@@ -9,9 +13,17 @@ interface MessageThreadProps {
 }
 
 export function MessageThread({ messages, empty }: MessageThreadProps) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const lastMessageKey = messages.at(-1)?.id;
+  const lastContentLength = messages.at(-1)?.content.length ?? 0;
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [lastMessageKey, lastContentLength, messages.length]);
+
   if (empty) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 text-center">
         <div className="mb-4 flex size-12 items-center justify-center rounded-full border border-border bg-surface-2">
           <Users className="size-5 text-muted-foreground" />
         </div>
@@ -27,16 +39,17 @@ export function MessageThread({ messages, empty }: MessageThreadProps) {
   }
 
   return (
-    <ScrollArea className="flex-1 px-4">
+    <ScrollArea className="min-h-0 flex-1">
       <div
-        className="flex flex-col gap-8 py-4"
+        className="flex flex-col gap-8 px-4 py-4"
         aria-label="Engineering team discussion"
         aria-live="polite"
-        aria-busy={messages.some((m) => m.isStreaming)}
+        aria-busy={messages.some((message) => message.isStreaming)}
       >
         {messages.map((message) => (
           <AgentMessage key={message.id} message={message} />
         ))}
+        <div ref={bottomRef} className="h-px shrink-0" aria-hidden />
       </div>
     </ScrollArea>
   );

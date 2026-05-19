@@ -11,6 +11,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | Next.js | 16 App Router, `src/app` |
 | React | 19 — use `React.SubmitEvent`, not deprecated `FormEvent` |
 | AI | Vercel AI SDK 6 + `@ai-sdk/deepseek`, `streamText`, `maxOutputTokens` |
+| Agents | PM → Architect → Backend → Frontend → Reviewer. **Random names per run** via `createSimulationRoster()` + `team-roster` artifact. |
+| DeepSeek | **v4 mixed** — PM/FE/reviewer: flash; architect + backend: pro; architect thinking **high**. Output caps: PM/RV 1600, AR 2200, BE/FE 1800. [API docs](https://api-docs.deepseek.com) |
 | DB | **Prisma 7** + `prisma.config.ts` + `@prisma/adapter-neon` |
 | Prisma client | Generated to `src/generated/prisma` — import from `@/generated/prisma/client` |
 | DB access | `src/lib/prisma.ts` (`server-only`) + `src/lib/db/*` helpers |

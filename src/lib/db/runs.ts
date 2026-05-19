@@ -1,10 +1,18 @@
 import type { Message } from "@/generated/prisma/client";
 
+import type { TeamRoster } from "@/ai/agents/roster";
+import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { AgentRole, SimulationMessage } from "@/features/agents/types";
+import { getPersona } from "@/features/agents/personas";
 import { prisma } from "@/lib/prisma";
 import { toAppRunStatus, toPrismaRunStatus } from "@/lib/db/run-status";
 import type { RunStatus as AppRunStatus } from "@/features/agents/types";
 import { getOrCreateDefaultProject } from "@/lib/db/projects";
+import {
+  getMemberFromRoster,
+  getTeamRoster,
+  parseTeamRoster,
+} from "@/lib/db/team-roster";
 
 export async function createRun(userPrompt: string, projectId?: string) {
   const project =
@@ -40,11 +48,13 @@ export async function appendMessage(
   agentRole: AgentRole,
   content: string,
   order: number,
+  agentName?: string,
 ) {
   return prisma.message.create({
     data: {
       runId,
       agentRole,
+      agentName,
       content,
       order,
     },
@@ -76,21 +86,42 @@ export async function listRecentRuns(limit = 10) {
 
 export function mapDbMessagesToSimulation(
   messages: Message[],
+  roster?: TeamRoster | null,
 ): SimulationMessage[] {
-  return messages.map((message) => ({
-    id: message.id,
-    role: message.agentRole as AgentRole,
-    content: message.content,
-    createdAt: message.createdAt.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-  }));
+  return messages.map((message) => {
+    const role = message.agentRole as AgentRole;
+    const simulationRole = role as SimulationAgentRole;
+    const rosterMember = roster
+      ? getMemberFromRoster(roster, simulationRole)
+      : null;
+    const persona = getPersona(role);
+    const agentName =
+      message.agentName ?? rosterMember?.name ?? persona.name;
+    const agentTitle = rosterMember?.title ?? persona.title;
+
+    return {
+      id: message.id,
+      role,
+      agentName,
+      agentTitle,
+      content: message.content,
+      createdAt: message.createdAt.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+  });
 }
 
 export async function getRunForWorkspace(runId: string) {
   const run = await getRunWithMessages(runId);
   if (!run) return null;
+
+  const rosterFromArtifact = run.artifacts.find(
+    (artifact) => artifact.type === "team-roster",
+  );
+  const roster =
+    parseTeamRoster(rosterFromArtifact?.data) ?? (await getTeamRoster(runId));
 
   const title =
     run.userPrompt.length > 48
@@ -103,6 +134,6 @@ export async function getRunForWorkspace(runId: string) {
     userPrompt: run.userPrompt,
     status: toAppRunStatus(run.status),
     updatedAt: run.updatedAt.toISOString(),
-    messages: mapDbMessagesToSimulation(run.messages),
+    messages: mapDbMessagesToSimulation(run.messages, roster),
   };
 }

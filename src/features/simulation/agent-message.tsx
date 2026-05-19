@@ -13,6 +13,8 @@ interface AgentMessageProps {
 
 export function AgentMessage({ message, className }: AgentMessageProps) {
   const persona = getPersona(message.role);
+  const displayName = message.agentName ?? persona.name;
+  const displayTitle = message.agentTitle ?? persona.title;
 
   return (
     <article
@@ -25,10 +27,10 @@ export function AgentMessage({ message, className }: AgentMessageProps) {
       <div className="min-w-0 flex-1">
         <header className="mb-2 flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold text-foreground">
-            {persona.name}
+            {displayName}
           </span>
           <Badge variant="outline" className="text-[10px] font-normal">
-            {persona.title}
+            {displayTitle}
           </Badge>
           <span className="text-xs text-muted-foreground">
             {message.createdAt}

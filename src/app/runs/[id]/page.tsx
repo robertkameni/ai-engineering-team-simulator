@@ -1,5 +1,7 @@
-import { WorkspaceView } from "@/features/workspace/workspace-view";
-import { MOCK_ACTIVE_RUN } from "@/features/simulation/mock-data";
+import { notFound } from "next/navigation";
+
+import { RunWorkspace } from "@/features/workspace/run-workspace";
+import { getRunForWorkspace } from "@/lib/db/runs";
 
 interface RunPageProps {
   params: Promise<{ id: string }>;
@@ -7,9 +9,11 @@ interface RunPageProps {
 
 export default async function RunPage({ params }: RunPageProps) {
   const { id } = await params;
+  const run = await getRunForWorkspace(id);
 
-  // Static demo: all run IDs show the sample debate until DB is wired
-  const run = { ...MOCK_ACTIVE_RUN, id };
+  if (!run) {
+    notFound();
+  }
 
-  return <WorkspaceView run={run} />;
+  return <RunWorkspace run={run} />;
 }

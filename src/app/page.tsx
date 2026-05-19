@@ -25,8 +25,8 @@ export default function HomePage() {
         </h1>
 
         <p className="mt-4 max-w-lg text-pretty text-sm leading-relaxed text-muted-foreground sm:text-base">
-          PM, architect, and reviewer agents collaborate on your product idea —
-          challenging assumptions, not just agreeing.
+          PM, architect, backend & frontend developers, and reviewer collaborate
+          on your product idea — challenging assumptions, not just agreeing.
         </p>
 
         <LandingPromptForm />
@@ -35,7 +35,7 @@ export default function HomePage() {
           href="/workspace"
           className="mt-8 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
         >
-          View demo workspace with sample debate →
+          Open workspace →
         </Link>
       </main>
     </div>

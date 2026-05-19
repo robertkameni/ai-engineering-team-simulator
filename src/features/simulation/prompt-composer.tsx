@@ -44,7 +44,7 @@ export function PromptComposer({
     <form
       onSubmit={handleSubmit}
       className={cn(
-        "border-t border-border bg-background px-4 py-4",
+        "shrink-0 border-t border-border bg-background px-4 py-4",
         className,
       )}
     >
