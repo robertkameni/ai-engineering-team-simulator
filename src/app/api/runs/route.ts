@@ -1,4 +1,4 @@
-import { listRecentRuns } from "@/lib/db/runs";
+import { formatRunTitle, listRecentRuns } from "@/lib/db/runs";
 import { toAppRunStatus } from "@/lib/db/run-status";
 
 export const runtime = "nodejs";
@@ -9,10 +9,7 @@ export async function GET() {
   return Response.json({
     runs: runs.map((run) => ({
       id: run.id,
-      title:
-        run.userPrompt.length > 48
-          ? `${run.userPrompt.slice(0, 48).trim()}…`
-          : run.userPrompt,
+      title: formatRunTitle(run.userPrompt),
       status: toAppRunStatus(run.status),
       updatedAt: formatRelativeTime(run.updatedAt),
     })),

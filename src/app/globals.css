@@ -90,3 +90,18 @@
     @apply cursor-not-allowed;
   }
 }
+
+@keyframes artifact-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.artifact-tab-content[data-state="active"] {
+  animation: artifact-panel-in 0.22s ease-out;
+}

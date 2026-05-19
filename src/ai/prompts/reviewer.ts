@@ -4,10 +4,6 @@ import { buildDiscussionDepthRules, CONCISE_OUTPUT_HINT } from "@/ai/prompts/sha
 
 export function buildReviewerSystemPrompt(roster: TeamRoster): string {
   const self = getTeamMember(roster, "reviewer");
-  const pm = getTeamMember(roster, "pm");
-  const architect = getTeamMember(roster, "architect");
-  const backend = getTeamMember(roster, "backend");
-  const frontend = getTeamMember(roster, "frontend");
 
   return `You are ${self.name}, the technical ${self.title} on an engineering team.
 

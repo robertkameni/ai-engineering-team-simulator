@@ -86,6 +86,21 @@ export async function listRecentRuns(limit = 10) {
   });
 }
 
+export async function deleteRun(runId: string): Promise<boolean> {
+  const existing = await prisma.run.findUnique({
+    where: { id: runId },
+    select: { id: true },
+  });
+  if (!existing) return false;
+
+  await prisma.run.delete({ where: { id: runId } });
+  return true;
+}
+
+export function formatRunTitle(userPrompt: string): string {
+  return userPrompt.trim();
+}
+
 export function mapDbMessagesToSimulation(
   messages: Message[],
   roster?: TeamRoster | null,
@@ -125,10 +140,7 @@ export async function getRunForWorkspace(runId: string) {
   const roster =
     parseTeamRoster(rosterFromArtifact?.data) ?? (await getTeamRoster(runId));
 
-  const title =
-    run.userPrompt.length > 48
-      ? `${run.userPrompt.slice(0, 48).trim()}…`
-      : run.userPrompt;
+  const title = formatRunTitle(run.userPrompt);
 
   const artifacts = mapDbArtifactsToRunArtifacts(run.artifacts);
   const artifactsStatus: ArtifactsPanelStatus = artifacts

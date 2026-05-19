@@ -92,6 +92,7 @@ export function SimulationWorkspace({
         />
       </WorkspaceMain>
       <PromptComposer
+        key={userPrompt}
         disabled={status === "running"}
         defaultValue={userPrompt}
         onSimulate={start}
