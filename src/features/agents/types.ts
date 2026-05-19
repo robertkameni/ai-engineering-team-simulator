@@ -1,3 +1,8 @@
+import type {
+  ArtifactsPanelStatus,
+  RunArtifacts,
+} from "@/features/artifacts/types";
+
 export type AgentRole =
   | "pm"
   | "architect"
@@ -38,6 +43,8 @@ export interface MockRun {
   status: RunStatus;
   updatedAt: string;
   messages: SimulationMessage[];
+  artifacts?: RunArtifacts | null;
+  artifactsStatus?: ArtifactsPanelStatus;
 }
 
 export interface MockArtifactSection {

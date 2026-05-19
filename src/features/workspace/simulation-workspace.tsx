@@ -20,7 +20,15 @@ export function SimulationWorkspace({
   userPrompt,
   title,
 }: SimulationWorkspaceProps) {
-  const { messages, status, error, activeAgent, start } = useSimulationStream();
+  const {
+    messages,
+    status,
+    error,
+    activeAgent,
+    artifacts,
+    artifactsStatus,
+    start,
+  } = useSimulationStream();
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -37,8 +45,18 @@ export function SimulationWorkspace({
     activeAgent != null &&
     messages.every((message) => !message.isStreaming);
 
+  const debateComplete =
+    status === "running" &&
+    messages.length > 0 &&
+    messages.every((message) => !message.isStreaming);
+
+  const panelArtifactsStatus =
+    artifactsStatus === "pending" && debateComplete
+      ? "generating"
+      : artifactsStatus;
+
   return (
-    <AppShell>
+    <AppShell artifacts={artifacts} artifactsStatus={panelArtifactsStatus}>
       <WorkspaceHeader
         title={title}
         status={status}
@@ -59,7 +77,7 @@ export function SimulationWorkspace({
             role={activeAgent}
           label={
             activeAgent === "architect"
-              ? "Reasoning through the architecture…"
+              ? "Drafting the architecture…"
               : activeAgent === "backend"
                 ? "Drafting the backend plan…"
                 : activeAgent === "frontend"

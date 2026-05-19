@@ -1,9 +1,6 @@
 import type { DeepSeekLanguageModelOptions } from "@ai-sdk/deepseek";
 
-import {
-  DEEPSEEK_CHAT_OPTIONS,
-  DEEPSEEK_REASONING_OPTIONS,
-} from "@/ai/deepseek-options";
+import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import type { DeepSeekModelId } from "@/ai/providers";
 import type { AgentRole } from "@/features/agents/types";
 
@@ -30,35 +27,35 @@ export const ACTIVE_AGENTS: AgentModelConfig[] = [
   {
     role: "pm",
     model: "deepseek-v4-flash",
-    maxOutputTokens: 1600,
-    temperature: 0.7,
+    maxOutputTokens: 450,
+    temperature: 0.65,
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   },
   {
     role: "architect",
     model: "deepseek-v4-pro",
-    maxOutputTokens: 2200,
+    maxOutputTokens: 650,
     temperature: 0.5,
-    deepseek: DEEPSEEK_REASONING_OPTIONS,
+    deepseek: DEEPSEEK_CHAT_OPTIONS,
   },
   {
     role: "backend",
     model: "deepseek-v4-pro",
-    maxOutputTokens: 1800,
+    maxOutputTokens: 500,
     temperature: 0.55,
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   },
   {
     role: "frontend",
     model: "deepseek-v4-flash",
-    maxOutputTokens: 1800,
+    maxOutputTokens: 500,
     temperature: 0.6,
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   },
   {
     role: "reviewer",
     model: "deepseek-v4-flash",
-    maxOutputTokens: 1600,
+    maxOutputTokens: 450,
     temperature: 0.6,
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   },

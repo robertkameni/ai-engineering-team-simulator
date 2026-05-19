@@ -1,5 +1,6 @@
 import { streamText } from "ai";
 
+import { generateRunArtifacts } from "@/ai/artifacts/generate-run-artifacts";
 import {
   SIMULATION_AGENT_ORDER,
   getAgentConfig,
@@ -11,7 +12,13 @@ import type { TeamRoster } from "@/ai/agents/roster";
 import { buildAgentMessages } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { getAgentSystemPrompt } from "@/ai/prompts";
+import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import { getDeepSeekModel } from "@/ai/providers";
+import { ARTIFACT_TYPES } from "@/features/artifacts/schemas";
+import {
+  runArtifactsOutputToBundle,
+  saveSingleArtifact,
+} from "@/lib/db/artifacts";
 import { saveTeamRoster } from "@/lib/db/team-roster";
 import {
   appendMessage,
@@ -62,6 +69,32 @@ export async function runSimulation(
       messageOrder += 1;
     }
 
+    send({ type: "artifacts_start" });
+
+    try {
+      const artifactOutput = await generateRunArtifacts({
+        productIdea,
+        transcript,
+        roster,
+      });
+      const bundle = runArtifactsOutputToBundle(artifactOutput);
+      for (const type of ARTIFACT_TYPES) {
+        await saveSingleArtifact(run.id, type, {
+          sections: bundle[type],
+        });
+      }
+      send({ type: "artifacts_ready", runId: run.id });
+    } catch (artifactError) {
+      console.error("Artifact generation failed:", artifactError);
+      send({
+        type: "artifacts_failed",
+        message:
+          artifactError instanceof Error
+            ? artifactError.message
+            : "Artifact generation failed",
+      });
+    }
+
     await updateRunStatus(run.id, "complete");
     send({ type: "done", runId: run.id });
   } catch (error) {
@@ -93,6 +126,50 @@ async function streamAgentTurn({
     title: member.title,
   });
 
+  let fullText = await collectAgentStream({
+    role,
+    productIdea,
+    transcript,
+    roster,
+    config,
+    send,
+  });
+
+  if (!fullText.trim()) {
+    console.warn(`Empty response for ${role}, retrying with expanded budget`);
+    fullText = await collectAgentStream({
+      role,
+      productIdea,
+      transcript,
+      roster,
+      config: {
+        ...config,
+        maxOutputTokens: Math.max(config.maxOutputTokens * 2, 900),
+        deepseek: DEEPSEEK_CHAT_OPTIONS,
+      },
+      send,
+    });
+  }
+
+  send({ type: "agent_end", role });
+  return fullText.trim() || `[${member.name} had no visible output — check API limits.]`;
+}
+
+async function collectAgentStream({
+  role,
+  productIdea,
+  transcript,
+  roster,
+  config,
+  send,
+}: {
+  role: SimulationAgentRole;
+  productIdea: string;
+  transcript: TranscriptEntry[];
+  roster: TeamRoster;
+  config: ReturnType<typeof getAgentConfig>;
+  send: (event: SimulationStreamEvent) => void;
+}): Promise<string> {
   const result = streamText({
     model: getDeepSeekModel(config.model),
     system: getAgentSystemPrompt(role, roster),
@@ -109,7 +186,5 @@ async function streamAgentTurn({
     fullText += delta;
     send({ type: "text-delta", role, delta });
   }
-
-  send({ type: "agent_end", role });
   return fullText;
 }

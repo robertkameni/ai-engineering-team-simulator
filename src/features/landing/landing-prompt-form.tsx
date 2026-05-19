@@ -27,7 +27,7 @@ export function LandingPromptForm() {
           id="landing-prompt"
           name="prompt"
           required
-          placeholder="Build a food delivery app for students on campus…"
+          placeholder="e.g. A food donation app for a church community…"
           rows={4}
           className="min-h-[120px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
           onKeyDown={(event) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp } from "lucide-react";
 
@@ -19,7 +19,7 @@ interface PromptComposerProps {
 
 export function PromptComposer({
   disabled = false,
-  placeholder = "Build a food delivery app for students on campus…",
+  placeholder = "Describe your product idea…",
   className,
   defaultValue = "",
   onSimulate,
@@ -27,7 +27,11 @@ export function PromptComposer({
   const router = useRouter();
   const [value, setValue] = useState(defaultValue);
 
-  async function handleSubmit(event: React.SubmitEvent<HTMLFormElement>) {
+  useEffect(() => {
+    setValue(defaultValue);
+  }, [defaultValue]);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = value.trim();
     if (!trimmed || disabled) return;

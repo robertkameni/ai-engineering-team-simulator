@@ -79,4 +79,14 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    @apply cursor-pointer;
+  }
+
+  button:disabled,
+  [role="button"]:disabled {
+    @apply cursor-not-allowed;
+  }
 }

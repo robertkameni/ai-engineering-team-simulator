@@ -8,11 +8,13 @@ import { prisma } from "@/lib/prisma";
 import { toAppRunStatus, toPrismaRunStatus } from "@/lib/db/run-status";
 import type { RunStatus as AppRunStatus } from "@/features/agents/types";
 import { getOrCreateDefaultProject } from "@/lib/db/projects";
+import { mapDbArtifactsToRunArtifacts } from "@/lib/db/artifacts";
 import {
   getMemberFromRoster,
   getTeamRoster,
   parseTeamRoster,
 } from "@/lib/db/team-roster";
+import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
 
 export async function createRun(userPrompt: string, projectId?: string) {
   const project =
@@ -128,6 +130,13 @@ export async function getRunForWorkspace(runId: string) {
       ? `${run.userPrompt.slice(0, 48).trim()}…`
       : run.userPrompt;
 
+  const artifacts = mapDbArtifactsToRunArtifacts(run.artifacts);
+  const artifactsStatus: ArtifactsPanelStatus = artifacts
+    ? "ready"
+    : toAppRunStatus(run.status) === "complete"
+      ? "unavailable"
+      : "pending";
+
   return {
     id: run.id,
     title,
@@ -135,5 +144,7 @@ export async function getRunForWorkspace(runId: string) {
     status: toAppRunStatus(run.status),
     updatedAt: run.updatedAt.toISOString(),
     messages: mapDbMessagesToSimulation(run.messages, roster),
+    artifacts,
+    artifactsStatus,
   };
 }

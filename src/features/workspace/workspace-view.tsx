@@ -19,7 +19,10 @@ export function WorkspaceView({
   onSimulate,
 }: WorkspaceViewProps) {
   return (
-    <AppShell>
+    <AppShell
+      artifacts={run.artifacts}
+      artifactsStatus={run.artifactsStatus ?? "idle"}
+    >
       <WorkspaceHeader
         title={run.title}
         status={run.status}

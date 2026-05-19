@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
+import type { ArtifactsPanelStatus, RunArtifacts } from "@/features/artifacts/types";
 import type { AgentRole, RunStatus, SimulationMessage } from "@/features/agents/types";
 import { parseSimulationEvent } from "@/lib/simulation-stream";
 
@@ -17,8 +18,25 @@ export function useSimulationStream() {
   const [error, setError] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [activeAgent, setActiveAgent] = useState<AgentRole | null>(null);
+  const [artifacts, setArtifacts] = useState<RunArtifacts | null>(null);
+  const [artifactsStatus, setArtifactsStatus] =
+    useState<ArtifactsPanelStatus>("idle");
   const abortRef = useRef<AbortController | null>(null);
   const activeMessageIdRef = useRef<string | null>(null);
+
+  const loadArtifacts = useCallback(async (id: string) => {
+    const response = await fetch(`/api/runs/${id}/artifacts`);
+    if (!response.ok) {
+      setArtifactsStatus("unavailable");
+      return;
+    }
+    const data = (await response.json()) as {
+      artifacts: RunArtifacts | null;
+      status: ArtifactsPanelStatus;
+    };
+    setArtifacts(data.artifacts);
+    setArtifactsStatus(data.status);
+  }, []);
 
   const start = useCallback(
     async (prompt: string) => {
@@ -31,6 +49,8 @@ export function useSimulationStream() {
       setMessages([]);
       setRunId(null);
       setActiveAgent(null);
+      setArtifacts(null);
+      setArtifactsStatus("pending");
       activeMessageIdRef.current = null;
 
       try {
@@ -57,6 +77,7 @@ export function useSimulationStream() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let currentRunId: string | null = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -71,7 +92,9 @@ export function useSimulationStream() {
             if (!event) continue;
 
             if (event.type === "run_started") {
+              currentRunId = event.runId;
               setRunId(event.runId);
+              setArtifactsStatus("pending");
             } else if (event.type === "agent_start") {
               setActiveAgent(event.role);
               const id = crypto.randomUUID();
@@ -111,6 +134,13 @@ export function useSimulationStream() {
               }
               activeMessageIdRef.current = null;
               setActiveAgent(null);
+            } else if (event.type === "artifacts_start") {
+              setArtifactsStatus("generating");
+            } else if (event.type === "artifacts_ready") {
+              currentRunId = event.runId;
+              await loadArtifacts(event.runId);
+            } else if (event.type === "artifacts_failed") {
+              setArtifactsStatus("unavailable");
             } else if (event.type === "error") {
               setError(event.message);
               setStatus("failed");
@@ -120,6 +150,9 @@ export function useSimulationStream() {
               setStatus((current) =>
                 current === "failed" ? current : "complete",
               );
+              if (currentRunId) {
+                await loadArtifacts(event.runId);
+              }
               router.replace(`/runs/${event.runId}`);
             }
           }
@@ -133,10 +166,11 @@ export function useSimulationStream() {
         }
         setStatus("failed");
         setActiveAgent(null);
+        setArtifactsStatus("unavailable");
         setError(err instanceof Error ? err.message : "Simulation failed");
       }
     },
-    [router],
+    [loadArtifacts, router],
   );
 
   const cancel = useCallback(() => {
@@ -144,6 +178,7 @@ export function useSimulationStream() {
     abortRef.current = null;
     setStatus("idle");
     setActiveAgent(null);
+    setArtifactsStatus("idle");
   }, []);
 
   return {
@@ -152,6 +187,8 @@ export function useSimulationStream() {
     error,
     runId,
     activeAgent,
+    artifacts,
+    artifactsStatus,
     start,
     cancel,
   };

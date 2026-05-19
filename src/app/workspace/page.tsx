@@ -30,6 +30,7 @@ export default async function WorkspacePage({
         status: "idle",
         updatedAt: new Date().toISOString(),
         messages: [],
+        artifactsStatus: "idle",
       }}
     />
   );

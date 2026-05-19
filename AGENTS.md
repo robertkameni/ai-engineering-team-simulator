@@ -16,6 +16,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | DB | **Prisma 7** + `prisma.config.ts` + `@prisma/adapter-neon` |
 | Prisma client | Generated to `src/generated/prisma` — import from `@/generated/prisma/client` |
 | DB access | `src/lib/prisma.ts` (`server-only`) + `src/lib/db/*` helpers |
+| Artifacts | Post-debate `generateText` + `Output.object` → `Artifact` rows; types in `src/features/artifacts/schemas.ts` |
 | Styling | Tailwind 4, shadcn, `tw-animate-css`, dark-first tokens |
 
 ## Conventions

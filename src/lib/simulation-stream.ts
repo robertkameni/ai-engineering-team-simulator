@@ -22,6 +22,17 @@ export type SimulationStreamEvent =
       role: AgentRole;
     }
   | {
+      type: "artifacts_start";
+    }
+  | {
+      type: "artifacts_ready";
+      runId: string;
+    }
+  | {
+      type: "artifacts_failed";
+      message: string;
+    }
+  | {
       type: "done";
       runId: string;
     }
