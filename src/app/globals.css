@@ -41,6 +41,10 @@
   --text-title: clamp(0.9375rem, 0.5cqi + 0.75rem, 1.125rem);
   --text-body: clamp(0.8125rem, 0.25cqi + 0.75rem, 0.9375rem);
   --text-caption: clamp(0.6875rem, 0.15cqi + 0.625rem, 0.75rem);
+
+  --scrollbar-size: 5px;
+  --scrollbar-thumb: oklch(1 0 0 / 18%);
+  --scrollbar-thumb-hover: oklch(1 0 0 / 30%);
 }
 
 @theme inline {
@@ -84,6 +88,30 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
   }
 
   body {
