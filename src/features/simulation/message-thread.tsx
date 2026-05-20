@@ -6,7 +6,6 @@ import { Users } from "lucide-react";
 import { AgentMessage } from "@/features/simulation/agent-message";
 import { MessageThreadSkeleton } from "@/features/simulation/message-thread-skeleton";
 import type { SimulationMessage } from "@/features/agents/types";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface MessageThreadProps {
   messages: SimulationMessage[];
@@ -25,9 +24,9 @@ export function MessageThread({ messages, empty, loading }: MessageThreadProps) 
 
   if (loading) {
     return (
-      <ScrollArea className="@container/message-thread min-h-0 flex-1">
+      <div className="@container/message-thread min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <MessageThreadSkeleton />
-      </ScrollArea>
+      </div>
     );
   }
 
@@ -50,18 +49,18 @@ export function MessageThread({ messages, empty, loading }: MessageThreadProps) 
   }
 
   return (
-    <ScrollArea className="@container/message-thread min-h-0 flex-1 max-[719px]:pb-16 min-[720px]:pb-0">
-      <div
-        className="flex flex-col gap-4 px-3 py-3 @md/message-thread:gap-8 @md/message-thread:px-4 @md/message-thread:py-4"
-        aria-label="Engineering team discussion"
-        aria-live="polite"
-        aria-busy={messages.some((message) => message.isStreaming)}
-      >
+    <div
+      className="@container/message-thread min-h-0 flex-1 overflow-y-auto overscroll-contain max-[719px]:pb-16 min-[720px]:pb-0"
+      aria-label="Engineering team discussion"
+      aria-live="polite"
+      aria-busy={messages.some((message) => message.isStreaming)}
+    >
+      <div className="flex flex-col gap-4 px-3 py-3 @md/message-thread:gap-8 @md/message-thread:px-4 @md/message-thread:py-4">
         {messages.map((message) => (
           <AgentMessage key={message.id} message={message} />
         ))}
         <div ref={bottomRef} className="h-px shrink-0" aria-hidden />
       </div>
-    </ScrollArea>
+    </div>
   );
 }

@@ -1,34 +1,35 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
+import { useFormStatus } from "react-dom";
 
+import { regenerateRunArtifactsAction } from "@/features/artifacts/regenerate-artifacts-action";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface RegenerateArtifactsButtonProps {
-  onRegenerate: () => void | Promise<void>;
+  runId: string;
   disabled?: boolean;
-  loading?: boolean;
   className?: string;
   variant?: "header" | "placeholder";
 }
 
-export function RegenerateArtifactsButton({
-  onRegenerate,
-  disabled = false,
-  loading = false,
+function RegenerateSubmit({
+  runId,
+  disabled,
   className,
-  variant = "header",
+  variant,
 }: RegenerateArtifactsButtonProps) {
+  const { pending } = useFormStatus();
   const isPlaceholder = variant === "placeholder";
+  const loading = pending;
 
   return (
     <Button
-      type="button"
+      type="submit"
       variant={isPlaceholder ? "default" : "outline"}
       size={isPlaceholder ? "default" : "sm"}
       disabled={disabled || loading}
-      onClick={() => void onRegenerate()}
       aria-label={loading ? "Regenerating artifacts" : "Regenerate artifacts"}
       className={cn(
         isPlaceholder
@@ -50,5 +51,24 @@ export function RegenerateArtifactsButton({
         </span>
       )}
     </Button>
+  );
+}
+
+export function RegenerateArtifactsButton({
+  runId,
+  disabled = false,
+  className,
+  variant = "header",
+}: RegenerateArtifactsButtonProps) {
+  return (
+    <form action={regenerateRunArtifactsAction}>
+      <input type="hidden" name="runId" value={runId} />
+      <RegenerateSubmit
+        runId={runId}
+        disabled={disabled}
+        className={className}
+        variant={variant}
+      />
+    </form>
   );
 }

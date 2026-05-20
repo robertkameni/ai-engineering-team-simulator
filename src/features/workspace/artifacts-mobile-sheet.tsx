@@ -9,9 +9,8 @@ interface ArtifactsMobileSheetProps {
   onOpenChange: (open: boolean) => void;
   artifacts?: RunArtifacts | null;
   status?: ArtifactsPanelStatus;
-  onRegenerateArtifacts?: () => void | Promise<void>;
+  regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;
-  isRegeneratingArtifacts?: boolean;
 }
 
 export function ArtifactsMobileSheet({
@@ -19,9 +18,8 @@ export function ArtifactsMobileSheet({
   onOpenChange,
   artifacts = null,
   status = "idle",
-  onRegenerateArtifacts,
+  regenerateRunId,
   canRegenerateArtifacts = false,
-  isRegeneratingArtifacts = false,
 }: ArtifactsMobileSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -38,9 +36,8 @@ export function ArtifactsMobileSheet({
           artifacts={artifacts}
           status={status}
           layout="sheet"
-          onRegenerateArtifacts={onRegenerateArtifacts}
+          regenerateRunId={regenerateRunId}
           canRegenerateArtifacts={canRegenerateArtifacts}
-          isRegeneratingArtifacts={isRegeneratingArtifacts}
         />
       </SheetContent>
     </Sheet>

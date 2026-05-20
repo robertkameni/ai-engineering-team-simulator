@@ -216,3 +216,131 @@
 .pulse-glow {
   animation: pulse-glow 1.8s ease-in-out infinite;
 }
+
+/* CSS-only tabs for server-rendered artifact panel */
+.artifact-static-tabs input[name="artifact-tab"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.artifact-static-tabs .artifact-static-panel {
+  display: none;
+}
+
+.artifact-static-labels label {
+  position: relative;
+}
+
+.artifact-static-labels label:hover {
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  color: var(--foreground);
+}
+
+.artifact-static-tabs:has(input[name="artifact-tab"][value="requirements"]:checked)
+  .artifact-static-labels
+  label[for="artifact-tab-requirements"]:hover,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="architecture"]:checked)
+  .artifact-static-labels
+  label[for="artifact-tab-architecture"]:hover,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="implementation"]:checked)
+  .artifact-static-labels
+  label[for="artifact-tab-implementation"]:hover,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="review"]:checked)
+  .artifact-static-labels
+  label[for="artifact-tab-review"]:hover {
+  filter: brightness(1.08);
+}
+
+.artifact-static-labels label::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0.5rem;
+  bottom: 0.125rem;
+  height: 0.125rem;
+  border-radius: 9999px;
+  background: currentColor;
+  transform: scaleX(0);
+  opacity: 0;
+  transition:
+    transform 200ms ease-out,
+    opacity 200ms ease-out;
+}
+
+.artifact-static-tabs:has(input[name="artifact-tab"][value="requirements"]:checked)
+  .artifact-static-panels
+  [data-artifact-panel="requirements"],
+.artifact-static-tabs:has(input[name="artifact-tab"][value="architecture"]:checked)
+  .artifact-static-panels
+  [data-artifact-panel="architecture"],
+.artifact-static-tabs:has(input[name="artifact-tab"][value="implementation"]:checked)
+  .artifact-static-panels
+  [data-artifact-panel="implementation"],
+.artifact-static-tabs:has(input[name="artifact-tab"][value="review"]:checked)
+  .artifact-static-panels
+  [data-artifact-panel="review"] {
+  display: flex;
+  animation: artifact-panel-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.artifact-static-tabs:has(input[name="artifact-tab"][value="requirements"]:checked)
+  .artifact-static-labels
+  label[for="artifact-tab-requirements"] {
+  border-color: color-mix(in oklch, var(--agent-pm) 40%, transparent);
+  background: color-mix(in oklch, var(--agent-pm) 12%, transparent);
+  color: var(--agent-pm);
+  box-shadow: 0 0 14px -4px color-mix(in oklch, var(--agent-pm) 50%, transparent);
+  font-weight: 600;
+}
+
+.artifact-static-tabs:has(input[name="artifact-tab"][value="architecture"]:checked)
+  .artifact-static-labels
+  label[for="artifact-tab-architecture"] {
+  border-color: color-mix(in oklch, var(--agent-architect) 40%, transparent);
+  background: color-mix(in oklch, var(--agent-architect) 12%, transparent);
+  color: var(--agent-architect);
+  box-shadow: 0 0 14px -4px color-mix(in oklch, var(--agent-architect) 50%, transparent);
+  font-weight: 600;
+}
+
+.artifact-static-tabs:has(input[name="artifact-tab"][value="implementation"]:checked)
+  .artifact-static-labels
+  label[for="artifact-tab-implementation"] {
+  border-color: color-mix(in oklch, var(--agent-backend) 40%, transparent);
+  background: color-mix(in oklch, var(--agent-backend) 12%, transparent);
+  color: var(--agent-backend);
+  box-shadow: 0 0 14px -4px color-mix(in oklch, var(--agent-backend) 50%, transparent);
+  font-weight: 600;
+}
+
+.artifact-static-tabs:has(input[name="artifact-tab"][value="review"]:checked)
+  .artifact-static-labels
+  label[for="artifact-tab-review"] {
+  border-color: color-mix(in oklch, var(--agent-reviewer) 40%, transparent);
+  background: color-mix(in oklch, var(--agent-reviewer) 12%, transparent);
+  color: var(--agent-reviewer);
+  box-shadow: 0 0 14px -4px color-mix(in oklch, var(--agent-reviewer) 50%, transparent);
+  font-weight: 600;
+}
+
+.artifact-static-tabs:has(input[name="artifact-tab"][value="requirements"]:checked)
+  .artifact-static-labels
+  label[for="artifact-tab-requirements"]::after,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="architecture"]:checked)
+  .artifact-static-labels
+  label[for="artifact-tab-architecture"]::after,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="implementation"]:checked)
+  .artifact-static-labels
+  label[for="artifact-tab-implementation"]::after,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="review"]:checked)
+  .artifact-static-labels
+  label[for="artifact-tab-review"]::after {
+  transform: scaleX(1);
+  opacity: 1;
+}

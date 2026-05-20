@@ -4,7 +4,8 @@ import type { TeamRoster } from "@/ai/agents/roster";
 import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { AgentRole, SimulationMessage } from "@/features/agents/types";
 import { getPersona } from "@/features/agents/personas";
-import { formatMessageTime } from "@/lib/format-time";
+import { formatMessageTime, formatRelativeTime } from "@/lib/format-time";
+import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { prisma } from "@/lib/prisma";
 import { toAppRunStatus, toPrismaRunStatus } from "@/lib/db/run-status";
 import type { RunStatus as AppRunStatus } from "@/features/agents/types";
@@ -85,6 +86,18 @@ export async function listRecentRuns(limit = 10) {
       },
     },
   });
+}
+
+export async function listRecentRunsForSidebar(
+  limit = 12,
+): Promise<SidebarRunItemData[]> {
+  const runs = await listRecentRuns(limit);
+  return runs.map((run) => ({
+    id: run.id,
+    title: formatRunTitle(run.userPrompt),
+    status: toAppRunStatus(run.status),
+    updatedAt: formatRelativeTime(run.updatedAt),
+  }));
 }
 
 export async function deleteRun(runId: string): Promise<boolean> {

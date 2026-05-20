@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 
 import type { ArtifactsPanelStatus, RunArtifacts } from "@/features/artifacts/types";
 import { Sidebar } from "@/features/workspace/sidebar";
+import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { WorkspaceMobileContext } from "@/features/workspace/workspace-mobile-context";
 import { useMinWidth } from "@/lib/use-media-query";
 
@@ -14,7 +15,6 @@ const ArtifactPanel = dynamic(
     import("@/features/artifacts/artifact-panel").then(
       (module) => module.ArtifactPanel,
     ),
-  { ssr: false },
 );
 
 const SidebarMobileSheet = dynamic(
@@ -37,18 +37,18 @@ interface AppShellProps {
   children: React.ReactNode;
   artifacts?: RunArtifacts | null;
   artifactsStatus?: ArtifactsPanelStatus;
-  onRegenerateArtifacts?: () => void | Promise<void>;
+  regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;
-  isRegeneratingArtifacts?: boolean;
+  initialRecentRuns?: SidebarRunItemData[];
 }
 
 export function AppShell({
   children,
   artifacts = null,
   artifactsStatus = "idle",
-  onRegenerateArtifacts,
+  regenerateRunId,
   canRegenerateArtifacts = false,
-  isRegeneratingArtifacts = false,
+  initialRecentRuns,
 }: AppShellProps) {
   const pathname = usePathname();
   const isWide = useMinWidth(960);
@@ -82,16 +82,15 @@ export function AppShell({
   const artifactPanelProps = {
     artifacts,
     status: artifactsStatus,
-    onRegenerateArtifacts,
+    regenerateRunId,
     canRegenerateArtifacts,
-    isRegeneratingArtifacts,
   };
 
   return (
     <WorkspaceMobileContext.Provider value={mobileContext}>
       <div className="@container/app-shell ambient-mesh relative flex h-svh flex-col overflow-hidden">
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden min-[720px]:flex-row">
-          <Sidebar />
+          <Sidebar initialRecentRuns={initialRecentRuns} />
           <div className="@container/workspace-main flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {children}
           </div>
@@ -106,6 +105,7 @@ export function AppShell({
           open={sidebarOpen}
           onOpenChange={setSidebarOpen}
           pathname={pathname}
+          initialRecentRuns={initialRecentRuns}
         />
       ) : null}
 

@@ -5,16 +5,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { X } from "lucide-react";
 
-import type { RunStatus } from "@/features/agents/types";
 import { Button } from "@/components/ui/button";
+import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { cn } from "@/lib/utils";
 
-export interface SidebarRunItemData {
-  id: string;
-  title: string;
-  status: RunStatus;
-  updatedAt: string;
-}
+export type { SidebarRunItemData };
 
 interface SidebarRunItemProps {
   run: SidebarRunItemData;

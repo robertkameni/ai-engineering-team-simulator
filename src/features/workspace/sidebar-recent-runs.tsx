@@ -1,24 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import {
-  SidebarRunItem,
-  type SidebarRunItemData,
-} from "@/features/workspace/sidebar-run-item";
+import { SidebarRunItem } from "@/features/workspace/sidebar-run-item";
+import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 
 interface SidebarRecentRunsProps {
   pathname: string;
   onNavigate?: () => void;
+  initialRuns?: SidebarRunItemData[];
 }
 
 export function SidebarRecentRuns({
   pathname,
   onNavigate,
+  initialRuns,
 }: SidebarRecentRunsProps) {
-  const [runs, setRuns] = useState<SidebarRunItemData[]>([]);
+  const [fetchedRuns, setFetchedRuns] = useState<SidebarRunItemData[] | null>(
+    null,
+  );
+  const [deletedIds, setDeletedIds] = useState(() => new Set<string>());
 
   useEffect(() => {
+    if (initialRuns != null && initialRuns.length > 0) return;
+
     let cancelled = false;
 
     async function fetchRuns() {
@@ -26,7 +31,7 @@ export function SidebarRecentRuns({
         const response = await fetch("/api/runs");
         if (!response.ok || cancelled) return;
         const data = (await response.json()) as { runs: SidebarRunItemData[] };
-        setRuns(data.runs);
+        setFetchedRuns(data.runs);
       } catch {
         // Keep empty list on failure
       }
@@ -37,10 +42,15 @@ export function SidebarRecentRuns({
     return () => {
       cancelled = true;
     };
-  }, [pathname]);
+  }, [pathname, initialRuns]);
+
+  const runs = useMemo(() => {
+    const source = initialRuns ?? fetchedRuns ?? [];
+    return source.filter((run) => !deletedIds.has(run.id));
+  }, [initialRuns, fetchedRuns, deletedIds]);
 
   function handleDeleted(runId: string) {
-    setRuns((current) => current.filter((run) => run.id !== runId));
+    setDeletedIds((current) => new Set(current).add(runId));
   }
 
   if (runs.length === 0) {

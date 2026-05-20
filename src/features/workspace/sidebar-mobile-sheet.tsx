@@ -2,17 +2,20 @@
 
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { SidebarContent } from "@/features/workspace/sidebar-content";
+import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 
 interface SidebarMobileSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   pathname: string;
+  initialRecentRuns?: SidebarRunItemData[];
 }
 
 export function SidebarMobileSheet({
   open,
   onOpenChange,
   pathname,
+  initialRecentRuns,
 }: SidebarMobileSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -27,6 +30,7 @@ export function SidebarMobileSheet({
         <SidebarContent
           pathname={pathname}
           onNavigate={() => onOpenChange(false)}
+          initialRecentRuns={initialRecentRuns}
         />
       </SheetContent>
     </Sheet>

@@ -6,13 +6,19 @@ import { Plus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SidebarRecentRuns } from "@/features/workspace/sidebar-recent-runs";
+import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 
 interface SidebarContentProps {
   pathname: string;
   onNavigate?: () => void;
+  initialRecentRuns?: SidebarRunItemData[];
 }
 
-export function SidebarContent({ pathname, onNavigate }: SidebarContentProps) {
+export function SidebarContent({
+  pathname,
+  onNavigate,
+  initialRecentRuns,
+}: SidebarContentProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="px-4 py-4">
@@ -61,6 +67,7 @@ export function SidebarContent({ pathname, onNavigate }: SidebarContentProps) {
             key={pathname}
             pathname={pathname}
             onNavigate={onNavigate}
+            initialRuns={initialRecentRuns}
           />
         </nav>
       </ScrollArea>
