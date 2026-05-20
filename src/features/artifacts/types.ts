@@ -1,4 +1,4 @@
-import type { ArtifactType } from "@/features/artifacts/schemas";
+import type { ArtifactType } from "@/features/artifacts/artifact-constants";
 
 export interface ArtifactSectionGroup {
   title: string;

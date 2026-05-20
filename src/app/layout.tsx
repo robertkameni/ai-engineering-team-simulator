@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Team Sim — AI Engineering Team Simulator",
+    default: "Team Sim - AI Engineering Team Simulator",
     template: "%s · Team Sim",
   },
   description:

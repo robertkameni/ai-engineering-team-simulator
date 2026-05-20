@@ -1,5 +1,5 @@
-import type { ArtifactType } from "@/features/artifacts/schemas";
-import { ARTIFACT_TYPES } from "@/features/artifacts/schemas";
+import type { ArtifactType } from "@/features/artifacts/artifact-constants";
+import { ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
 import type { MockRun } from "@/features/agents/types";
 
 const ARTIFACT_LABELS: Record<ArtifactType, string> = {

@@ -41,7 +41,7 @@ export function WorkspaceHeader({
             type="button"
             variant="ghost"
             size="icon"
-            className="size-8 shrink-0 @[720px]/app-shell:hidden"
+            className="size-8 shrink-0 max-[719px]:inline-flex min-[720px]:hidden"
             onClick={mobile.openSidebar}
             aria-label="Open menu"
           >
@@ -75,7 +75,7 @@ export function WorkspaceHeader({
             type="button"
             variant="outline"
             size="icon"
-            className="glass-card size-8 border-glass-border @[960px]/app-shell:hidden"
+            className="glass-card size-8 border-glass-border max-[959px]:inline-flex min-[960px]:hidden"
             onClick={mobile.openArtifacts}
             aria-label="Expand artifacts"
             title="Expand artifacts"

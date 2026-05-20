@@ -27,21 +27,21 @@ export function MessageContent({ content, className }: MessageContentProps) {
         if (block.type === "heading") {
           if (block.level === 2) {
             return (
-              <h3
+              <h2
                 key={key}
                 className="mt-2 mb-2 text-title font-semibold text-foreground"
               >
                 {block.text}
-              </h3>
+              </h2>
             );
           }
           return (
-            <h4
+            <h3
               key={key}
               className="mt-4 mb-1 text-body font-semibold text-foreground"
             >
               {block.text}
-            </h4>
+            </h3>
           );
         }
 

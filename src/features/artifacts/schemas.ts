@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export {
+  ARTIFACT_TYPES,
+  isArtifactType,
+  type ArtifactType,
+} from "@/features/artifacts/artifact-constants";
+
 export const artifactSectionSchema = z.object({
   title: z.string().describe("Section heading"),
   items: z
@@ -34,16 +40,3 @@ export const runArtifactsOutputSchema = z.object({
 export type ArtifactSection = z.infer<typeof artifactSectionSchema>;
 export type ArtifactDocument = z.infer<typeof artifactDocumentSchema>;
 export type RunArtifactsOutput = z.infer<typeof runArtifactsOutputSchema>;
-
-export const ARTIFACT_TYPES = [
-  "requirements",
-  "architecture",
-  "implementation",
-  "review",
-] as const;
-
-export type ArtifactType = (typeof ARTIFACT_TYPES)[number];
-
-export function isArtifactType(value: string): value is ArtifactType {
-  return (ARTIFACT_TYPES as readonly string[]).includes(value);
-}

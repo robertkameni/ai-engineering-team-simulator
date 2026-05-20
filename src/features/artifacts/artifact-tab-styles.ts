@@ -1,4 +1,4 @@
-import type { ArtifactType } from "@/features/artifacts/schemas";
+import type { ArtifactType } from "@/features/artifacts/artifact-constants";
 import { cn } from "@/lib/utils";
 
 export const ARTIFACT_TAB_CONFIG: {

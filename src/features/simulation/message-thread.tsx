@@ -50,7 +50,7 @@ export function MessageThread({ messages, empty, loading }: MessageThreadProps) 
   }
 
   return (
-    <ScrollArea className="@container/message-thread min-h-0 flex-1 pb-16 @[720px]/app-shell:pb-0">
+    <ScrollArea className="@container/message-thread min-h-0 flex-1 max-[719px]:pb-16 min-[720px]:pb-0">
       <div
         className="flex flex-col gap-4 px-3 py-3 @md/message-thread:gap-8 @md/message-thread:px-4 @md/message-thread:py-4"
         aria-label="Engineering team discussion"

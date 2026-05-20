@@ -8,6 +8,16 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: projectRoot,
   },
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-scroll-area",
+      "@radix-ui/react-slot",
+    ],
+  },
+  productionBrowserSourceMaps: false,
 };
 
 export default nextConfig;

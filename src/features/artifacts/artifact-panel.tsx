@@ -140,7 +140,7 @@ export function ArtifactPanel({
         "@container/artifact-panel glass-panel flex min-h-0 shrink-0 flex-col overflow-x-hidden",
         isSheet
           ? "h-full w-full max-h-none border-0"
-          : "hidden h-full max-h-none w-[min(100%,420px)] border-l border-glass-border @[960px]/app-shell:flex",
+          : "hidden h-full max-h-none w-[min(100%,420px)] border-l border-glass-border min-[960px]:flex",
       )}
     >
       <header className="flex shrink-0 items-start justify-between gap-2 border-b border-glass-border px-4 py-3">
