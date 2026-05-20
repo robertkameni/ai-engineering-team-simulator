@@ -28,7 +28,7 @@ export default async function WorkspacePage({
         title: "New simulation",
         userPrompt: "",
         status: "idle",
-        updatedAt: new Date().toISOString(),
+        updatedAt: "",
         messages: [],
         artifactsStatus: "idle",
       }}

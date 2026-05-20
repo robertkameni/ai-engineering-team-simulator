@@ -25,3 +25,12 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Do not import `@/lib/prisma` or `@/generated/prisma` in client components.
 - API routes: `export const runtime = "nodejs"`, `maxDuration` for multi-agent runs.
 - Prefer Server Components; client only for stream UI, sidebar pathname, forms.
+- Use the latest stable technologies and always follow current best practices.
+- Prefer clean, maintainable, and simple solutions.
+- Apply D.R.Y. (Don’t Repeat Yourself) and K.I.S.S. principles consistently.
+- Avoid over-engineering.
+- Write readable and maintainable code.
+- Prefer composition over duplication.
+- Keep functions and components small and focused.
+- Use clear naming conventions.
+- Prioritize scalability and performance when relevant.

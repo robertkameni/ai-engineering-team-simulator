@@ -1,3 +1,5 @@
+import { QuotedBlock } from "@/features/simulation/quoted-block";
+import { parseMessageBlocks } from "@/features/simulation/parse-message-blocks";
 import { cn } from "@/lib/utils";
 
 interface MessageContentProps {
@@ -5,66 +7,76 @@ interface MessageContentProps {
   className?: string;
 }
 
-/** Lightweight markdown-ish rendering for demo messages */
 export function MessageContent({ content, className }: MessageContentProps) {
-  const lines = content.split("\n");
+  const blocks = parseMessageBlocks(content);
 
   return (
     <div
       className={cn(
-        "max-w-none text-sm leading-relaxed text-foreground/90",
+        "max-w-none text-body leading-relaxed text-foreground/90",
         className,
       )}
     >
-      {lines.map((line, index) => {
-        const key = `${index}-${line.slice(0, 24)}`;
+      {blocks.map((block, index) => {
+        const key = `${index}-${block.type}`;
 
-        if (line.startsWith("### ")) {
+        if (block.type === "spacer") {
+          return <div key={key} className="h-2" />;
+        }
+
+        if (block.type === "heading") {
+          if (block.level === 2) {
+            return (
+              <h3
+                key={key}
+                className="mt-2 mb-2 text-title font-semibold text-foreground"
+              >
+                {block.text}
+              </h3>
+            );
+          }
           return (
             <h4
               key={key}
-              className="mt-4 mb-1 text-sm font-semibold text-foreground"
+              className="mt-4 mb-1 text-body font-semibold text-foreground"
             >
-              {line.slice(4)}
+              {block.text}
             </h4>
           );
         }
 
-        if (line.startsWith("## ")) {
+        if (block.type === "quote") {
           return (
-            <h3
+            <QuotedBlock
               key={key}
-              className="mt-2 mb-2 text-base font-semibold text-foreground"
-            >
-              {line.slice(3)}
-            </h3>
+              agentName={block.agentName}
+              text={block.text}
+              verdict={block.verdict}
+              className="my-2"
+            />
           );
         }
 
-        if (line.startsWith("- ")) {
+        if (block.type === "bullet") {
           return (
             <p key={key} className="my-0.5 pl-1 text-muted-foreground">
               <span className="mr-2 text-muted-foreground/60">○</span>
-              {formatInline(line.slice(2))}
+              {formatInline(block.text)}
             </p>
           );
         }
 
-        if (line.startsWith("**") && line.endsWith("**")) {
+        if (block.type === "emphasis") {
           return (
             <p key={key} className="my-1 font-medium text-foreground">
-              {line.slice(2, -2)}
+              {block.text}
             </p>
           );
-        }
-
-        if (line.trim() === "") {
-          return <div key={key} className="h-2" />;
         }
 
         return (
           <p key={key} className="my-1">
-            {formatInline(line)}
+            {formatInline(block.text)}
           </p>
         );
       })}
@@ -80,7 +92,7 @@ function formatInline(text: string) {
       return (
         <code
           key={i}
-          className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground"
+          className="rounded bg-muted/60 px-1 py-0.5 font-mono text-caption text-foreground"
         >
           {part.slice(1, -1)}
         </code>

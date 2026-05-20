@@ -10,7 +10,7 @@ Living roadmap for the product, architecture, and implementation phases. Update 
 
 A **multi-agent engineering simulator**: the user describes a product idea; AI teammates debate it in real time (requirements, architecture, implementation, review). Runs are **persisted**, **replayable** from the sidebar, and summarized as structured **artifacts** (requirements, architecture, implementation, review) in the right panel.
 
-**Target experience:** Premium dark UI, streaming debate in the center, artifacts on the right (`lg+`), run history in the sidebar with delete.
+**Target experience:** Premium dark UI, streaming debate in the center, artifacts on the right (`960px+`), run history in the sidebar with delete. On mobile: menu drawer for history, floating **+** for new simulations, artifacts in a bottom sheet.
 
 ---
 
@@ -57,7 +57,7 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 | [3](#phase-3--single-agent-streaming) | Single-agent streaming | **Done** (superseded by Phase 4) |
 | [4](#phase-4--multi-agent--persistence) | Multi-agent + persistence | **Done** |
 | [5](#phase-5--structured-artifacts) | Structured artifacts | **Done** |
-| [6](#phase-6--polish) | Polish & UX | **Partial** |
+| [6](#phase-6--polish) | Polish & UX | **Partial** (~85%) |
 | [7](#phase-7--deploy) | Deploy to Vercel | **Not started** |
 | [8](#phase-8--auth-optional) | Auth (optional) | **Not started** |
 | [9](#phase-9--stretch) | Stretch goals | **Not started** |
@@ -163,27 +163,32 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 
 ## Phase 6 — Polish
 
-**Goal:** Production-quality UX and resilience.
+**Goal:** Production-quality UX, glass design system, and resilience.
 
-- [ ] Parse reviewer quotes into `QuotedBlock` UI (component exists, not wired to parser)
-- [ ] Copy / export run as Markdown (thread + artifacts)
+- [x] **Glass design system** — `glass-panel`, `glass-card`, `glass-input`, ambient mesh background (`globals.css`)
+- [x] **Fluid typography** — container-query-based `--text-display/title/body/caption`
+- [x] **Animations** — message enter, artifact tab fade, shimmer skeletons, pulse-glow indicators
+- [x] **Container-query layout** — `@container/app-shell`: sidebar at `720px`, artifacts side panel at `960px`
+- [x] **Mobile workspace** — sidebar drawer (header menu), FAB **+** opens prompt sheet, artifacts bottom sheet (header layers icon); inline artifact panel hidden below `960px`
+- [x] **Mobile density** — compact header, icon-only export/status, tighter messages, thread padding for FAB
+- [x] **Artifact tabs (mobile)** — 2×2 grid, auto height, `gap-4`, bottom spacing on tab wrapper
+- [x] **Sheet UI** — `src/components/ui/sheet.tsx` (Radix Dialog) for mobile drawers; accessible `SheetTitle` on all sheets
+- [x] **Hydration stability** — `suppressHydrationWarning` on textarea; stable `formatMessageTime()` (`de-DE`, UTC) for SSR/client parity
+- [x] **Parse reviewer quotes** → `QuotedBlock` UI (`parse-message-blocks.ts`)
+- [x] **Export run as Markdown** — header button + `downloadRunMarkdown()` (`lib/export/run-markdown.ts`)
+- [x] **Loading skeletons** — message thread + artifact panel while bootstrapping / generating
 - [ ] Regenerate artifacts for an existing run (API + UI)
-- [ ] Loading skeletons for thread / artifact panel
-- [ ] Broader mobile layout pass (artifact panel hidden below `lg`)
-- [ ] Optional: architect reasoning preview (disabled intentionally — consumed token budget with no visible text)
 
-**Done (partial phase):**
+**Also done (earlier partial work):**
 
 - [x] Simulation error banner + retry
 - [x] Agent typing indicators + handoff labels
 - [x] Auto-scroll message thread
-- [x] Artifact generation reliability (sequential + JSON fallback)
-- [x] Artifact panel visual feedback on tab click
+- [x] Artifact tab visual feedback (role colors, press scale)
 - [x] Sidebar delete + improved title visibility
-- [x] Prompt composer sync via `key` (no effect setState)
-- [x] ESLint clean (`react-hooks/set-state-in-effect` addressed)
+- [x] ESLint clean
 
-**Replay today:** `/runs/[id]` is read-only DB replay (no re-call to AI). Not a dedicated “replay mode” UX.
+**Replay today:** `/runs/[id]` is read-only DB replay (no re-call to AI).
 
 ---
 
@@ -247,9 +252,12 @@ src/
     prompts/              # per-role system + turn prompts
   features/
     artifacts/            # panel, schemas, tab styles
-    simulation/           # stream hook, thread, composer
-    workspace/            # shell, sidebar, run/simulation views
-  lib/db/                 # Prisma helpers
+    simulation/           # stream hook, thread, composer (mobile FAB + sheet)
+    workspace/            # shell, sidebar, mobile context, run/simulation views
+  lib/
+    db/                   # Prisma helpers
+    export/               # run-markdown.ts
+    format-time.ts        # stable SSR message timestamps
 ```
 
 ---
@@ -276,7 +284,7 @@ After Prisma schema changes: run `npm run db:generate` and **restart** `npm run 
 ## Suggested implementation order
 
 ```
-Finish Phase 6 (export, regenerate artifacts, skeletons) → Phase 7 (deploy) → Phase 8 (auth, if needed)
+Finish Phase 6 (regenerate artifacts) → Phase 7 (deploy) → Phase 8 (auth, if needed)
 ```
 
 ---
@@ -288,8 +296,9 @@ Finish Phase 6 (export, regenerate artifacts, skeletons) → Phase 7 (deploy) �
 | 2026-05-20 | Master plan created; Phases 0–4 complete; 5-agent roster + DeepSeek v4 |
 | 2026-05-20 | `Message.agentName`, dynamic roster, scroll layout fix |
 | 2026-05-20 | Phase 5: structured artifacts, SSE + API + live panel |
-| 2026-05-20 | Phase 6 (partial): concise prompts, artifact UX, sidebar delete, tab effects, ESLint fixes |
+| 2026-05-20 | Phase 6 (partial): glass design system, container-query layout, animations, quote parsing, Markdown export, skeletons |
 | 2026-05-20 | Architect uses chat-only stream; sequential artifact gen + JSON fallback; `DELETE /api/runs/[id]` |
+| 2026-05-19 | Mobile workspace: sidebar drawer, prompt FAB + sheet, artifacts sheet; hydration + `format-time.ts`; artifact tab mobile spacing |
 
 ---
 

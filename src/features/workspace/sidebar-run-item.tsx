@@ -20,9 +20,15 @@ interface SidebarRunItemProps {
   run: SidebarRunItemData;
   isActive: boolean;
   onDeleted: (runId: string) => void;
+  onNavigate?: () => void;
 }
 
-export function SidebarRunItem({ run, isActive, onDeleted }: SidebarRunItemProps) {
+export function SidebarRunItem({
+  run,
+  isActive,
+  onDeleted,
+  onNavigate,
+}: SidebarRunItemProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const href = `/runs/${run.id}`;
@@ -49,12 +55,13 @@ export function SidebarRunItem({ run, isActive, onDeleted }: SidebarRunItemProps
   return (
     <div
       className={cn(
-        "group flex items-stretch gap-0.5 rounded-md transition-colors",
-        isActive ? "bg-accent" : "hover:bg-accent/50",
+        "group flex items-stretch gap-0.5 rounded-lg transition-all duration-200",
+        isActive ? "glass-card border-l-2 border-l-foreground" : "hover:bg-white/4",
       )}
     >
       <Link
         href={href}
+        onClick={onNavigate}
         className={cn(
           "min-w-0 flex-1 rounded-md px-3 py-2",
           isActive
@@ -63,7 +70,7 @@ export function SidebarRunItem({ run, isActive, onDeleted }: SidebarRunItemProps
         )}
         title={run.title}
       >
-        <p className="line-clamp-2 text-sm leading-snug wrap-break-word text-foreground">
+        <p className="line-clamp-2 text-body leading-snug wrap-break-word text-foreground">
           {run.title}
         </p>
         <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">

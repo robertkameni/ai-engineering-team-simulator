@@ -7,9 +7,7 @@ import type { ArtifactsPanelStatus, RunArtifacts } from "@/features/artifacts/ty
 import type { AgentRole, RunStatus, SimulationMessage } from "@/features/agents/types";
 import { parseSimulationEvent } from "@/lib/simulation-stream";
 
-function formatMessageTime(date = new Date()) {
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
+import { formatMessageTime } from "@/lib/format-time";
 
 export function useSimulationStream() {
   const router = useRouter();
@@ -108,7 +106,7 @@ export function useSimulationStream() {
                   agentTitle: event.title,
                   content: "",
                   isStreaming: true,
-                  createdAt: formatMessageTime(),
+                  createdAt: formatMessageTime(new Date()),
                 },
               ]);
             } else if (event.type === "text-delta") {

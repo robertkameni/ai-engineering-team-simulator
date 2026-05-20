@@ -4,6 +4,7 @@ import type { TeamRoster } from "@/ai/agents/roster";
 import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { AgentRole, SimulationMessage } from "@/features/agents/types";
 import { getPersona } from "@/features/agents/personas";
+import { formatMessageTime } from "@/lib/format-time";
 import { prisma } from "@/lib/prisma";
 import { toAppRunStatus, toPrismaRunStatus } from "@/lib/db/run-status";
 import type { RunStatus as AppRunStatus } from "@/features/agents/types";
@@ -122,10 +123,7 @@ export function mapDbMessagesToSimulation(
       agentName,
       agentTitle,
       content: message.content,
-      createdAt: message.createdAt.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      createdAt: formatMessageTime(message.createdAt),
     };
   });
 }

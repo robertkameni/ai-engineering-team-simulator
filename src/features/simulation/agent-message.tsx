@@ -19,26 +19,29 @@ export function AgentMessage({ message, className }: AgentMessageProps) {
   return (
     <article
       className={cn(
-        "flex gap-3",
+        "message-enter @container/agent-message flex gap-2 @md/agent-message:gap-3",
         className,
       )}
     >
       <AgentAvatar role={message.role} />
       <div className="min-w-0 flex-1">
-        <header className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="text-sm font-semibold text-foreground">
+        <header className="mb-1.5 flex flex-wrap items-center gap-1.5 @md/agent-message:mb-2 @md/agent-message:gap-2">
+          <span className="text-body font-semibold text-foreground">
             {displayName}
           </span>
-          <Badge variant="outline" className="text-[10px] font-normal">
+          <Badge
+            variant="outline"
+            className="glass-card hidden border-glass-border text-[10px] font-normal @md/agent-message:inline-flex"
+          >
             {displayTitle}
           </Badge>
-          <span className="text-xs text-muted-foreground">
+          <span className="hidden text-caption text-muted-foreground @md/agent-message:inline">
             {message.createdAt}
           </span>
         </header>
         <div
           className={cn(
-            "rounded-lg border border-border border-l-[3px] bg-surface-2 px-4 py-3",
+            "glass-card rounded-xl border-l-[3px] px-3 py-2.5 @md/agent-message:px-4 @md/agent-message:py-3",
             persona.borderClass,
           )}
         >

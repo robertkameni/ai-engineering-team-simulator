@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useRef } from "react";
 import { ArrowRight } from "lucide-react";
-
 import { ExamplePromptChips } from "@/features/simulation/example-prompt-chips";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +17,7 @@ export function LandingPromptForm() {
         ref={formRef}
         action="/workspace"
         method="get"
-        className="mt-10 w-full rounded-xl border border-border bg-surface-2 p-2 shadow-xs"
+        className="mt-10 w-full rounded-2xl glass-input p-2 shadow-lg transition-all duration-300 focus-within:ring-2 focus-within:ring-ring/30"
       >
         <label htmlFor="landing-prompt" className="sr-only">
           Product idea

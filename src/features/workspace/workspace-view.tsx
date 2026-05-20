@@ -27,6 +27,7 @@ export function WorkspaceView({
         title={run.title}
         status={run.status}
         subtitle={run.userPrompt}
+        run={run}
       />
       <WorkspaceMain>
         <MessageThread

@@ -15,18 +15,24 @@ export function AgentTypingIndicator({
   const persona = getPersona(role);
 
   return (
-    <div className="flex shrink-0 gap-3 px-4 py-2" aria-live="polite">
+    <div
+      className="message-enter flex shrink-0 gap-3 px-3 py-2 @md/workspace-main:px-4"
+      aria-live="polite"
+    >
       <AgentAvatar role={role} />
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-semibold text-foreground">
+      <div className="glass-card flex flex-wrap items-center gap-1.5 rounded-xl px-3 py-2 @md/workspace-main:gap-2">
+        <span className="text-body font-semibold text-foreground">
           {persona.name}
         </span>
-        <Badge variant="outline" className="text-[10px] font-normal">
+        <Badge
+          variant="outline"
+          className="glass-card hidden border-glass-border text-[10px] font-normal @md/workspace-main:inline-flex"
+        >
           {persona.title}
         </Badge>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          <span className="size-1.5 animate-pulse rounded-full bg-agent-architect" />
-          {label}
+        <span className="flex items-center gap-1.5 text-caption text-muted-foreground">
+          <span className="pulse-glow size-1.5 rounded-full bg-agent-architect" />
+          <span className="truncate">{label}</span>
         </span>
       </div>
     </div>

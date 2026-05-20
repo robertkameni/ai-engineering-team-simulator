@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
+import type { MockRun } from "@/features/agents/types";
 import { AppShell } from "@/features/workspace/app-shell";
 import { WorkspaceMain } from "@/features/workspace/workspace-main";
 import { WorkspaceHeader } from "@/features/workspace/workspace-header";
@@ -24,11 +25,13 @@ export function SimulationWorkspace({
     messages,
     status,
     error,
+    runId,
     activeAgent,
     artifacts,
     artifactsStatus,
     start,
   } = useSimulationStream();
+  
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -55,12 +58,35 @@ export function SimulationWorkspace({
       ? "generating"
       : artifactsStatus;
 
+  const exportRun = useMemo<MockRun>(
+    () => ({
+      id: runId ?? "live",
+      title,
+      userPrompt,
+      status,
+      updatedAt: new Date().toISOString(),
+      messages,
+      artifacts,
+      artifactsStatus: panelArtifactsStatus,
+    }),
+    [
+      runId,
+      title,
+      userPrompt,
+      status,
+      messages,
+      artifacts,
+      panelArtifactsStatus,
+    ],
+  );
+
   return (
     <AppShell artifacts={artifacts} artifactsStatus={panelArtifactsStatus}>
       <WorkspaceHeader
         title={title}
         status={status}
         subtitle={userPrompt}
+        run={messages.length > 0 ? exportRun : undefined}
       />
       <WorkspaceMain>
         {error ? (
@@ -75,20 +101,21 @@ export function SimulationWorkspace({
         {showHandoff && activeAgent ? (
           <AgentTypingIndicator
             role={activeAgent}
-          label={
-            activeAgent === "architect"
-              ? "Drafting the architecture…"
-              : activeAgent === "backend"
-                ? "Drafting the backend plan…"
-                : activeAgent === "frontend"
-                  ? "Designing the frontend experience…"
-                  : "Joining the discussion…"
-          }
+            label={
+              activeAgent === "architect"
+                ? "Drafting the architecture…"
+                : activeAgent === "backend"
+                  ? "Drafting the backend plan…"
+                  : activeAgent === "frontend"
+                    ? "Designing the frontend experience…"
+                    : "Joining the discussion…"
+            }
           />
         ) : null}
         <MessageThread
           messages={messages}
           empty={status === "idle" && messages.length === 0}
+          loading={showBootstrapping}
         />
       </WorkspaceMain>
       <PromptComposer

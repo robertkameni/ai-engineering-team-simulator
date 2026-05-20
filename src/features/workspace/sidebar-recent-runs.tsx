@@ -9,9 +9,13 @@ import {
 
 interface SidebarRecentRunsProps {
   pathname: string;
+  onNavigate?: () => void;
 }
 
-export function SidebarRecentRuns({ pathname }: SidebarRecentRunsProps) {
+export function SidebarRecentRuns({
+  pathname,
+  onNavigate,
+}: SidebarRecentRunsProps) {
   const [runs, setRuns] = useState<SidebarRunItemData[]>([]);
 
   useEffect(() => {
@@ -55,6 +59,7 @@ export function SidebarRecentRuns({ pathname }: SidebarRecentRunsProps) {
           run={run}
           isActive={pathname === `/runs/${run.id}`}
           onDeleted={handleDeleted}
+          onNavigate={onNavigate}
         />
       ))}
     </>

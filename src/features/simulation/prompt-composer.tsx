@@ -2,9 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
@@ -13,17 +20,28 @@ interface PromptComposerProps {
   placeholder?: string;
   className?: string;
   defaultValue?: string;
-  /** When set, runs live simulation instead of navigating with ?prompt= */
   onSimulate?: (prompt: string) => void | Promise<void>;
 }
 
-export function PromptComposer({
+interface PromptComposerFormProps {
+  disabled?: boolean;
+  placeholder?: string;
+  defaultValue?: string;
+  onSimulate?: (prompt: string) => void | Promise<void>;
+  onSubmitted?: () => void;
+  showHint?: boolean;
+  idPrefix?: string;
+}
+
+function PromptComposerForm({
   disabled = false,
   placeholder = "Describe your product idea…",
-  className,
   defaultValue = "",
   onSimulate,
-}: PromptComposerProps) {
+  onSubmitted,
+  showHint = true,
+  idPrefix = "workspace",
+}: PromptComposerFormProps) {
   const router = useRouter();
   const [value, setValue] = useState(defaultValue);
 
@@ -34,61 +52,124 @@ export function PromptComposer({
 
     if (onSimulate) {
       await onSimulate(trimmed);
+      onSubmitted?.();
       return;
     }
 
+    onSubmitted?.();
     router.push(`/workspace?prompt=${encodeURIComponent(trimmed)}`);
   }
 
+  const textareaId = `${idPrefix}-prompt`;
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className={cn(
-        "shrink-0 border-t border-border bg-background px-4 py-4",
-        className,
-      )}
-    >
-      <div className="mx-auto flex max-w-3xl flex-col gap-2">
-        <label htmlFor="workspace-prompt" className="sr-only">
-          Product idea
-        </label>
-        <div className="relative rounded-lg border border-input bg-surface-2 shadow-xs focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/30">
-          <Textarea
-            id="workspace-prompt"
-            name="prompt"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(event) => {
-              if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
-            }}
-            disabled={disabled}
-            placeholder={placeholder}
-            rows={3}
-            className="min-h-[88px] resize-none border-0 bg-transparent pr-12 shadow-none focus-visible:ring-0"
-          />
-          <div className="absolute right-2 bottom-2">
-            <Button
-              type="submit"
-              size="icon"
-              disabled={disabled || !value.trim()}
-              className="size-8 rounded-md"
-              aria-label={onSimulate ? "Run simulation" : "Start simulation"}
-            >
-              <ArrowUp />
-            </Button>
-          </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+      <label htmlFor={textareaId} className="sr-only">
+        Product idea
+      </label>
+      <div className="glass-input relative rounded-xl transition-all duration-200 focus-within:ring-2 focus-within:ring-ring/30">
+        <Textarea
+          id={textareaId}
+          name="prompt"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+              event.preventDefault();
+              event.currentTarget.form?.requestSubmit();
+            }
+          }}
+          disabled={disabled}
+          placeholder={placeholder}
+          rows={3}
+          className="min-h-[80px] resize-none border-0 bg-transparent pr-12 text-body shadow-none focus-visible:ring-0 @md/composer:min-h-[88px]"
+        />
+        <div className="absolute right-2 bottom-2">
+          <Button
+            type="submit"
+            size="icon"
+            disabled={disabled || !value.trim()}
+            className="size-8 rounded-lg transition-transform duration-200 hover:scale-105 active:scale-95"
+            aria-label={onSimulate ? "Run simulation" : "Start simulation"}
+          >
+            <ArrowUp />
+          </Button>
         </div>
-        <p className="text-xs text-muted-foreground" aria-live="polite">
+      </div>
+      {showHint ? (
+        <p className="text-caption text-muted-foreground" aria-live="polite">
           {disabled
             ? "Team is discussing…"
             : onSimulate
               ? "Press ⌘ Enter to run again"
               : "Press ⌘ Enter to start the simulation"}
         </p>
-      </div>
+      ) : null}
     </form>
+  );
+}
+
+export function PromptComposer({
+  disabled = false,
+  placeholder,
+  className,
+  defaultValue = "",
+  onSimulate,
+}: PromptComposerProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <>
+      <div
+        className={cn(
+          "@container/composer glass-panel hidden shrink-0 border-t-0 border-glass-border px-3 py-3 @md/composer:px-4 @md/composer:py-4 @[720px]/app-shell:block",
+          className,
+        )}
+      >
+        <div className="mx-auto max-w-3xl">
+          <PromptComposerForm
+            disabled={disabled}
+            placeholder={placeholder}
+            defaultValue={defaultValue}
+            onSimulate={onSimulate}
+          />
+        </div>
+      </div>
+
+      <div className="pointer-events-none fixed right-4 bottom-4 z-40 @[720px]/app-shell:hidden">
+        <Button
+          type="button"
+          size="icon"
+          disabled={disabled}
+          onClick={() => setMobileOpen(true)}
+          className="pointer-events-auto size-12 rounded-full shadow-lg transition-transform duration-200 hover:scale-105 active:scale-95"
+          aria-label="New simulation"
+        >
+          <Plus className="size-5" />
+        </Button>
+      </div>
+
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent
+          side="bottom"
+          className="glass-panel gap-0 border-glass-border px-4 pt-4 pb-6"
+        >
+          <SheetHeader className="px-0 pb-3 text-left">
+            <SheetTitle>New simulation</SheetTitle>
+            <SheetDescription>
+              Describe what you want the team to build.
+            </SheetDescription>
+          </SheetHeader>
+          <PromptComposerForm
+            disabled={disabled}
+            placeholder={placeholder}
+            defaultValue={defaultValue}
+            onSimulate={onSimulate}
+            onSubmitted={() => setMobileOpen(false)}
+            idPrefix="mobile-workspace"
+          />
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
