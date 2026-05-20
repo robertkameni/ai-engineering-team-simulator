@@ -6,10 +6,15 @@ import { ArrowRight } from "lucide-react";
 import { ExamplePromptChips } from "@/features/simulation/example-prompt-chips";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  isSubmitShortcut,
+  useSubmitShortcutLabel,
+} from "@/lib/submit-shortcut";
 
 export function LandingPromptForm() {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const shortcutLabel = useSubmitShortcutLabel();
 
   return (
     <>
@@ -30,14 +35,15 @@ export function LandingPromptForm() {
           rows={4}
           className="min-h-[120px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
           onKeyDown={(event) => {
-            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-              event.preventDefault();
-              formRef.current?.requestSubmit();
-            }
+            if (!isSubmitShortcut(event)) return;
+            event.preventDefault();
+            formRef.current?.requestSubmit();
           }}
         />
         <div className="flex items-center justify-between gap-2 px-1 pb-1">
-          <p className="text-xs text-muted-foreground">⌘ Enter to start</p>
+          <p className="text-xs text-muted-foreground">
+            {shortcutLabel} to start
+          </p>
           <Button type="submit" className="gap-2">
             Start simulation
             <ArrowRight />

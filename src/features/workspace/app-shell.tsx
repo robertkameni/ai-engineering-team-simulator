@@ -3,12 +3,9 @@
 import { useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { ArtifactPanel } from "@/features/artifacts/artifact-panel";
-import type {
-  ArtifactsPanelStatus,
-  RunArtifacts,
-} from "@/features/artifacts/types";
+import type {ArtifactsPanelStatus,RunArtifacts} from "@/features/artifacts/types";
 import { Sidebar } from "@/features/workspace/sidebar";
 import { SidebarContent } from "@/features/workspace/sidebar-content";
 import { WorkspaceMobileContext } from "@/features/workspace/workspace-mobile-context";
@@ -17,19 +14,29 @@ interface AppShellProps {
   children: React.ReactNode;
   artifacts?: RunArtifacts | null;
   artifactsStatus?: ArtifactsPanelStatus;
+  onRegenerateArtifacts?: () => void | Promise<void>;
+  canRegenerateArtifacts?: boolean;
+  isRegeneratingArtifacts?: boolean;
 }
 
 export function AppShell({
   children,
   artifacts = null,
   artifactsStatus = "idle",
+  onRegenerateArtifacts,
+  canRegenerateArtifacts = false,
+  isRegeneratingArtifacts = false,
 }: AppShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [artifactsOpen, setArtifactsOpen] = useState(false);
 
-  const showArtifactsAction =
-    artifactsStatus !== "idle" || artifacts != null;
+  const showArtifactPanel =
+    artifactsStatus !== "idle" ||
+    artifacts != null ||
+    canRegenerateArtifacts;
+
+  const showArtifactsAction = showArtifactPanel;
 
   const mobileContext = useMemo(
     () => ({
@@ -40,6 +47,14 @@ export function AppShell({
     [showArtifactsAction],
   );
 
+  const artifactPanelProps = {
+    artifacts,
+    status: artifactsStatus,
+    onRegenerateArtifacts,
+    canRegenerateArtifacts,
+    isRegeneratingArtifacts,
+  };
+
   return (
     <WorkspaceMobileContext.Provider value={mobileContext}>
       <div className="@container/app-shell ambient-mesh relative flex h-svh flex-col overflow-hidden">
@@ -48,13 +63,9 @@ export function AppShell({
           <div className="@container/workspace-main flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             {children}
           </div>
-          <div className="hidden min-h-0 @[960px]/app-shell:flex">
-            <ArtifactPanel
-              artifacts={artifacts}
-              status={artifactsStatus}
-              layout="inline"
-            />
-          </div>
+          {showArtifactPanel ? (
+            <ArtifactPanel {...artifactPanelProps} layout="inline" />
+          ) : null}
         </div>
       </div>
 
@@ -64,6 +75,9 @@ export function AppShell({
           className="glass-panel w-[min(100%,288px)] border-glass-border p-0 sm:max-w-xs"
         >
           <SheetTitle className="sr-only">Recent simulations</SheetTitle>
+          <SheetDescription className="sr-only">
+            Browse recent runs and start a new simulation
+          </SheetDescription>
           <SidebarContent
             pathname={pathname}
             onNavigate={() => setSidebarOpen(false)}
@@ -71,19 +85,21 @@ export function AppShell({
         </SheetContent>
       </Sheet>
 
-      <Sheet open={artifactsOpen} onOpenChange={setArtifactsOpen}>
-        <SheetContent
-          side="bottom"
-          className="glass-panel h-[min(88svh,720px)] gap-0 border-glass-border p-0"
-        >
-          <SheetTitle className="sr-only">Artifacts</SheetTitle>
-          <ArtifactPanel
-            artifacts={artifacts}
-            status={artifactsStatus}
-            layout="sheet"
-          />
-        </SheetContent>
-      </Sheet>
+      {showArtifactPanel ? (
+        <Sheet open={artifactsOpen} onOpenChange={setArtifactsOpen}>
+          <SheetContent
+            side="bottom"
+            showClose={false}
+            className="glass-panel h-[min(88svh,720px)] gap-0 border-glass-border p-0"
+          >
+            <SheetTitle className="sr-only">Artifacts</SheetTitle>
+            <SheetDescription className="sr-only">
+              Structured outputs from the team debate
+            </SheetDescription>
+            <ArtifactPanel {...artifactPanelProps} layout="sheet" />
+          </SheetContent>
+        </Sheet>
+      ) : null}
     </WorkspaceMobileContext.Provider>
   );
 }

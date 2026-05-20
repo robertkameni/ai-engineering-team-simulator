@@ -31,7 +31,10 @@ export function AgentMessage({ message, className }: AgentMessageProps) {
           </span>
           <Badge
             variant="outline"
-            className="glass-card hidden border-glass-border text-[10px] font-normal @md/agent-message:inline-flex"
+            className={cn(
+              "text-[10px] font-medium",
+              persona.badgeClass,
+            )}
           >
             {displayTitle}
           </Badge>

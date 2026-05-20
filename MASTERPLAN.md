@@ -57,7 +57,7 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 | [3](#phase-3--single-agent-streaming) | Single-agent streaming | **Done** (superseded by Phase 4) |
 | [4](#phase-4--multi-agent--persistence) | Multi-agent + persistence | **Done** |
 | [5](#phase-5--structured-artifacts) | Structured artifacts | **Done** |
-| [6](#phase-6--polish) | Polish & UX | **Partial** (~85%) |
+| [6](#phase-6--polish) | Polish & UX | **Done** |
 | [7](#phase-7--deploy) | Deploy to Vercel | **Not started** |
 | [8](#phase-8--auth-optional) | Auth (optional) | **Not started** |
 | [9](#phase-9--stretch) | Stretch goals | **Not started** |
@@ -177,7 +177,7 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 - [x] **Parse reviewer quotes** → `QuotedBlock` UI (`parse-message-blocks.ts`)
 - [x] **Export run as Markdown** — header button + `downloadRunMarkdown()` (`lib/export/run-markdown.ts`)
 - [x] **Loading skeletons** — message thread + artifact panel while bootstrapping / generating
-- [ ] Regenerate artifacts for an existing run (API + UI)
+- [x] **Regenerate artifacts** — `POST /api/runs/[id]/artifacts` re-synthesizes from saved debate; UI in artifact panel header + unavailable placeholder
 
 **Also done (earlier partial work):**
 
@@ -188,7 +188,7 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 - [x] Sidebar delete + improved title visibility
 - [x] ESLint clean
 
-**Replay today:** `/runs/[id]` is read-only DB replay (no re-call to AI).
+**Replay today:** `/runs/[id]` replays the saved debate from DB; artifacts can be **regenerated** without re-running agents.
 
 ---
 
@@ -237,6 +237,7 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 | `/api/runs` | GET | Recent runs for sidebar |
 | `/api/runs/[id]` | DELETE | Delete run and related rows |
 | `/api/runs/[id]/artifacts` | GET | Artifact bundle for a run |
+| `/api/runs/[id]/artifacts` | POST | Regenerate artifacts from saved debate |
 
 ---
 
@@ -284,7 +285,7 @@ After Prisma schema changes: run `npm run db:generate` and **restart** `npm run 
 ## Suggested implementation order
 
 ```
-Finish Phase 6 (regenerate artifacts) → Phase 7 (deploy) → Phase 8 (auth, if needed)
+Finish Phase 7 (deploy) → Phase 8 (auth, if needed)
 ```
 
 ---
@@ -299,6 +300,7 @@ Finish Phase 6 (regenerate artifacts) → Phase 7 (deploy) → Phase 8 (auth, if
 | 2026-05-20 | Phase 6 (partial): glass design system, container-query layout, animations, quote parsing, Markdown export, skeletons |
 | 2026-05-20 | Architect uses chat-only stream; sequential artifact gen + JSON fallback; `DELETE /api/runs/[id]` |
 | 2026-05-19 | Mobile workspace: sidebar drawer, prompt FAB + sheet, artifacts sheet; hydration + `format-time.ts`; artifact tab mobile spacing |
+| 2026-05-19 | Phase 6 complete: `POST /api/runs/[id]/artifacts` regenerate + artifact panel UI |
 
 ---
 

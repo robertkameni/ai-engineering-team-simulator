@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, Plus } from "lucide-react";
 
@@ -13,6 +13,10 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  isSubmitShortcut,
+  useSubmitShortcutLabel,
+} from "@/lib/submit-shortcut";
 import { cn } from "@/lib/utils";
 
 interface PromptComposerProps {
@@ -44,26 +48,33 @@ function PromptComposerForm({
 }: PromptComposerFormProps) {
   const router = useRouter();
   const [value, setValue] = useState(defaultValue);
+  const shortcutLabel = useSubmitShortcutLabel();
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmed = value.trim();
-    if (!trimmed || disabled) return;
+  const submitPrompt = useCallback(
+    async (prompt: string) => {
+      const trimmed = prompt.trim();
+      if (!trimmed || disabled) return;
 
-    if (onSimulate) {
-      await onSimulate(trimmed);
+      if (onSimulate) {
+        await onSimulate(trimmed);
+        onSubmitted?.();
+        return;
+      }
+
       onSubmitted?.();
-      return;
-    }
+      router.push(`/workspace?prompt=${encodeURIComponent(trimmed)}`);
+    },
+    [disabled, onSimulate, onSubmitted, router],
+  );
 
-    onSubmitted?.();
-    router.push(`/workspace?prompt=${encodeURIComponent(trimmed)}`);
+  async function handleAction(formData: FormData) {
+    await submitPrompt(String(formData.get("prompt") ?? ""));
   }
 
   const textareaId = `${idPrefix}-prompt`;
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+    <form action={handleAction} className="flex flex-col gap-2">
       <label htmlFor={textareaId} className="sr-only">
         Product idea
       </label>
@@ -74,10 +85,9 @@ function PromptComposerForm({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(event) => {
-            if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-              event.preventDefault();
-              event.currentTarget.form?.requestSubmit();
-            }
+            if (!isSubmitShortcut(event)) return;
+            event.preventDefault();
+            void submitPrompt(value);
           }}
           disabled={disabled}
           placeholder={placeholder}
@@ -101,8 +111,8 @@ function PromptComposerForm({
           {disabled
             ? "Team is discussing…"
             : onSimulate
-              ? "Press ⌘ Enter to run again"
-              : "Press ⌘ Enter to start the simulation"}
+              ? `Press ${shortcutLabel} to run again`
+              : `Press ${shortcutLabel} to start the simulation`}
         </p>
       ) : null}
     </form>

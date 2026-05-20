@@ -10,6 +10,9 @@ interface WorkspaceViewProps {
   showEmptyThread?: boolean;
   initialPrompt?: string;
   onSimulate?: (prompt: string) => void | Promise<void>;
+  onRegenerateArtifacts?: () => void | Promise<void>;
+  canRegenerateArtifacts?: boolean;
+  isRegeneratingArtifacts?: boolean;
 }
 
 export function WorkspaceView({
@@ -17,11 +20,17 @@ export function WorkspaceView({
   showEmptyThread = false,
   initialPrompt,
   onSimulate,
+  onRegenerateArtifacts,
+  canRegenerateArtifacts = false,
+  isRegeneratingArtifacts = false,
 }: WorkspaceViewProps) {
   return (
     <AppShell
       artifacts={run.artifacts}
       artifactsStatus={run.artifactsStatus ?? "idle"}
+      onRegenerateArtifacts={onRegenerateArtifacts}
+      canRegenerateArtifacts={canRegenerateArtifacts}
+      isRegeneratingArtifacts={isRegeneratingArtifacts}
     >
       <WorkspaceHeader
         title={run.title}

@@ -8,6 +8,8 @@ export const AGENT_PERSONAS: Record<AgentRole, AgentPersona> = {
     initials: "PM",
     accentClass: "text-agent-pm",
     borderClass: "border-l-agent-pm",
+    badgeClass:
+      "border-agent-pm/40 bg-agent-pm/10 text-agent-pm",
   },
   architect: {
     role: "architect",
@@ -16,6 +18,8 @@ export const AGENT_PERSONAS: Record<AgentRole, AgentPersona> = {
     initials: "AR",
     accentClass: "text-agent-architect",
     borderClass: "border-l-agent-architect",
+    badgeClass:
+      "border-agent-architect/40 bg-agent-architect/10 text-agent-architect",
   },
   frontend: {
     role: "frontend",
@@ -24,6 +28,8 @@ export const AGENT_PERSONAS: Record<AgentRole, AgentPersona> = {
     initials: "FE",
     accentClass: "text-agent-frontend",
     borderClass: "border-l-agent-frontend",
+    badgeClass:
+      "border-agent-frontend/40 bg-agent-frontend/10 text-agent-frontend",
   },
   backend: {
     role: "backend",
@@ -32,6 +38,8 @@ export const AGENT_PERSONAS: Record<AgentRole, AgentPersona> = {
     initials: "BE",
     accentClass: "text-agent-backend",
     borderClass: "border-l-agent-backend",
+    badgeClass:
+      "border-agent-backend/40 bg-agent-backend/10 text-agent-backend",
   },
   reviewer: {
     role: "reviewer",
@@ -40,6 +48,8 @@ export const AGENT_PERSONAS: Record<AgentRole, AgentPersona> = {
     initials: "RV",
     accentClass: "text-agent-reviewer",
     borderClass: "border-l-agent-reviewer",
+    badgeClass:
+      "border-agent-reviewer/40 bg-agent-reviewer/10 text-agent-reviewer",
   },
   devops: {
     role: "devops",
@@ -48,6 +58,8 @@ export const AGENT_PERSONAS: Record<AgentRole, AgentPersona> = {
     initials: "DO",
     accentClass: "text-agent-devops",
     borderClass: "border-l-agent-devops",
+    badgeClass:
+      "border-agent-devops/40 bg-agent-devops/10 text-agent-devops",
   },
 };
 

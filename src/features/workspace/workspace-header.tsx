@@ -1,6 +1,7 @@
 "use client";
 
-import { Menu, Layers } from "lucide-react";
+import Link from "next/link";
+import { Home, Menu, Layers } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { RunStatusPill } from "@/features/simulation/run-status-pill";
@@ -47,6 +48,16 @@ export function WorkspaceHeader({
             <Menu className="size-4" />
           </Button>
         ) : null}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 shrink-0"
+          asChild
+        >
+          <Link href="/" aria-label="Back to home" title="Back to home">
+            <Home className="size-4" />
+          </Link>
+        </Button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-body font-semibold tracking-tight text-foreground @[720px]/app-shell:text-title">
             {title}
@@ -66,7 +77,8 @@ export function WorkspaceHeader({
             size="icon"
             className="glass-card size-8 border-glass-border @[960px]/app-shell:hidden"
             onClick={mobile.openArtifacts}
-            aria-label="View artifacts"
+            aria-label="Expand artifacts"
+            title="Expand artifacts"
           >
             <Layers className="size-4" />
           </Button>

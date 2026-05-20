@@ -20,6 +20,7 @@ export interface AgentPersona {
   initials: string;
   accentClass: string;
   borderClass: string;
+  badgeClass: string;
 }
 
 export interface SimulationMessage {

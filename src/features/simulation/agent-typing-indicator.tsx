@@ -2,6 +2,7 @@ import { getPersona } from "@/features/agents/personas";
 import type { AgentRole } from "@/features/agents/types";
 import { AgentAvatar } from "@/features/agents/agent-avatar";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 interface AgentTypingIndicatorProps {
   role: AgentRole;
@@ -26,7 +27,7 @@ export function AgentTypingIndicator({
         </span>
         <Badge
           variant="outline"
-          className="glass-card hidden border-glass-border text-[10px] font-normal @md/workspace-main:inline-flex"
+          className={cn("text-[10px] font-medium", persona.badgeClass)}
         >
           {persona.title}
         </Badge>

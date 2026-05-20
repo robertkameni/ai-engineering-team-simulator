@@ -10,6 +10,10 @@ import {
   normalizeArtifactItem,
   normalizeArtifactTitle,
 } from "@/features/artifacts/format-artifact";
+import { RegenerateArtifactsButton } from "@/features/artifacts/regenerate-artifacts-button";
+import { SheetClose } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 import {
   ARTIFACT_TAB_CONFIG,
   ARTIFACT_TAB_LIST_CLASS,
@@ -65,14 +69,24 @@ function ArtifactSections({ sections }: { sections: ArtifactSectionGroup[] }) {
   );
 }
 
-function ArtifactPlaceholder({ status }: { status: ArtifactsPanelStatus }) {
+function ArtifactPlaceholder({
+  status,
+  onRegenerateArtifacts,
+  canRegenerateArtifacts,
+  isRegeneratingArtifacts,
+}: {
+  status: ArtifactsPanelStatus;
+  onRegenerateArtifacts?: () => void | Promise<void>;
+  canRegenerateArtifacts?: boolean;
+  isRegeneratingArtifacts?: boolean;
+}) {
   const copy =
     status === "generating"
       ? "Synthesizing structured deliverables from the debate…"
       : status === "pending"
         ? "The team is debating — structured artifacts will generate when they finish."
         : status === "unavailable"
-          ? "Artifacts could not be generated for this run. Start a new simulation to try again."
+          ? "Artifacts could not be generated for this run. Regenerate from the saved debate or start a new simulation."
           : "Start a simulation to generate requirements, architecture, implementation, and review.";
 
   if (status === "generating") {
@@ -85,6 +99,15 @@ function ArtifactPlaceholder({ status }: { status: ArtifactsPanelStatus }) {
         <span className="pulse-glow mb-3 size-2.5 rounded-full bg-agent-architect" />
       ) : null}
       <p className="text-body text-muted-foreground">{copy}</p>
+      {status === "unavailable" &&
+      canRegenerateArtifacts &&
+      onRegenerateArtifacts ? (
+        <RegenerateArtifactsButton
+          variant="placeholder"
+          onRegenerate={onRegenerateArtifacts}
+          loading={isRegeneratingArtifacts}
+        />
+      ) : null}
     </section>
   );
 }
@@ -93,30 +116,67 @@ interface ArtifactPanelProps {
   artifacts?: RunArtifacts | null;
   status?: ArtifactsPanelStatus;
   layout?: "inline" | "sheet";
+  onRegenerateArtifacts?: () => void | Promise<void>;
+  canRegenerateArtifacts?: boolean;
+  isRegeneratingArtifacts?: boolean;
 }
 
 export function ArtifactPanel({
   artifacts = null,
   status = "idle",
   layout = "inline",
+  onRegenerateArtifacts,
+  canRegenerateArtifacts = false,
+  isRegeneratingArtifacts = false,
 }: ArtifactPanelProps) {
   const isReady = status === "ready" && artifacts != null;
   const isSheet = layout === "sheet";
+  const showRegenerate =
+    canRegenerateArtifacts && onRegenerateArtifacts != null;
 
   return (
     <aside
       className={cn(
-        "@container/artifact-panel glass-panel flex min-h-0 w-full shrink-0 flex-col overflow-x-hidden",
+        "@container/artifact-panel glass-panel flex min-h-0 shrink-0 flex-col overflow-x-hidden",
         isSheet
-          ? "h-full max-h-none border-0"
-          : "max-h-[42vh] border-t border-glass-border @[960px]/app-shell:max-h-none @[960px]/app-shell:w-[min(100%,420px)] @[960px]/app-shell:border-t-0 @[960px]/app-shell:border-l",
+          ? "h-full w-full max-h-none border-0"
+          : "hidden h-full max-h-none w-[min(100%,420px)] border-l border-glass-border @[960px]/app-shell:flex",
       )}
     >
-      <header className="shrink-0 border-b border-glass-border px-4 py-3">
-        <h2 className="text-title font-semibold tracking-tight">Artifacts</h2>
-        <p className="mt-0.5 hidden text-caption text-muted-foreground @[720px]/artifact-panel:block">
-          Structured outputs from the team
-        </p>
+      <header className="flex shrink-0 items-start justify-between gap-2 border-b border-glass-border px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-title font-semibold tracking-tight">Artifacts</h2>
+          <p
+            className={cn(
+              "mt-0.5 text-caption text-muted-foreground",
+              isSheet ? "block" : "hidden @[720px]/artifact-panel:block",
+            )}
+          >
+            Structured outputs from the team
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {showRegenerate ? (
+            <RegenerateArtifactsButton
+              onRegenerate={onRegenerateArtifacts}
+              loading={isRegeneratingArtifacts}
+              disabled={status === "generating" || status === "pending"}
+            />
+          ) : null}
+          {isSheet ? (
+            <SheetClose asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="glass-card size-8 border-glass-border"
+                aria-label="Close artifacts"
+              >
+                <X className="size-4" />
+              </Button>
+            </SheetClose>
+          ) : null}
+        </div>
       </header>
 
       {isReady ? (
@@ -149,7 +209,7 @@ export function ArtifactPanel({
                   "px-4",
                   isSheet
                     ? "h-[calc(100%-1px)] max-h-[calc(88svh-7rem)]"
-                    : "h-[min(100%,calc(42vh-7rem))] @[960px]/app-shell:h-[calc(100svh-7.5rem)]",
+                    : "h-[calc(100svh-7.5rem)]",
                 )}
               >
                 <ArtifactSections sections={artifacts[tab.value]} />
@@ -158,7 +218,12 @@ export function ArtifactPanel({
           ))}
         </Tabs>
       ) : (
-        <ArtifactPlaceholder status={status} />
+        <ArtifactPlaceholder
+          status={status}
+          onRegenerateArtifacts={onRegenerateArtifacts}
+          canRegenerateArtifacts={canRegenerateArtifacts}
+          isRegeneratingArtifacts={isRegeneratingArtifacts}
+        />
       )}
     </aside>
   );

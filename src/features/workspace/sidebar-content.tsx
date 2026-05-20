@@ -15,18 +15,24 @@ interface SidebarContentProps {
 export function SidebarContent({ pathname, onNavigate }: SidebarContentProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex items-center gap-2 px-4 py-4">
-        <span className="glass-card flex size-9 items-center justify-center rounded-xl">
-          <Sparkles className="size-4 text-agent-architect" />
-        </span>
-        <span className="min-w-0">
-          <p className="truncate text-title font-semibold tracking-tight">
-            Team Sim
-          </p>
-          <p className="truncate text-caption text-muted-foreground">
-            Engineering simulator
-          </p>
-        </span>
+      <header className="px-4 py-4">
+        <Link
+          href="/"
+          onClick={onNavigate}
+          className="flex items-center gap-2 rounded-lg transition-colors hover:bg-white/4"
+        >
+          <span className="glass-card flex size-9 shrink-0 items-center justify-center rounded-xl">
+            <Sparkles className="size-4 text-agent-architect" />
+          </span>
+          <span className="min-w-0">
+            <p className="truncate text-title font-semibold tracking-tight">
+              Team Sim
+            </p>
+            <p className="truncate text-caption text-muted-foreground">
+              Engineering simulator
+            </p>
+          </span>
+        </Link>
       </header>
 
       <section className="px-3 pb-2">
