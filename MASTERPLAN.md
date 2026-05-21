@@ -57,7 +57,7 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 | [3](#phase-3--single-agent-streaming) | Single-agent streaming | **Done** (superseded by Phase 4) |
 | [4](#phase-4--multi-agent--persistence) | Multi-agent + persistence | **Done** |
 | [5](#phase-5--structured-artifacts) | Structured artifacts | **Done** |
-| [6](#phase-6--polish) | Polish & UX | **Done** |
+| [6](#phase-6--polish) | Polish & UX (+ SSR/perf paths) | **Done** |
 | [7](#phase-7--deploy) | Deploy to Vercel | **Not started** |
 | [8](#phase-8--auth-optional) | Auth (optional) | **Not started** |
 | [9](#phase-9--stretch) | Stretch goals | **Not started** |
@@ -152,7 +152,7 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 - [x] Persist to `Artifact` table; `saveSingleArtifact` per type
 - [x] `ArtifactPanel` — four tabs, card sections, normalized bullets (`format-artifact.ts`)
 - [x] Tab UX — role-colored active state, press scale, content fade-in (`artifact-tab-styles.ts`, `globals.css`)
-- [x] Responsive tabs — 4 columns in one row; 2×2 grid when panel container is narrow (`@container/artifact-panel`)
+- [x] Responsive tabs — wide panel: four columns in one row; narrow artifact panel: **2×2 grid** (`@container/artifact-panel`, `@min-[480px]/artifact-panel`)
 - [x] SSE `artifacts_start` / `artifacts_ready` / `artifacts_failed`
 - [x] `GET /api/runs/[id]/artifacts`
 - [x] Live workspace derives `generating` when debate ends before SSE
@@ -189,6 +189,22 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 - [x] ESLint clean
 
 **Replay today:** `/runs/[id]` replays the saved debate from DB; artifacts can be **regenerated** without re-running agents.
+
+### Phase 6+ — SSR, performance paths, and UX follow-ups *(shipped incrementally)*
+
+These build on Phase 6; they reduce client JS on **saved-run** replay and tighten Core Web Vitals when measured on a **production** build.
+
+- [x] **Server-rendered `/runs/[id]`** — async server page fetches run + sidebar list; **`SavedRunWorkspace`** replaces heavy client workspace shell for persisted runs (`src/app/runs/[id]/page.tsx`, `src/features/workspace/saved-run-workspace.tsx`).
+- [x] **Static message thread for saved runs** — `MessageThreadStatic` — server HTML, native scroll, optional skip of Radix-heavy paths for replay.
+- [x] **Sidebar SSR on saved runs** — `listRecentRunsForSidebar()` + `SidebarStatic` / `SidebarContentStatic`; relative time labels aligned with SSR (`formatRelativeTime`).
+- [x] **Delete from static sidebar** — `deleteRunAction` server action (revalidate + redirect when deleting the open run).
+- [x] **Regenerate artifacts (saved-run path)** — `regenerateRunArtifactsAction` + form/`useFormStatus`; `revalidatePath` after success (`src/features/artifacts/regenerate-artifacts-action.ts`).
+- [x] **`ArtifactPanelStatic`** — artifact tabs without Radix on desktop saved-run path (CSS radios + `:has()` / `globals.css`); native scroll inside panels; **`ArtifactSections`** shared with client `ArtifactPanel`.
+- [x] **Tab bar layout fixes** — 2-column tab grid when the artifact panel is narrow, 4 columns when `@min-[480px]/artifact-panel`; wrap + `title` tooltips so long labels (e.g. Implementation) are readable without ellipsis-only UX.
+- [x] **Thin scrollbars** — global WebKit/`scrollbar-*` tuning + slimmer Radix `ScrollArea` track (`globals.css`, `components/ui/scroll-area.tsx`).
+- [x] **Live `/workspace`** — retains streaming client shell; **`PromptComposer`** code-split (`next/dynamic`); sidebar still uses **`ScrollArea`** where needed.
+
+**Perf note:** Lighthouse and field metrics on `next dev` are **not representative** — always verify with `npm run build && npm start` before judging LCP/TBT.
 
 ---
 
@@ -238,6 +254,7 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 | `/api/runs/[id]` | DELETE | Delete run and related rows |
 | `/api/runs/[id]/artifacts` | GET | Artifact bundle for a run |
 | `/api/runs/[id]/artifacts` | POST | Regenerate artifacts from saved debate |
+| _(Server Actions)_ | — | `regenerateRunArtifactsAction`, `deleteRunAction` — used on saved-run UI; invalidate via `revalidatePath` |
 
 ---
 
@@ -245,20 +262,20 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 
 ```
 src/
-  app/                    # Routes, API handlers
+  app/                    # Routes, API handlers (`runs/[id]` server component for replay)
   ai/
     agents/               # config, roster
     artifacts/            # generate-run-artifacts, templates, transcript
     orchestration/        # run-simulation.ts
     prompts/              # per-role system + turn prompts
   features/
-    artifacts/            # panel, schemas, tab styles
-    simulation/           # stream hook, thread, composer (mobile FAB + sheet)
-    workspace/            # shell, sidebar, mobile context, run/simulation views
+    artifacts/            # ArtifactPanel (+ static panel), schemas, sections, regenerate action
+    simulation/           # stream hook, thread (client + static), composer (FAB + sheet)
+    workspace/            # AppShell, SavedRunWorkspace, sidebar (client + static), mobile sheets
   lib/
-    db/                   # Prisma helpers
+    db/                   # Prisma helpers (incl. listRecentRunsForSidebar)
     export/               # run-markdown.ts
-    format-time.ts        # stable SSR message timestamps
+    format-time.ts        # stable SSR message timestamps + relative sidebar labels
 ```
 
 ---
@@ -294,6 +311,7 @@ Finish Phase 7 (deploy) → Phase 8 (auth, if needed)
 
 | Date | Change |
 |------|--------|
+| 2026-05-22 | Phase 6+ documented: SSR saved-run workspace, static artifact panel + shared sections, sidebar SSR/static delete, regenerate server action, thin scrollbars; perf verification note (prod build). |
 | 2026-05-20 | Master plan created; Phases 0–4 complete; 5-agent roster + DeepSeek v4 |
 | 2026-05-20 | `Message.agentName`, dynamic roster, scroll layout fix |
 | 2026-05-20 | Phase 5: structured artifacts, SSE + API + live panel |
@@ -304,4 +322,4 @@ Finish Phase 7 (deploy) → Phase 8 (auth, if needed)
 
 ---
 
-*Last updated: May 2026*
+*Last updated: 2026-05-22*
