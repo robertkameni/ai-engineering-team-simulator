@@ -2,7 +2,7 @@
 
 Living roadmap for the product, architecture, and implementation phases. Update this file when a phase ships or scope changes.
 
-**Related docs:** [AGENTS.md](./AGENTS.md) (stack conventions for coding agents), [README.md](./README.md) (setup).
+**Related docs:** [AGENTS.md](./AGENTS.md) (stack conventions for coding agents), [README.md](./README.md) (setup), [DEPLOYMENT.md](./DEPLOYMENT.md) (Vercel).
 
 ---
 
@@ -23,7 +23,7 @@ A **multi-agent engineering simulator**: the user describes a product idea; AI t
 | AI | Vercel AI SDK 6, `@ai-sdk/deepseek`, `streamText`, `generateText` + `Output.object` |
 | Models | DeepSeek v4 — [API docs](https://api-docs.deepseek.com) |
 | Database | Prisma 7 + `prisma.config.ts` + `@prisma/adapter-neon` (Neon Postgres) |
-| Deploy target | Vercel (not wired yet) |
+| Deploy target | Vercel — [Production](https://ai-engineering-team-simulator.vercel.app) · [DEPLOYMENT.md](./DEPLOYMENT.md) |
 
 ### Agent pipeline (per run)
 
@@ -58,7 +58,7 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 | [4](#phase-4--multi-agent--persistence) | Multi-agent + persistence | **Done** |
 | [5](#phase-5--structured-artifacts) | Structured artifacts | **Done** |
 | [6](#phase-6--polish) | Polish & UX (+ SSR/perf paths) | **Done** |
-| [7](#phase-7--deploy) | Deploy to Vercel | **Not started** |
+| [7](#phase-7--deploy) | Deploy to Vercel | **Done** — [Production](https://ai-engineering-team-simulator.vercel.app) |
 | [8](#phase-8--auth-optional) | Auth (optional) | **Not started** |
 | [9](#phase-9--stretch) | Stretch goals | **Not started** |
 
@@ -212,11 +212,13 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 
 **Goal:** Public preview on Vercel.
 
-- [ ] Link Vercel project + Neon integration
-- [ ] Env: `DEEPSEEK_API_KEY`, `DATABASE_URL` (preview + production)
-- [ ] `maxDuration` on `/api/simulate` (currently 300s) — confirm plan limits
-- [ ] `prisma migrate deploy` in CI or build step
-- [ ] Smoke test preview URL end-to-end
+**Guide:** [DEPLOYMENT.md](./DEPLOYMENT.md)
+
+- [ ] Link Vercel project + Neon integration *(dashboard — follow DEPLOYMENT.md)*
+- [ ] Env: `DEEPSEEK_API_KEY`, `DATABASE_URL` (preview + production) *(dashboard)*
+- [x] **`maxDuration`** — `runtime = "nodejs"` and `maxDuration = 300` on `/api/simulate` and `POST /api/runs/[id]/artifacts`; align with [Vercel plan limits](https://vercel.com/docs/functions/limitations) *(upgrade if Hobby caps below 300s)*.
+- [x] **`prisma migrate deploy`** — runs during `npm run build` when `DATABASE_URL` is set (`scripts/prisma-migrate-deploy-if-url.mjs`); skipped in CI/no-DB contexts with a warning.
+- [ ] Smoke test preview URL end-to-end *(after first deploy)*.
 
 ---
 
@@ -302,7 +304,7 @@ After Prisma schema changes: run `npm run db:generate` and **restart** `npm run 
 ## Suggested implementation order
 
 ```
-Finish Phase 7 (deploy) → Phase 8 (auth, if needed)
+Phase 8 (auth, if needed) → Phase 9 (stretch), or iterate on UX/perf post-launch.
 ```
 
 ---
@@ -311,6 +313,8 @@ Finish Phase 7 (deploy) → Phase 8 (auth, if needed)
 
 | Date | Change |
 |------|--------|
+| 2026-05-22 | Phase 7 **shipped**: production at [ai-engineering-team-simulator.vercel.app](https://ai-engineering-team-simulator.vercel.app); README + DEPLOYMENT + MASTERPLAN updated. |
+| 2026-05-22 | Phase 7 (repo): `DEPLOYMENT.md`, `.env.example`, build runs `prisma migrate deploy` when `DATABASE_URL` is set (`scripts/prisma-migrate-deploy-if-url.mjs`); MASTERPLAN Phase 7 checklist + README deploy section. |
 | 2026-05-22 | Phase 6+ documented: SSR saved-run workspace, static artifact panel + shared sections, sidebar SSR/static delete, regenerate server action, thin scrollbars; perf verification note (prod build). |
 | 2026-05-20 | Master plan created; Phases 0–4 complete; 5-agent roster + DeepSeek v4 |
 | 2026-05-20 | `Message.agentName`, dynamic roster, scroll layout fix |

@@ -2,33 +2,110 @@ Follow AGENTS.md.
 
 # /analyse
 
-Analyze {{SCOPE}} with strict focus on observable runtime behavior and verified implementation details.
+Analyze {{SCOPE}} with strict focus on observable runtime correctness and reachable execution behavior.
+
+---
+
+# OBJECTIVE
+
+Determine whether the current implementation contains meaningful runtime risks.
+
+The goal is correctness verification, not issue discovery.
+
+It is valid to conclude:
+- no meaningful runtime issues found
+- execution flow is runtime-safe
+- current safeguards are sufficient
 
 ---
 
 # RULES
 
 Only report:
-- real runtime issues
+- observable runtime failures
 - reachable execution problems
-- verifiable architectural inconsistencies
-
-Separate:
-- facts
-- issues
-- opportunities
+- persistence inconsistencies
+- missing failure handling in active code paths
 
 Do not:
 - speculate
-- redesign architecture unnecessarily
-- report hypothetical edge cases
-- duplicate concerns
+- report theoretical concerns
+- search for edge cases without evidence
+- suggest architectural redesigns
+- report style or preference concerns
+- duplicate mitigated concerns
 
-Focus on:
-- runtime correctness
-- data flow
-- execution safety
-- implementation accuracy
+Respect:
+- existing safeguards
+- deployment constraints
+- current runtime behavior
+
+---
+
+# EVIDENCE RULE
+
+Only state conclusions supported by:
+- observable control flow
+- reachable execution paths
+- explicit framework behavior
+- verified persistence behavior
+
+Do not infer hidden runtime behavior without evidence.
+
+---
+
+# ISSUE THRESHOLD
+
+Do not report an issue unless:
+
+1. the runtime path is reachable
+2. the impact is observable
+3. existing code does not already mitigate it
+4. the issue affects actual runtime correctness
+
+If mitigation already exists:
+- do not re-report the concern
+
+---
+
+# SUFFICIENCY RULE
+
+Once:
+- runtime paths are protected
+- persistence remains consistent
+- failures are handled appropriately
+
+prefer concluding correctness over searching for additional concerns.
+
+---
+
+# ZERO-ISSUE VALIDATION
+
+It is expected and acceptable to conclude:
+
+- no meaningful runtime issues detected
+- no additional reachable risks found
+- implementation is operationally correct
+
+Do not continue searching for issues once correctness is established.
+
+---
+
+# SEVERITY RULES
+
+High
+- runtime crash
+- persistent invalid state
+- security exposure
+- corrupted persistence
+
+Medium
+- inconsistent persisted state
+- degraded visible behavior
+- partial execution failure
+
+Low
+- observable but low-impact runtime inconsistency
 
 ---
 
@@ -38,63 +115,22 @@ Focus on:
 What is being analyzed.
 
 ## Structure
-Factual modules, entry points, dependencies, and execution flow.
+Factual runtime modules, entry points, and execution flow only.
 
 ## Issues
-Only real reachable problems.
+Only meaningful reachable runtime problems.
 
 Each issue must include:
 - affected file/module
 - runtime impact
-- why it is reachable
+- why reachable
 - severity
 
+If no meaningful runtime issues exist:
+- explicitly state that none were found
+
 ## Dependencies
-Only actual dependencies relevant to execution.
-
-## Opportunities
-Non-critical improvements only.
-
-Must:
-- preserve architecture
-- improve maintainability or correctness
-- avoid redesigns
+Only execution-relevant dependencies.
 
 ## Risk Assessment
-Only concrete runtime risk# Severity Rules
-
-High
-- data corruption
-- security exposure
-- persistent invalid state
-- runtime crash affecting core flow
-
-Medium
-- inconsistent persisted state
-- degraded user-visible behavior
-- partial failure without recovery
-
-Low
-- maintainability risk
-- developer-facing inconsistency
-- edge-case runtime behavior with low impact
-
-# Confidence Handling
-
-Only state conclusions that are directly supported by:
-- observable control flow
-- reachable runtime paths
-- explicit framework behavior
-
-If certainty is incomplete:
-- state the assumption briefly
-- reduce confidence accordingly
-- avoid definitive language
-
-# Issue Threshold
-
-Do not report an issue unless:
-
-1. the runtime path is reachable
-2. the impact is observable
-3. the current implementation does not already mitigate it
+Only concrete reachable runtime risks.

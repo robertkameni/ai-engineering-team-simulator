@@ -2,7 +2,11 @@ Follow AGENTS.md.
 
 # /review
 
-Review {{SCOPE}} with focus on runtime correctness, architecture consistency, and implementation quality.
+Review {{SCOPE}} with focus on:
+- runtime correctness
+- architecture boundary correctness
+- implementation quality
+- maintainability
 
 ---
 
@@ -10,25 +14,67 @@ Review {{SCOPE}} with focus on runtime correctness, architecture consistency, an
 
 Evaluate:
 - actual runtime flow
+- reachable execution paths
 - current implementation behavior
-- architectural boundary correctness
-- maintainability
+- layer responsibility correctness
 
 Only report:
 - reachable issues
-- concrete architectural violations
-- observable implementation risks
+- concrete implementation risks
+- observable architectural violations
 
 Do not:
 - speculate
+- report theoretical concerns
 - suggest unnecessary redesigns
-- recommend distributed systems patterns
-- report theoretical scalability concerns
+- recommend distributed-system patterns
+- duplicate concerns already mitigated elsewhere
 
 Respect:
-- existing boundaries
-- deployment model
+- existing architecture boundaries
+- deployment constraints
 - current runtime behavior
+
+---
+
+## EVIDENCE RULE
+
+Only state conclusions supported by:
+- observable runtime behavior
+- reachable execution paths
+- explicit control flow
+- verified framework behavior
+
+Do not infer hidden behavior without evidence.
+
+---
+
+## ISSUE THRESHOLD
+
+Do not report an issue unless:
+1. the runtime path is reachable
+2. the impact is observable
+3. the current implementation does not already mitigate it
+
+---
+
+## SEVERITY RULES
+
+High
+- runtime crash
+- persistent invalid state
+- security exposure
+- core execution failure
+
+Medium
+- inconsistent persisted state
+- degraded user-visible behavior
+- partial execution failure
+
+Low
+- maintainability risk
+- developer-facing inconsistency
+- low-impact edge-case behavior
 
 ---
 
@@ -46,10 +92,11 @@ Exactly 3 concrete strengths tied to implementation quality.
 ## Issues
 Maximum 3 issues.
 
-Each must include:
+Each issue must include:
 - affected layer/module
 - runtime impact
 - why reachable
+- severity
 - minimal fix
 
 ## Optional Improvement

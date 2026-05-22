@@ -40,7 +40,19 @@ export async function runSimulation(
     await saveTeamRoster(run.id, roster);
     await touchRunActivity(run.id);
 
-    send({ type: "run_started", runId: run.id });
+    const notify = (event: SimulationStreamEvent) => {
+      try {
+        send(event);
+      } catch (error) {
+        console.warn("Simulation stream: failed to notify client", {
+          eventType: event.type,
+          runId: run.id,
+          error,
+        });
+      }
+    };
+
+    notify({ type: "run_started", runId: run.id });
 
     for (const role of SIMULATION_AGENT_ORDER) {
       if (!isSimulationAgent(role)) continue;
@@ -53,7 +65,7 @@ export async function runSimulation(
         productIdea,
         transcript,
         roster,
-        send,
+        send: notify,
       });
 
       const member = getTeamMember(roster, role);
@@ -74,11 +86,12 @@ export async function runSimulation(
     }
 
     debateComplete = true;
-    artifactPhaseStarted = true;
 
     await updateArtifactStatus(run.id, "pending");
-    send({ type: "artifacts_start" });
-    send({ type: "done", runId: run.id });
+    artifactPhaseStarted = true;
+
+    notify({ type: "artifacts_start" });
+    notify({ type: "done", runId: run.id });
     return run.id;
   } catch (error) {
     await reconcileRunFailure(run.id, {

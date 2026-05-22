@@ -1,4 +1,5 @@
 import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
+import { isStoredSimulationAgentRole } from "@/ai/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 import { generateRunArtifacts } from "@/ai/artifacts/generate-run-artifacts";
 import type { TranscriptEntry } from "@/ai/context/transcript";
@@ -109,13 +110,24 @@ export async function regenerateRunArtifacts(
     return { ok: false, error: "run_in_progress" };
   }
 
+  const simulationMessages = run.messages.filter((message) =>
+    isStoredSimulationAgentRole(message.agentRole),
+  );
+
+  if (simulationMessages.length === 0) {
+    return {
+      ok: false,
+      error: "generation_failed",
+    };
+  }
+
   const rosterArtifact = run.artifacts.find(
     (artifact) => artifact.type === TEAM_ROSTER_ARTIFACT_TYPE,
   );
   const roster =
     parseTeamRoster(rosterArtifact?.data) ??
     (await getTeamRoster(runId)) ??
-    buildRosterFromMessages(run.messages);
+    buildRosterFromMessages(simulationMessages);
 
   try {
     await updateArtifactStatus(runId, "generating");
@@ -123,7 +135,7 @@ export async function regenerateRunArtifacts(
 
     const artifactOutput = await generateRunArtifacts({
       productIdea: run.userPrompt,
-      transcript: mapMessagesToTranscript(run.messages),
+      transcript: mapMessagesToTranscript(simulationMessages),
       roster,
     });
     const bundle = runArtifactsOutputToBundle(artifactOutput);

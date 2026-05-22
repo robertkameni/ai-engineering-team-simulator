@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Engineering Team Simulator
 
-## Getting Started
+Multi-agent product debate simulator: describe an idea, watch PM → Architect → Backend → Frontend → Reviewer discuss it with streaming replies, persisted runs, and structured artifacts (requirements, architecture, implementation, review).
 
-First, run the development server:
+**Stack:** Next.js 16 (App Router), React 19, Tailwind 4, Prisma 7 + Neon, Vercel AI SDK + DeepSeek. Conventions live in [AGENTS.md](./AGENTS.md).
+
+## Production
+
+**Live app:** [https://ai-engineering-team-simulator.vercel.app](https://ai-engineering-team-simulator.vercel.app)
+
+## Local setup
 
 ```bash
+npm install
+cp .env.example .env.local   # fill DEEPSEEK_API_KEY + DATABASE_URL (Neon)
+npm run db:migrate           # first time / after schema changes
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Recommended:** Lighthouse and perf checks on **`npm run build && npm run start`**, not `next dev`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
+| Command | Purpose |
+|--------|---------|
+| `npm run dev` | Dev server |
+| `npm run build` | Generate Prisma client, migrate if `DATABASE_URL` is set, production Next build |
+| `npm run start` | Serve production build |
+| `npm run lint` | ESLint |
+| `npm run db:migrate` | `prisma migrate dev` |
+| `npm run db:migrate:deploy` | `prisma migrate deploy` |
 
-To learn more about Next.js, take a look at the following resources:
+## Deploy (Phase 7)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+See **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Vercel + Neon env vars, build/migrations, smoke test checklist.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Docs
 
-## Deploy on Vercel
+| File | Contents |
+|------|----------|
+| [MASTERPLAN.md](./MASTERPLAN.md) | Product roadmap and phase checklist |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Vercel deployment |
+| [AGENTS.md](./AGENTS.md) | Stack rules for contributors / AI agents |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+*README last aligned with MASTERPLAN: Phase 7 production URL.*

@@ -15,11 +15,10 @@ interface RegenerateArtifactsButtonProps {
 }
 
 function RegenerateSubmit({
-  runId,
   disabled,
   className,
   variant,
-}: RegenerateArtifactsButtonProps) {
+}: Omit<RegenerateArtifactsButtonProps, "runId">) {
   const { pending } = useFormStatus();
   const isPlaceholder = variant === "placeholder";
   const loading = pending;
@@ -64,7 +63,6 @@ export function RegenerateArtifactsButton({
     <form action={regenerateRunArtifactsAction}>
       <input type="hidden" name="runId" value={runId} />
       <RegenerateSubmit
-        runId={runId}
         disabled={disabled}
         className={className}
         variant={variant}
