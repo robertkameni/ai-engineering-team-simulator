@@ -1,0 +1,73 @@
+import type { ArtifactStatus as PrismaArtifactStatus } from "@/generated/prisma/client";
+
+import type { RunStatus as AppRunStatus } from "@/features/agents/types";
+import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
+import { prisma } from "@/lib/prisma";
+
+export type AppArtifactStatus =
+  | "none"
+  | "pending"
+  | "generating"
+  | "ready"
+  | "failed";
+
+const TO_APP: Record<PrismaArtifactStatus, AppArtifactStatus> = {
+  NONE: "none",
+  PENDING: "pending",
+  GENERATING: "generating",
+  READY: "ready",
+  FAILED: "failed",
+};
+
+const TO_PRISMA: Record<AppArtifactStatus, PrismaArtifactStatus> = {
+  none: "NONE",
+  pending: "PENDING",
+  generating: "GENERATING",
+  ready: "READY",
+  failed: "FAILED",
+};
+
+export function toAppArtifactStatus(
+  status: PrismaArtifactStatus,
+): AppArtifactStatus {
+  return TO_APP[status];
+}
+
+export function toPrismaArtifactStatus(
+  status: AppArtifactStatus,
+): PrismaArtifactStatus {
+  return TO_PRISMA[status];
+}
+
+export function deriveArtifactsPanelStatus(
+  runStatus: AppRunStatus,
+  artifactStatus: AppArtifactStatus,
+): ArtifactsPanelStatus {
+  switch (artifactStatus) {
+    case "ready":
+      return "ready";
+    case "generating":
+      return "generating";
+    case "pending":
+      return "generating";
+    case "failed":
+      return "unavailable";
+    case "none":
+      if (runStatus === "running") return "pending";
+      if (runStatus === "failed") return "unavailable";
+      if (runStatus === "complete") return "unavailable";
+      return "idle";
+    default:
+      return "idle";
+  }
+}
+
+export async function updateArtifactStatus(
+  runId: string,
+  status: AppArtifactStatus,
+) {
+  return prisma.run.update({
+    where: { id: runId },
+    data: { artifactStatus: toPrismaArtifactStatus(status) },
+  });
+}

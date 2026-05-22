@@ -1,4 +1,5 @@
 import type { RunStatus } from "@/features/agents/types";
+import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -23,33 +24,47 @@ const STATUS_DOTS: Record<RunStatus, string> = {
   failed: "bg-destructive",
 };
 
+function resolveRunningLabel(artifactsStatus?: ArtifactsPanelStatus): string {
+  if (artifactsStatus === "generating") return "Synthesizing";
+  if (artifactsStatus === "pending") return "Debating";
+  return "Running";
+}
+
 interface RunStatusPillProps {
   status: RunStatus;
+  artifactsStatus?: ArtifactsPanelStatus;
   className?: string;
   compactOnMobile?: boolean;
 }
 
 export function RunStatusPill({
   status,
+  artifactsStatus,
   className,
   compactOnMobile = false,
 }: RunStatusPillProps) {
+  const label =
+    status === "running"
+      ? resolveRunningLabel(artifactsStatus)
+      : STATUS_LABELS[status];
+  const isActive = status === "running";
+
   return (
     <Badge
       variant="outline"
       className={cn("gap-1.5 font-normal", STATUS_STYLES[status], className)}
-      title={STATUS_LABELS[status]}
+      title={label}
     >
       {compactOnMobile ? (
         <span
           className={cn(
             "size-1.5 shrink-0 rounded-full",
             STATUS_DOTS[status],
-            status === "running" && "animate-pulse",
+            isActive && "animate-pulse",
           )}
           aria-hidden
         />
-      ) : status === "running" ? (
+      ) : isActive ? (
         <span className="size-1.5 animate-pulse rounded-full bg-current" />
       ) : null}
       <span
@@ -57,7 +72,7 @@ export function RunStatusPill({
           compactOnMobile && "sr-only @[420px]/workspace-header:not-sr-only",
         )}
       >
-        {STATUS_LABELS[status]}
+        {label}
       </span>
     </Badge>
   );

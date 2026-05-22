@@ -1,13 +1,33 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
+import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
 import type { ArtifactsPanelStatus, RunArtifacts } from "@/features/artifacts/types";
 import type { AgentRole, RunStatus, SimulationMessage } from "@/features/agents/types";
 import { parseSimulationEvent } from "@/lib/simulation-stream";
 
 import { formatMessageTime } from "@/lib/format-time";
+
+function resolvePanelArtifactsStatus(
+  artifactsStatus: ArtifactsPanelStatus,
+  runStatus: RunStatus,
+  messages: SimulationMessage[],
+  activeAgent: AgentRole | null,
+): ArtifactsPanelStatus {
+  const debateComplete =
+    runStatus === "running" &&
+    messages.length >= SIMULATION_AGENT_ORDER.length &&
+    messages.every((message) => !message.isStreaming) &&
+    activeAgent == null;
+
+  if (artifactsStatus === "pending" && debateComplete) {
+    return "generating";
+  }
+
+  return artifactsStatus;
+}
 
 export function useSimulationStream() {
   const router = useRouter();
@@ -21,6 +41,17 @@ export function useSimulationStream() {
     useState<ArtifactsPanelStatus>("idle");
   const abortRef = useRef<AbortController | null>(null);
   const activeMessageIdRef = useRef<string | null>(null);
+
+  const panelArtifactsStatus = useMemo(
+    () =>
+      resolvePanelArtifactsStatus(
+        artifactsStatus,
+        status,
+        messages,
+        activeAgent,
+      ),
+    [artifactsStatus, status, messages, activeAgent],
+  );
 
   const loadArtifacts = useCallback(async (id: string) => {
     const response = await fetch(`/api/runs/${id}/artifacts`);
@@ -134,23 +165,33 @@ export function useSimulationStream() {
               setActiveAgent(null);
             } else if (event.type === "artifacts_start") {
               setArtifactsStatus("generating");
+              if (currentRunId) {
+                void loadArtifacts(currentRunId);
+              }
             } else if (event.type === "artifacts_ready") {
               currentRunId = event.runId;
               await loadArtifacts(event.runId);
             } else if (event.type === "artifacts_failed") {
-              setArtifactsStatus("unavailable");
+              if (currentRunId) {
+                await loadArtifacts(currentRunId);
+              } else {
+                setArtifactsStatus("unavailable");
+              }
             } else if (event.type === "error") {
               setError(event.message);
               setStatus("failed");
               setActiveAgent(null);
+              if (currentRunId) {
+                await loadArtifacts(currentRunId);
+              } else {
+                setArtifactsStatus("unavailable");
+              }
             } else if (event.type === "done") {
               setRunId(event.runId);
               setStatus((current) =>
                 current === "failed" ? current : "complete",
               );
-              if (currentRunId) {
-                await loadArtifacts(event.runId);
-              }
+              await loadArtifacts(event.runId);
               router.replace(`/runs/${event.runId}`);
             }
           }
@@ -186,7 +227,7 @@ export function useSimulationStream() {
     runId,
     activeAgent,
     artifacts,
-    artifactsStatus,
+    artifactsStatus: panelArtifactsStatus,
     start,
     cancel,
   };

@@ -34,20 +34,28 @@ export async function getArtifactsForRun(runId: string) {
   });
 }
 
+export async function saveArtifactBundle(runId: string, artifacts: RunArtifacts) {
+  await prisma.$transaction(
+    ARTIFACT_TYPES.map((type) => {
+      const data: ArtifactDocument = { sections: artifacts[type] };
+      const json = data as unknown as Prisma.InputJsonValue;
+
+      return prisma.artifact.upsert({
+        where: {
+          runId_type: { runId, type },
+        },
+        create: { runId, type, data: json },
+        update: { data: json },
+      });
+    }),
+  );
+}
+
 export async function saveRunArtifacts(
   runId: string,
   artifacts: RunArtifacts,
 ) {
-  await Promise.all(
-    ARTIFACT_TYPES.map((type) => {
-      const data: ArtifactDocument = { sections: artifacts[type] };
-      return upsertArtifact(
-        runId,
-        type,
-        data as unknown as Prisma.InputJsonValue,
-      );
-    }),
-  );
+  await saveArtifactBundle(runId, artifacts);
 }
 
 export async function saveSingleArtifact(

@@ -4,12 +4,15 @@ import { generateRunArtifacts } from "@/ai/artifacts/generate-run-artifacts";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import type { AgentRole } from "@/features/agents/types";
 import { getPersona } from "@/features/agents/personas";
-import { ARTIFACT_TYPES } from "@/features/artifacts/schemas";
-import type { RunArtifacts } from "@/features/artifacts/types";
+import { type RunArtifacts } from "@/features/artifacts/types";
 import {
   runArtifactsOutputToBundle,
-  saveSingleArtifact,
+  saveArtifactBundle,
 } from "@/lib/db/artifacts";
+import {
+  toAppArtifactStatus,
+  updateArtifactStatus,
+} from "@/lib/db/artifact-status";
 import { getRunWithMessages } from "@/lib/db/runs";
 import { toAppRunStatus } from "@/lib/db/run-status";
 import {
@@ -73,7 +76,11 @@ export async function regenerateRunArtifacts(
   }
 
   const status = toAppRunStatus(run.status);
+  const artifactStatus = toAppArtifactStatus(run.artifactStatus);
   if (status === "running" || status === "idle") {
+    return { ok: false, error: "run_in_progress" };
+  }
+  if (artifactStatus === "generating") {
     return { ok: false, error: "run_in_progress" };
   }
 
@@ -86,22 +93,21 @@ export async function regenerateRunArtifacts(
     buildRosterFromMessages(run.messages);
 
   try {
+    await updateArtifactStatus(runId, "generating");
+
     const artifactOutput = await generateRunArtifacts({
       productIdea: run.userPrompt,
       transcript: mapMessagesToTranscript(run.messages),
       roster,
     });
     const bundle = runArtifactsOutputToBundle(artifactOutput);
-
-    for (const type of ARTIFACT_TYPES) {
-      await saveSingleArtifact(runId, type, {
-        sections: bundle[type],
-      });
-    }
+    await saveArtifactBundle(runId, bundle);
+    await updateArtifactStatus(runId, "ready");
 
     return { ok: true, artifacts: bundle };
   } catch (error) {
     console.error("Regenerate artifacts failed:", error);
+    await updateArtifactStatus(runId, "failed");
     return {
       ok: false,
       error: "generation_failed",

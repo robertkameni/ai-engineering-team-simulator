@@ -1,6 +1,11 @@
 import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
 import { mapDbArtifactsToRunArtifacts } from "@/lib/db/artifacts";
+import {
+  deriveArtifactsPanelStatus,
+  toAppArtifactStatus,
+} from "@/lib/db/artifact-status";
 import { getRunWithMessages } from "@/lib/db/runs";
+import { toAppRunStatus } from "@/lib/db/run-status";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -18,10 +23,14 @@ export async function GET(_request: Request, { params }: RouteParams) {
   }
 
   const artifacts = mapDbArtifactsToRunArtifacts(run.artifacts);
+  const panelStatus = deriveArtifactsPanelStatus(
+    toAppRunStatus(run.status),
+    toAppArtifactStatus(run.artifactStatus),
+  );
 
   return Response.json({
     artifacts,
-    status: artifacts ? "ready" : "unavailable",
+    status: panelStatus,
   });
 }
 

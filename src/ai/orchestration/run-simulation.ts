@@ -14,10 +14,9 @@ import type { TranscriptEntry } from "@/ai/context/transcript";
 import { getAgentSystemPrompt } from "@/ai/prompts";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import { getDeepSeekModel } from "@/ai/providers";
-import { ARTIFACT_TYPES } from "@/features/artifacts/schemas";
 import {
   runArtifactsOutputToBundle,
-  saveSingleArtifact,
+  saveArtifactBundle,
 } from "@/lib/db/artifacts";
 import { saveTeamRoster } from "@/lib/db/team-roster";
 import {
@@ -25,6 +24,7 @@ import {
   createRun,
   updateRunStatus,
 } from "@/lib/db/runs";
+import { updateArtifactStatus } from "@/lib/db/artifact-status";
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
 export async function runSimulation(
@@ -32,15 +32,16 @@ export async function runSimulation(
   send: (event: SimulationStreamEvent) => void,
 ) {
   const run = await createRun(productIdea);
-  const roster = createSimulationRoster();
-  await saveTeamRoster(run.id, roster);
-
-  send({ type: "run_started", runId: run.id });
 
   const transcript: TranscriptEntry[] = [];
   let messageOrder = 0;
 
   try {
+    const roster = createSimulationRoster();
+    await saveTeamRoster(run.id, roster);
+
+    send({ type: "run_started", runId: run.id });
+
     for (const role of SIMULATION_AGENT_ORDER) {
       if (!isSimulationAgent(role)) continue;
 
@@ -69,7 +70,10 @@ export async function runSimulation(
       messageOrder += 1;
     }
 
+    await updateArtifactStatus(run.id, "pending");
+
     send({ type: "artifacts_start" });
+    await updateArtifactStatus(run.id, "generating");
 
     try {
       const artifactOutput = await generateRunArtifacts({
@@ -78,14 +82,14 @@ export async function runSimulation(
         roster,
       });
       const bundle = runArtifactsOutputToBundle(artifactOutput);
-      for (const type of ARTIFACT_TYPES) {
-        await saveSingleArtifact(run.id, type, {
-          sections: bundle[type],
-        });
-      }
+      await saveArtifactBundle(run.id, bundle);
+      await updateArtifactStatus(run.id, "ready");
+      await updateRunStatus(run.id, "complete");
       send({ type: "artifacts_ready", runId: run.id });
     } catch (artifactError) {
       console.error("Artifact generation failed:", artifactError);
+      await updateArtifactStatus(run.id, "failed");
+      await updateRunStatus(run.id, "complete");
       send({
         type: "artifacts_failed",
         message:
@@ -95,7 +99,6 @@ export async function runSimulation(
       });
     }
 
-    await updateRunStatus(run.id, "complete");
     send({ type: "done", runId: run.id });
   } catch (error) {
     await updateRunStatus(run.id, "failed");

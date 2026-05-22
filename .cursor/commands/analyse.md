@@ -61,4 +61,40 @@ Must:
 - avoid redesigns
 
 ## Risk Assessment
-Only concrete runtime risks.
+Only concrete runtime risk# Severity Rules
+
+High
+- data corruption
+- security exposure
+- persistent invalid state
+- runtime crash affecting core flow
+
+Medium
+- inconsistent persisted state
+- degraded user-visible behavior
+- partial failure without recovery
+
+Low
+- maintainability risk
+- developer-facing inconsistency
+- edge-case runtime behavior with low impact
+
+# Confidence Handling
+
+Only state conclusions that are directly supported by:
+- observable control flow
+- reachable runtime paths
+- explicit framework behavior
+
+If certainty is incomplete:
+- state the assumption briefly
+- reduce confidence accordingly
+- avoid definitive language
+
+# Issue Threshold
+
+Do not report an issue unless:
+
+1. the runtime path is reachable
+2. the impact is observable
+3. the current implementation does not already mitigate it

@@ -4,18 +4,14 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 
+import { ArtifactPanel } from "@/features/artifacts/artifact-panel";
 import type { ArtifactsPanelStatus, RunArtifacts } from "@/features/artifacts/types";
+import type { DebateProgress } from "@/features/artifacts/artifact-panel-phase";
+import type { AgentRole } from "@/features/agents/types";
 import { Sidebar } from "@/features/workspace/sidebar";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { WorkspaceMobileContext } from "@/features/workspace/workspace-mobile-context";
 import { useMinWidth } from "@/lib/use-media-query";
-
-const ArtifactPanel = dynamic(
-  () =>
-    import("@/features/artifacts/artifact-panel").then(
-      (module) => module.ArtifactPanel,
-    ),
-);
 
 const SidebarMobileSheet = dynamic(
   () =>
@@ -40,6 +36,9 @@ interface AppShellProps {
   regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;
   initialRecentRuns?: SidebarRunItemData[];
+  debateProgress?: DebateProgress;
+  debateMessages?: { role: AgentRole; isStreaming?: boolean }[];
+  activeAgent?: AgentRole | null;
 }
 
 export function AppShell({
@@ -49,6 +48,9 @@ export function AppShell({
   regenerateRunId,
   canRegenerateArtifacts = false,
   initialRecentRuns,
+  debateProgress,
+  debateMessages,
+  activeAgent = null,
 }: AppShellProps) {
   const pathname = usePathname();
   const isWide = useMinWidth(960);
@@ -84,6 +86,9 @@ export function AppShell({
     status: artifactsStatus,
     regenerateRunId,
     canRegenerateArtifacts,
+    debateProgress,
+    debateMessages,
+    activeAgent,
   };
 
   return (

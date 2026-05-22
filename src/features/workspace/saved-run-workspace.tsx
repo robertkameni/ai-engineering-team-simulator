@@ -52,6 +52,10 @@ export function SavedRunWorkspace({
               status={artifactsStatus}
               regenerateRunId={regenerateRunId}
               canRegenerateArtifacts={canRegenerateArtifacts}
+              debateMessages={run.messages.map((message) => ({
+                role: message.role,
+                isStreaming: message.isStreaming,
+              }))}
             />
           ) : null
         }

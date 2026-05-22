@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Tabs,
   TabsContent,
@@ -5,8 +7,8 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skeleton";
 import { ArtifactSections } from "@/features/artifacts/artifact-sections";
+import { ArtifactPanelPlaceholder } from "@/features/artifacts/artifact-panel-placeholder";
 import { RegenerateArtifactsButton } from "@/features/artifacts/regenerate-artifacts-button";
 import { SheetClose } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -16,51 +18,16 @@ import {
   ARTIFACT_TAB_LIST_CLASS,
   ARTIFACT_TAB_TRIGGER_BASE,
 } from "@/features/artifacts/artifact-tab-styles";
+import {
+  artifactPanelSubtitle,
+  type DebateProgress,
+} from "@/features/artifacts/artifact-panel-phase";
 import type {
   ArtifactsPanelStatus,
   RunArtifacts,
 } from "@/features/artifacts/types";
+import type { AgentRole } from "@/features/agents/types";
 import { cn } from "@/lib/utils";
-
-function ArtifactPlaceholder({
-  status,
-  regenerateRunId,
-  canRegenerateArtifacts,
-}: {
-  status: ArtifactsPanelStatus;
-  regenerateRunId?: string;
-  canRegenerateArtifacts?: boolean;
-}) {
-  const copy =
-    status === "generating"
-      ? "Synthesizing structured deliverables from the debate…"
-      : status === "pending"
-        ? "The team is debating — structured artifacts will generate when they finish."
-        : status === "unavailable"
-          ? "Artifacts could not be generated for this run. Regenerate from the saved debate or start a new simulation."
-          : "Start a simulation to generate requirements, architecture, implementation, and review.";
-
-  if (status === "generating") {
-    return <ArtifactPanelSkeleton />;
-  }
-
-  return (
-    <section className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
-      {status === "pending" ? (
-        <span className="pulse-glow mb-3 size-2.5 rounded-full bg-agent-architect" />
-      ) : null}
-      <p className="text-body text-muted-foreground">{copy}</p>
-      {status === "unavailable" &&
-      canRegenerateArtifacts &&
-      regenerateRunId ? (
-        <RegenerateArtifactsButton
-          variant="placeholder"
-          runId={regenerateRunId}
-        />
-      ) : null}
-    </section>
-  );
-}
 
 interface ArtifactPanelProps {
   artifacts?: RunArtifacts | null;
@@ -68,6 +35,9 @@ interface ArtifactPanelProps {
   layout?: "inline" | "sheet";
   regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;
+  debateProgress?: DebateProgress;
+  debateMessages?: { role: AgentRole; isStreaming?: boolean }[];
+  activeAgent?: AgentRole | null;
 }
 
 export function ArtifactPanel({
@@ -76,10 +46,14 @@ export function ArtifactPanel({
   layout = "inline",
   regenerateRunId,
   canRegenerateArtifacts = false,
+  debateProgress,
+  debateMessages,
+  activeAgent = null,
 }: ArtifactPanelProps) {
   const isReady = status === "ready" && artifacts != null;
   const isSheet = layout === "sheet";
   const showRegenerate = canRegenerateArtifacts && regenerateRunId != null;
+  const subtitle = artifactPanelSubtitle(status, debateProgress);
 
   return (
     <aside
@@ -93,14 +67,7 @@ export function ArtifactPanel({
       <header className="flex shrink-0 items-start justify-between gap-2 border-b border-glass-border px-4 py-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-title font-semibold tracking-tight">Artifacts</h2>
-          <p
-            className={cn(
-              "mt-0.5 text-caption text-muted-foreground",
-              isSheet ? "block" : "hidden @[720px]/artifact-panel:block",
-            )}
-          >
-            Structured outputs from the team
-          </p>
+          <p className="mt-0.5 text-caption text-muted-foreground">{subtitle}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {showRegenerate ? (
@@ -165,10 +132,13 @@ export function ArtifactPanel({
           ))}
         </Tabs>
       ) : (
-        <ArtifactPlaceholder
+        <ArtifactPanelPlaceholder
           status={status}
           regenerateRunId={regenerateRunId}
           canRegenerateArtifacts={canRegenerateArtifacts}
+          debateProgress={debateProgress}
+          debateMessages={debateMessages}
+          activeAgent={activeAgent}
         />
       )}
     </aside>

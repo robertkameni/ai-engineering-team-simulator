@@ -10,7 +10,9 @@ import { MessageThread } from "@/features/simulation/message-thread";
 import { PromptComposer } from "@/features/simulation/prompt-composer";
 import { SimulationErrorBanner } from "@/features/simulation/simulation-error-banner";
 import { AgentTypingIndicator } from "@/features/simulation/agent-typing-indicator";
+import { debateProgressFromMessages } from "@/features/artifacts/artifact-panel-phase";
 import { useSimulationStream } from "@/features/simulation/use-simulation-stream";
+import { useWorkspaceMobile } from "@/features/workspace/workspace-mobile-context";
 
 interface SimulationWorkspaceProps {
   userPrompt: string;
@@ -31,8 +33,21 @@ export function SimulationWorkspace({
     artifactsStatus,
     start,
   } = useSimulationStream();
-  
+
+  const mobile = useWorkspaceMobile();
+  const artifactsSheetOpenedRef = useRef(false);
   const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (artifactsStatus !== "generating" || artifactsSheetOpenedRef.current) {
+      return;
+    }
+    if (!mobile?.showArtifactsAction) {
+      return;
+    }
+    artifactsSheetOpenedRef.current = true;
+    mobile.openArtifacts();
+  }, [artifactsStatus, mobile]);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -48,15 +63,10 @@ export function SimulationWorkspace({
     activeAgent != null &&
     messages.every((message) => !message.isStreaming);
 
-  const debateComplete =
-    status === "running" &&
-    messages.length > 0 &&
-    messages.every((message) => !message.isStreaming);
-
-  const panelArtifactsStatus =
-    artifactsStatus === "pending" && debateComplete
-      ? "generating"
-      : artifactsStatus;
+  const debateProgress = useMemo(
+    () => debateProgressFromMessages(messages, activeAgent),
+    [messages, activeAgent],
+  );
 
   const exportRun = useMemo<MockRun>(
     () => ({
@@ -67,7 +77,7 @@ export function SimulationWorkspace({
       updatedAt: new Date().toISOString(),
       messages,
       artifacts,
-      artifactsStatus: panelArtifactsStatus,
+      artifactsStatus,
     }),
     [
       runId,
@@ -76,16 +86,24 @@ export function SimulationWorkspace({
       status,
       messages,
       artifacts,
-      panelArtifactsStatus,
+      artifactsStatus,
     ],
   );
 
   return (
-    <AppShell artifacts={artifacts} artifactsStatus={panelArtifactsStatus}>
+    <AppShell
+      artifacts={artifacts}
+      artifactsStatus={artifactsStatus}
+      debateProgress={debateProgress}
+      debateMessages={messages}
+      activeAgent={activeAgent}
+    >
       <WorkspaceHeader
         title={title}
         status={status}
         subtitle={userPrompt}
+        artifactsStatus={artifactsStatus}
+        debateProgress={debateProgress}
         run={messages.length > 0 ? exportRun : undefined}
       />
       <WorkspaceMain>

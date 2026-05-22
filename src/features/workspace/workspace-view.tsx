@@ -8,6 +8,9 @@ import { MessageThreadStatic } from "@/features/simulation/message-thread-static
 import { PromptComposerPlaceholder } from "@/features/simulation/prompt-composer-placeholder";
 import type { MockRun } from "@/features/agents/types";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
+import {
+  debateProgressFromMessages,
+} from "@/features/artifacts/artifact-panel-phase";
 
 const PromptComposer = dynamic(
   () =>
@@ -40,6 +43,7 @@ export function WorkspaceView({
   initialRecentRuns,
 }: WorkspaceViewProps) {
   const messages = showEmptyThread ? [] : run.messages;
+  const debateProgress = debateProgressFromMessages(messages, null);
   const thread =
     staticMessages && messages.length > 0 ? (
       <MessageThreadStatic messages={messages} />
@@ -54,11 +58,18 @@ export function WorkspaceView({
       regenerateRunId={regenerateRunId}
       canRegenerateArtifacts={canRegenerateArtifacts}
       initialRecentRuns={initialRecentRuns}
+      debateProgress={debateProgress}
+      debateMessages={messages.map((message) => ({
+        role: message.role,
+        isStreaming: message.isStreaming,
+      }))}
     >
       <WorkspaceHeader
         title={run.title}
         status={run.status}
         subtitle={run.userPrompt}
+        artifactsStatus={run.artifactsStatus ?? "idle"}
+        debateProgress={debateProgress}
         run={run}
       />
       <WorkspaceMain>{thread}</WorkspaceMain>

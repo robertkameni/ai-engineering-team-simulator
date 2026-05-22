@@ -5,10 +5,13 @@ import { Home, Menu, Layers } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { RunStatusPill } from "@/features/simulation/run-status-pill";
+import { ArtifactStatusPill } from "@/features/artifacts/artifact-status-pill";
 import { ExportRunButton } from "@/features/workspace/export-run-button";
 import { useWorkspaceMobile } from "@/features/workspace/workspace-mobile-context";
 import type { MockRun } from "@/features/agents/types";
 import type { RunStatus } from "@/features/agents/types";
+import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
+import type { DebateProgress } from "@/features/artifacts/artifact-panel-phase";
 import { cn } from "@/lib/utils";
 
 interface WorkspaceHeaderProps {
@@ -16,6 +19,8 @@ interface WorkspaceHeaderProps {
   status: RunStatus;
   subtitle?: string;
   run?: MockRun;
+  artifactsStatus?: ArtifactsPanelStatus;
+  debateProgress?: DebateProgress;
   className?: string;
 }
 
@@ -24,6 +29,8 @@ export function WorkspaceHeader({
   status,
   subtitle,
   run,
+  artifactsStatus = "idle",
+  debateProgress,
   className,
 }: WorkspaceHeaderProps) {
   const mobile = useWorkspaceMobile();
@@ -84,7 +91,17 @@ export function WorkspaceHeader({
           </Button>
         ) : null}
         {run ? <ExportRunButton run={run} /> : null}
-        <RunStatusPill status={status} compactOnMobile />
+        {artifactsStatus === "pending" || artifactsStatus === "unavailable" ? (
+          <ArtifactStatusPill
+            status={artifactsStatus}
+            debateProgress={debateProgress}
+          />
+        ) : null}
+        <RunStatusPill
+          status={status}
+          artifactsStatus={artifactsStatus}
+          compactOnMobile
+        />
       </div>
     </header>
   );

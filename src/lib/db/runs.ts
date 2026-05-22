@@ -7,6 +7,10 @@ import { getPersona } from "@/features/agents/personas";
 import { formatMessageTime, formatRelativeTime } from "@/lib/format-time";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { prisma } from "@/lib/prisma";
+import {
+  deriveArtifactsPanelStatus,
+  toAppArtifactStatus,
+} from "@/lib/db/artifact-status";
 import { toAppRunStatus, toPrismaRunStatus } from "@/lib/db/run-status";
 import type { RunStatus as AppRunStatus } from "@/features/agents/types";
 import { getOrCreateDefaultProject } from "@/lib/db/projects";
@@ -16,7 +20,6 @@ import {
   getTeamRoster,
   parseTeamRoster,
 } from "@/lib/db/team-roster";
-import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
 
 export async function createRun(userPrompt: string, projectId?: string) {
   const project =
@@ -154,17 +157,15 @@ export async function getRunForWorkspace(runId: string) {
   const title = formatRunTitle(run.userPrompt);
 
   const artifacts = mapDbArtifactsToRunArtifacts(run.artifacts);
-  const artifactsStatus: ArtifactsPanelStatus = artifacts
-    ? "ready"
-    : toAppRunStatus(run.status) === "complete"
-      ? "unavailable"
-      : "pending";
+  const runStatus = toAppRunStatus(run.status);
+  const artifactStatus = toAppArtifactStatus(run.artifactStatus);
+  const artifactsStatus = deriveArtifactsPanelStatus(runStatus, artifactStatus);
 
   return {
     id: run.id,
     title,
     userPrompt: run.userPrompt,
-    status: toAppRunStatus(run.status),
+    status: runStatus,
     updatedAt: run.updatedAt.toISOString(),
     messages: mapDbMessagesToSimulation(run.messages, roster),
     artifacts,
