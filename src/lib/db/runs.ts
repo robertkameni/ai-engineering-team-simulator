@@ -11,6 +11,7 @@ import {
   deriveArtifactsPanelStatus,
   toAppArtifactStatus,
 } from "@/lib/db/artifact-status";
+import { reconcileStaleRunIfNeeded } from "@/lib/db/run-reconcile";
 import { toAppRunStatus, toPrismaRunStatus } from "@/lib/db/run-status";
 import type { RunStatus as AppRunStatus } from "@/features/agents/types";
 import { getOrCreateDefaultProject } from "@/lib/db/projects";
@@ -43,6 +44,13 @@ export async function updateRunStatus(runId: string, status: AppRunStatus) {
   });
 }
 
+export async function touchRunActivity(runId: string) {
+  return prisma.run.update({
+    where: { id: runId },
+    data: { updatedAt: new Date() },
+  });
+}
+
 export async function updateRunSummary(runId: string, summary: string) {
   return prisma.run.update({
     where: { id: runId },
@@ -57,15 +65,23 @@ export async function appendMessage(
   order: number,
   agentName?: string,
 ) {
-  return prisma.message.create({
-    data: {
-      runId,
-      agentRole,
-      agentName,
-      content,
-      order,
-    },
-  });
+  const now = new Date();
+
+  return prisma.$transaction([
+    prisma.message.create({
+      data: {
+        runId,
+        agentRole,
+        agentName,
+        content,
+        order,
+      },
+    }),
+    prisma.run.update({
+      where: { id: runId },
+      data: { updatedAt: now },
+    }),
+  ]);
 }
 
 export async function getRunWithMessages(runId: string) {
@@ -79,16 +95,37 @@ export async function getRunWithMessages(runId: string) {
 }
 
 export async function listRecentRuns(limit = 10) {
-  return prisma.run.findMany({
-    orderBy: { updatedAt: "desc" },
+  const query = {
+    orderBy: { updatedAt: "desc" as const },
     take: limit,
     include: {
+      _count: { select: { messages: true } },
       messages: {
-        orderBy: { order: "asc" },
+        orderBy: { order: "asc" as const },
         take: 1,
       },
     },
-  });
+  };
+
+  let runs = await prisma.run.findMany(query);
+
+  await Promise.all(
+    runs
+      .filter((run) => run.status === "RUNNING")
+      .map((run) =>
+        reconcileStaleRunIfNeeded({
+          id: run.id,
+          status: run.status,
+          artifactStatus: run.artifactStatus,
+          updatedAt: run.updatedAt,
+          messageCount: run._count.messages,
+        }),
+      ),
+  );
+
+  runs = await prisma.run.findMany(query);
+
+  return runs;
 }
 
 export async function listRecentRunsForSidebar(
@@ -145,8 +182,20 @@ export function mapDbMessagesToSimulation(
 }
 
 export async function getRunForWorkspace(runId: string) {
-  const run = await getRunWithMessages(runId);
+  let run = await getRunWithMessages(runId);
   if (!run) return null;
+
+  const reconciled = await reconcileStaleRunIfNeeded({
+    id: run.id,
+    status: run.status,
+    artifactStatus: run.artifactStatus,
+    updatedAt: run.updatedAt,
+    messageCount: run.messages.length,
+  });
+  if (reconciled) {
+    run = await getRunWithMessages(runId);
+    if (!run) return null;
+  }
 
   const rosterFromArtifact = run.artifacts.find(
     (artifact) => artifact.type === "team-roster",

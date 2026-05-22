@@ -1,14 +1,11 @@
 import type { RunStatus } from "@/features/agents/types";
 import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
 import { Badge } from "@/components/ui/badge";
+import {
+  deriveRunDisplayLabel,
+  panelToAppArtifactStatus,
+} from "@/lib/run-display-label";
 import { cn } from "@/lib/utils";
-
-const STATUS_LABELS: Record<RunStatus, string> = {
-  idle: "Idle",
-  running: "Running",
-  complete: "Complete",
-  failed: "Failed",
-};
 
 const STATUS_STYLES: Record<RunStatus, string> = {
   idle: "text-muted-foreground",
@@ -24,12 +21,6 @@ const STATUS_DOTS: Record<RunStatus, string> = {
   failed: "bg-destructive",
 };
 
-function resolveRunningLabel(artifactsStatus?: ArtifactsPanelStatus): string {
-  if (artifactsStatus === "generating") return "Synthesizing";
-  if (artifactsStatus === "pending") return "Debating";
-  return "Running";
-}
-
 interface RunStatusPillProps {
   status: RunStatus;
   artifactsStatus?: ArtifactsPanelStatus;
@@ -43,10 +34,11 @@ export function RunStatusPill({
   className,
   compactOnMobile = false,
 }: RunStatusPillProps) {
-  const label =
-    status === "running"
-      ? resolveRunningLabel(artifactsStatus)
-      : STATUS_LABELS[status];
+  const label = deriveRunDisplayLabel(
+    status,
+    panelToAppArtifactStatus(status, artifactsStatus),
+    artifactsStatus,
+  );
   const isActive = status === "running";
 
   return (

@@ -67,6 +67,26 @@ export function useSimulationStream() {
     setArtifactsStatus(data.status);
   }, []);
 
+  const synthesizeArtifacts = useCallback(
+    async (id: string) => {
+      const response = await fetch(`/api/runs/${id}/artifacts`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(
+          payload?.error ?? `Artifact synthesis failed (${response.status})`,
+        );
+      }
+
+      await loadArtifacts(id);
+    },
+    [loadArtifacts],
+  );
+
   const start = useCallback(
     async (prompt: string) => {
       abortRef.current?.abort();
@@ -107,6 +127,9 @@ export function useSimulationStream() {
         const decoder = new TextDecoder();
         let buffer = "";
         let currentRunId: string | null = null;
+        let streamSettled = false;
+        let synthesisPromise: Promise<void> | null = null;
+        let synthesisFailed = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -166,18 +189,31 @@ export function useSimulationStream() {
             } else if (event.type === "artifacts_start") {
               setArtifactsStatus("generating");
               if (currentRunId) {
-                void loadArtifacts(currentRunId);
+                synthesisPromise = synthesizeArtifacts(currentRunId).catch(
+                  (synthesisError) => {
+                    synthesisFailed = true;
+                    setError(
+                      synthesisError instanceof Error
+                        ? synthesisError.message
+                        : "Artifact synthesis failed",
+                    );
+                    void loadArtifacts(currentRunId!);
+                  },
+                );
               }
             } else if (event.type === "artifacts_ready") {
               currentRunId = event.runId;
               await loadArtifacts(event.runId);
             } else if (event.type === "artifacts_failed") {
+              synthesisFailed = true;
+              setError(event.message);
               if (currentRunId) {
                 await loadArtifacts(currentRunId);
               } else {
                 setArtifactsStatus("unavailable");
               }
             } else if (event.type === "error") {
+              streamSettled = true;
               setError(event.message);
               setStatus("failed");
               setActiveAgent(null);
@@ -187,17 +223,36 @@ export function useSimulationStream() {
                 setArtifactsStatus("unavailable");
               }
             } else if (event.type === "done") {
+              streamSettled = true;
               setRunId(event.runId);
-              setStatus((current) =>
-                current === "failed" ? current : "complete",
-              );
-              await loadArtifacts(event.runId);
+              currentRunId = event.runId;
+
+              if (synthesisPromise) {
+                await synthesisPromise;
+              }
+
+              if (synthesisFailed) {
+                setStatus("complete");
+              } else {
+                setStatus((current) =>
+                  current === "failed" ? current : "complete",
+                );
+              }
+
               router.replace(`/runs/${event.runId}`);
             }
           }
         }
 
-        setStatus((current) => (current === "running" ? "complete" : current));
+        if (!streamSettled) {
+          setStatus("failed");
+          setError("Simulation interrupted before completion");
+          setArtifactsStatus("unavailable");
+          if (currentRunId) {
+            await loadArtifacts(currentRunId);
+          }
+        }
+
         setActiveAgent(null);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
@@ -209,7 +264,7 @@ export function useSimulationStream() {
         setError(err instanceof Error ? err.message : "Simulation failed");
       }
     },
-    [loadArtifacts, router],
+    [loadArtifacts, router, synthesizeArtifacts],
   );
 
   const cancel = useCallback(() => {

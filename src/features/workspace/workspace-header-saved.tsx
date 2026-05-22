@@ -73,7 +73,11 @@ export function WorkspaceHeaderSaved({
       </div>
       <div className="flex shrink-0 items-center gap-1.5 @[720px]/app-shell:gap-2">
         <ExportRunButton run={run} />
-        <RunStatusPill status={status} compactOnMobile />
+        <RunStatusPill
+          status={status}
+          artifactsStatus={run.artifactsStatus}
+          compactOnMobile
+        />
       </div>
     </header>
   );

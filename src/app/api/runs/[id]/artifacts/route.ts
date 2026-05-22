@@ -5,6 +5,7 @@ import {
   toAppArtifactStatus,
 } from "@/lib/db/artifact-status";
 import { getRunWithMessages } from "@/lib/db/runs";
+import { reconcileStaleRunIfNeeded } from "@/lib/db/run-reconcile";
 import { toAppRunStatus } from "@/lib/db/run-status";
 
 export const runtime = "nodejs";
@@ -14,9 +15,28 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+async function getRunForArtifacts(runId: string) {
+  let run = await getRunWithMessages(runId);
+  if (!run) return null;
+
+  const reconciled = await reconcileStaleRunIfNeeded({
+    id: run.id,
+    status: run.status,
+    artifactStatus: run.artifactStatus,
+    updatedAt: run.updatedAt,
+    messageCount: run.messages.length,
+  });
+
+  if (reconciled) {
+    run = await getRunWithMessages(runId);
+  }
+
+  return run;
+}
+
 export async function GET(_request: Request, { params }: RouteParams) {
   const { id } = await params;
-  const run = await getRunWithMessages(id);
+  const run = await getRunForArtifacts(id);
 
   if (!run) {
     return Response.json({ error: "Run not found" }, { status: 404 });

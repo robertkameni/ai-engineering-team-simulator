@@ -13,7 +13,8 @@ import {
   toAppArtifactStatus,
   updateArtifactStatus,
 } from "@/lib/db/artifact-status";
-import { getRunWithMessages } from "@/lib/db/runs";
+import { getRunWithMessages, touchRunActivity, updateRunStatus } from "@/lib/db/runs";
+import { reconcileStaleRunIfNeeded } from "@/lib/db/run-reconcile";
 import { toAppRunStatus } from "@/lib/db/run-status";
 import {
   getTeamRoster,
@@ -66,7 +67,20 @@ function mapMessagesToTranscript(
 export async function regenerateRunArtifacts(
   runId: string,
 ): Promise<RegenerateRunArtifactsResult> {
-  const run = await getRunWithMessages(runId);
+  let run = await getRunWithMessages(runId);
+  if (!run) {
+    return { ok: false, error: "not_found" };
+  }
+
+  await reconcileStaleRunIfNeeded({
+    id: run.id,
+    status: run.status,
+    artifactStatus: run.artifactStatus,
+    updatedAt: run.updatedAt,
+    messageCount: run.messages.length,
+  });
+
+  run = await getRunWithMessages(runId);
   if (!run) {
     return { ok: false, error: "not_found" };
   }
@@ -77,10 +91,21 @@ export async function regenerateRunArtifacts(
 
   const status = toAppRunStatus(run.status);
   const artifactStatus = toAppArtifactStatus(run.artifactStatus);
-  if (status === "running" || status === "idle") {
+  const debateComplete =
+    run.messages.length >= SIMULATION_AGENT_ORDER.length;
+
+  if (status === "idle") {
     return { ok: false, error: "run_in_progress" };
   }
-  if (artifactStatus === "generating") {
+
+  if (status === "running") {
+    if (!debateComplete) {
+      return { ok: false, error: "run_in_progress" };
+    }
+    if (artifactStatus === "generating" || artifactStatus === "ready") {
+      return { ok: false, error: "run_in_progress" };
+    }
+  } else if (artifactStatus === "generating") {
     return { ok: false, error: "run_in_progress" };
   }
 
@@ -94,6 +119,7 @@ export async function regenerateRunArtifacts(
 
   try {
     await updateArtifactStatus(runId, "generating");
+    await touchRunActivity(runId);
 
     const artifactOutput = await generateRunArtifacts({
       productIdea: run.userPrompt,
@@ -103,11 +129,17 @@ export async function regenerateRunArtifacts(
     const bundle = runArtifactsOutputToBundle(artifactOutput);
     await saveArtifactBundle(runId, bundle);
     await updateArtifactStatus(runId, "ready");
+    if (status === "running") {
+      await updateRunStatus(runId, "complete");
+    }
 
     return { ok: true, artifacts: bundle };
   } catch (error) {
     console.error("Regenerate artifacts failed:", error);
     await updateArtifactStatus(runId, "failed");
+    if (status === "running") {
+      await updateRunStatus(runId, "complete");
+    }
     return {
       ok: false,
       error: "generation_failed",

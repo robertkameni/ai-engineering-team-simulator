@@ -1,6 +1,5 @@
 import { streamText } from "ai";
 
-import { generateRunArtifacts } from "@/ai/artifacts/generate-run-artifacts";
 import {
   SIMULATION_AGENT_ORDER,
   getAgentConfig,
@@ -12,19 +11,15 @@ import type { TeamRoster } from "@/ai/agents/roster";
 import { buildAgentMessages } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { getAgentSystemPrompt } from "@/ai/prompts";
-import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import { getDeepSeekModel } from "@/ai/providers";
-import {
-  runArtifactsOutputToBundle,
-  saveArtifactBundle,
-} from "@/lib/db/artifacts";
+import { updateArtifactStatus } from "@/lib/db/artifact-status";
+import { reconcileRunFailure } from "@/lib/db/run-reconcile";
 import { saveTeamRoster } from "@/lib/db/team-roster";
 import {
   appendMessage,
   createRun,
-  updateRunStatus,
+  touchRunActivity,
 } from "@/lib/db/runs";
-import { updateArtifactStatus } from "@/lib/db/artifact-status";
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
 export async function runSimulation(
@@ -35,15 +30,19 @@ export async function runSimulation(
 
   const transcript: TranscriptEntry[] = [];
   let messageOrder = 0;
+  let debateComplete = false;
 
   try {
     const roster = createSimulationRoster();
     await saveTeamRoster(run.id, roster);
+    await touchRunActivity(run.id);
 
     send({ type: "run_started", runId: run.id });
 
     for (const role of SIMULATION_AGENT_ORDER) {
       if (!isSimulationAgent(role)) continue;
+
+      await touchRunActivity(run.id);
 
       const fullText = await streamAgentTurn({
         role,
@@ -70,38 +69,18 @@ export async function runSimulation(
       messageOrder += 1;
     }
 
+    debateComplete = true;
+
     await updateArtifactStatus(run.id, "pending");
-
     send({ type: "artifacts_start" });
-    await updateArtifactStatus(run.id, "generating");
-
-    try {
-      const artifactOutput = await generateRunArtifacts({
-        productIdea,
-        transcript,
-        roster,
-      });
-      const bundle = runArtifactsOutputToBundle(artifactOutput);
-      await saveArtifactBundle(run.id, bundle);
-      await updateArtifactStatus(run.id, "ready");
-      await updateRunStatus(run.id, "complete");
-      send({ type: "artifacts_ready", runId: run.id });
-    } catch (artifactError) {
-      console.error("Artifact generation failed:", artifactError);
-      await updateArtifactStatus(run.id, "failed");
-      await updateRunStatus(run.id, "complete");
-      send({
-        type: "artifacts_failed",
-        message:
-          artifactError instanceof Error
-            ? artifactError.message
-            : "Artifact generation failed",
-      });
-    }
-
     send({ type: "done", runId: run.id });
   } catch (error) {
-    await updateRunStatus(run.id, "failed");
+    if (!debateComplete) {
+      await reconcileRunFailure(run.id, {
+        debateComplete: false,
+        artifactPhaseStarted: false,
+      });
+    }
     throw error;
   }
 }
@@ -129,33 +108,45 @@ async function streamAgentTurn({
     title: member.title,
   });
 
-  let fullText = await collectAgentStream({
-    role,
-    productIdea,
-    transcript,
-    roster,
-    config,
-    send,
-  });
-
-  if (!fullText.trim()) {
-    console.warn(`Empty response for ${role}, retrying with expanded budget`);
+  let fullText: string;
+  try {
     fullText = await collectAgentStream({
       role,
       productIdea,
       transcript,
       roster,
-      config: {
-        ...config,
-        maxOutputTokens: Math.max(config.maxOutputTokens * 2, 900),
-        deepseek: DEEPSEEK_CHAT_OPTIONS,
-      },
+      config,
       send,
     });
+
+    if (!fullText.trim()) {
+      console.warn(`Empty response for ${role}, retrying with expanded budget`);
+      fullText = await collectAgentStream({
+        role,
+        productIdea,
+        transcript,
+        roster,
+        config: {
+          ...config,
+          maxOutputTokens: Math.max(config.maxOutputTokens * 2, 900),
+        },
+        send,
+      });
+    }
+  } catch (streamError) {
+    send({ type: "agent_end", role });
+    throw streamError;
+  }
+
+  if (!fullText.trim()) {
+    send({ type: "agent_end", role });
+    throw new Error(
+      `${member.name} (${role}) returned no output — check API limits or retry.`,
+    );
   }
 
   send({ type: "agent_end", role });
-  return fullText.trim() || `[${member.name} had no visible output — check API limits.]`;
+  return fullText.trim();
 }
 
 async function collectAgentStream({
@@ -185,9 +176,16 @@ async function collectAgentStream({
   });
 
   let fullText = "";
-  for await (const delta of result.textStream) {
-    fullText += delta;
-    send({ type: "text-delta", role, delta });
+  try {
+    for await (const delta of result.textStream) {
+      fullText += delta;
+      send({ type: "text-delta", role, delta });
+    }
+  } catch (error) {
+    if (fullText.trim()) {
+      return fullText;
+    }
+    throw error;
   }
   return fullText;
 }

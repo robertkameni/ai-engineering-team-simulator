@@ -1,6 +1,6 @@
 import type { DeepSeekLanguageModelOptions } from "@ai-sdk/deepseek";
 
-import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
+import { DEEPSEEK_CHAT_OPTIONS, DEEPSEEK_REASONING_OPTIONS } from "@/ai/deepseek-options";
 import type { DeepSeekModelId } from "@/ai/providers";
 import type { AgentRole } from "@/features/agents/types";
 
@@ -36,7 +36,7 @@ export const ACTIVE_AGENTS: AgentModelConfig[] = [
     model: "deepseek-v4-pro",
     maxOutputTokens: 650,
     temperature: 0.5,
-    deepseek: DEEPSEEK_CHAT_OPTIONS,
+    deepseek: DEEPSEEK_REASONING_OPTIONS,
   },
   {
     role: "backend",
