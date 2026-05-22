@@ -22,15 +22,18 @@ import {
 } from "@/lib/db/runs";
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
+const STREAM_HEARTBEAT_MS = 15_000;
+
 export async function runSimulation(
   productIdea: string,
   send: (event: SimulationStreamEvent) => void,
-) {
+): Promise<string> {
   const run = await createRun(productIdea);
 
   const transcript: TranscriptEntry[] = [];
   let messageOrder = 0;
   let debateComplete = false;
+  let artifactPhaseStarted = false;
 
   try {
     const roster = createSimulationRoster();
@@ -45,6 +48,7 @@ export async function runSimulation(
       await touchRunActivity(run.id);
 
       const fullText = await streamAgentTurn({
+        runId: run.id,
         role,
         productIdea,
         transcript,
@@ -70,28 +74,30 @@ export async function runSimulation(
     }
 
     debateComplete = true;
+    artifactPhaseStarted = true;
 
     await updateArtifactStatus(run.id, "pending");
     send({ type: "artifacts_start" });
     send({ type: "done", runId: run.id });
+    return run.id;
   } catch (error) {
-    if (!debateComplete) {
-      await reconcileRunFailure(run.id, {
-        debateComplete: false,
-        artifactPhaseStarted: false,
-      });
-    }
+    await reconcileRunFailure(run.id, {
+      debateComplete,
+      artifactPhaseStarted,
+    });
     throw error;
   }
 }
 
 async function streamAgentTurn({
+  runId,
   role,
   productIdea,
   transcript,
   roster,
   send,
 }: {
+  runId: string;
   role: SimulationAgentRole;
   productIdea: string;
   transcript: TranscriptEntry[];
@@ -111,6 +117,7 @@ async function streamAgentTurn({
   let fullText: string;
   try {
     fullText = await collectAgentStream({
+      runId,
       role,
       productIdea,
       transcript,
@@ -122,6 +129,7 @@ async function streamAgentTurn({
     if (!fullText.trim()) {
       console.warn(`Empty response for ${role}, retrying with expanded budget`);
       fullText = await collectAgentStream({
+        runId,
         role,
         productIdea,
         transcript,
@@ -150,6 +158,7 @@ async function streamAgentTurn({
 }
 
 async function collectAgentStream({
+  runId,
   role,
   productIdea,
   transcript,
@@ -157,6 +166,7 @@ async function collectAgentStream({
   config,
   send,
 }: {
+  runId: string;
   role: SimulationAgentRole;
   productIdea: string;
   transcript: TranscriptEntry[];
@@ -176,10 +186,17 @@ async function collectAgentStream({
   });
 
   let fullText = "";
+  let lastHeartbeatAt = Date.now();
   try {
     for await (const delta of result.textStream) {
       fullText += delta;
       send({ type: "text-delta", role, delta });
+
+      const now = Date.now();
+      if (now - lastHeartbeatAt >= STREAM_HEARTBEAT_MS) {
+        await touchRunActivity(runId);
+        lastHeartbeatAt = now;
+      }
     }
   } catch (error) {
     if (fullText.trim()) {

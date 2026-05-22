@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { after } from "next/server";
 
 import { runSimulation } from "@/ai/orchestration/run-simulation";
+import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
 import {
   encodeSimulationEvent,
   type SimulationStreamEvent,
@@ -39,13 +41,22 @@ export async function POST(request: Request) {
         );
       };
 
+      let successRunId: string | null = null;
       try {
-        await runSimulation(prompt, send);
+        successRunId = await runSimulation(prompt, send);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Simulation failed";
         send({ type: "error", message });
       } finally {
+        if (successRunId) {
+          const runIdForSynthesis = successRunId;
+          after(() => {
+            void regenerateRunArtifacts(runIdForSynthesis).catch((error) => {
+              console.error("Deferred artifact synthesis failed:", error);
+            });
+          });
+        }
         controller.close();
       }
     },

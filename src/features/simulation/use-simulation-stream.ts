@@ -10,6 +10,10 @@ import { parseSimulationEvent } from "@/lib/simulation-stream";
 
 import { formatMessageTime } from "@/lib/format-time";
 
+const POLL_ARTIFACT_INTERVAL_MS = 800;
+/** Match artifacts route synthesis budget (approx). */
+const POLL_ARTIFACT_MAX_MS = 320_000;
+
 function resolvePanelArtifactsStatus(
   artifactsStatus: ArtifactsPanelStatus,
   runStatus: RunStatus,
@@ -55,10 +59,12 @@ export function useSimulationStream() {
 
   const loadArtifacts = useCallback(async (id: string) => {
     const response = await fetch(`/api/runs/${id}/artifacts`);
+    
     if (!response.ok) {
       setArtifactsStatus("unavailable");
       return;
     }
+
     const data = (await response.json()) as {
       artifacts: RunArtifacts | null;
       status: ArtifactsPanelStatus;
@@ -67,22 +73,35 @@ export function useSimulationStream() {
     setArtifactsStatus(data.status);
   }, []);
 
-  const synthesizeArtifacts = useCallback(
-    async (id: string) => {
-      const response = await fetch(`/api/runs/${id}/artifacts`, {
-        method: "POST",
-      });
+  const pollArtifactsUntilSettled = useCallback(
+    async (id: string): Promise<ArtifactsPanelStatus> => {
+      const deadline = Date.now() + POLL_ARTIFACT_MAX_MS;
+      while (Date.now() < deadline) {
+        const response = await fetch(`/api/runs/${id}/artifacts`);
+        
+        if (!response.ok) {
+          setArtifactsStatus("unavailable");
+          return "unavailable";
+        }
 
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(
-          payload?.error ?? `Artifact synthesis failed (${response.status})`,
+        const data = (await response.json()) as {
+          artifacts: RunArtifacts | null;
+          status: ArtifactsPanelStatus;
+        };
+
+        setArtifacts(data.artifacts);
+        setArtifactsStatus(data.status);
+        
+        if (data.status === "ready" || data.status === "unavailable") {
+          return data.status;
+        }
+
+        await new Promise((r) =>
+          globalThis.setTimeout(r, POLL_ARTIFACT_INTERVAL_MS),
         );
       }
-
       await loadArtifacts(id);
+      return "unavailable";
     },
     [loadArtifacts],
   );
@@ -101,6 +120,7 @@ export function useSimulationStream() {
       setArtifacts(null);
       setArtifactsStatus("pending");
       activeMessageIdRef.current = null;
+      let currentRunId: string | null = null;
 
       try {
         const response = await fetch("/api/simulate", {
@@ -126,10 +146,7 @@ export function useSimulationStream() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let currentRunId: string | null = null;
         let streamSettled = false;
-        let synthesisPromise: Promise<void> | null = null;
-        let synthesisFailed = false;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -165,7 +182,9 @@ export function useSimulationStream() {
               ]);
             } else if (event.type === "text-delta") {
               const activeId = activeMessageIdRef.current;
+              
               if (!activeId) continue;
+              
               setMessages((prev) =>
                 prev.map((message) =>
                   message.id === activeId
@@ -175,6 +194,7 @@ export function useSimulationStream() {
               );
             } else if (event.type === "agent_end") {
               const activeId = activeMessageIdRef.current;
+              
               if (activeId) {
                 setMessages((prev) =>
                   prev.map((message) =>
@@ -188,35 +208,12 @@ export function useSimulationStream() {
               setActiveAgent(null);
             } else if (event.type === "artifacts_start") {
               setArtifactsStatus("generating");
-              if (currentRunId) {
-                synthesisPromise = synthesizeArtifacts(currentRunId).catch(
-                  (synthesisError) => {
-                    synthesisFailed = true;
-                    setError(
-                      synthesisError instanceof Error
-                        ? synthesisError.message
-                        : "Artifact synthesis failed",
-                    );
-                    void loadArtifacts(currentRunId!);
-                  },
-                );
-              }
-            } else if (event.type === "artifacts_ready") {
-              currentRunId = event.runId;
-              await loadArtifacts(event.runId);
-            } else if (event.type === "artifacts_failed") {
-              synthesisFailed = true;
-              setError(event.message);
-              if (currentRunId) {
-                await loadArtifacts(currentRunId);
-              } else {
-                setArtifactsStatus("unavailable");
-              }
             } else if (event.type === "error") {
               streamSettled = true;
               setError(event.message);
               setStatus("failed");
               setActiveAgent(null);
+              
               if (currentRunId) {
                 await loadArtifacts(currentRunId);
               } else {
@@ -227,12 +224,11 @@ export function useSimulationStream() {
               setRunId(event.runId);
               currentRunId = event.runId;
 
-              if (synthesisPromise) {
-                await synthesisPromise;
-              }
-
-              if (synthesisFailed) {
+              const finalPanel = await pollArtifactsUntilSettled(event.runId);
+              
+              if (finalPanel === "unavailable") {
                 setStatus("complete");
+                setError((prev) => prev ?? "Artifact synthesis failed");
               } else {
                 setStatus((current) =>
                   current === "failed" ? current : "complete",
@@ -264,7 +260,7 @@ export function useSimulationStream() {
         setError(err instanceof Error ? err.message : "Simulation failed");
       }
     },
-    [loadArtifacts, router, synthesizeArtifacts],
+    [loadArtifacts, pollArtifactsUntilSettled, router],
   );
 
   const cancel = useCallback(() => {

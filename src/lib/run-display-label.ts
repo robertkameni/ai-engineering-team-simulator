@@ -26,7 +26,10 @@ export function deriveRunDisplayLabel(
   artifactsPanelStatus?: ArtifactsPanelStatus,
 ): string {
   if (runStatus === "running") {
-    if (artifactStatus === "generating" || artifactStatus === "pending") {
+    if (
+      artifactStatus === "generating" ||
+      artifactsPanelStatus === "generating"
+    ) {
       return "Synthesizing";
     }
     return "Debating";
