@@ -29,15 +29,15 @@ A **multi-agent engineering simulator**: the user describes a product idea; AI t
 
 Order (fixed slots): **PM → Architect → Backend → Frontend → Reviewer**
 
-| Role | Model | Thinking | Max output tokens |
-|------|--------|----------|-------------------|
-| PM | `deepseek-v4-flash` | Off | 450 |
+| Role | Model | Thinking | Max output tokens (debate turn) |
+|------|--------|----------|----------------------------------|
+| PM | `deepseek-v4-flash` | Off | 600 |
 | Architect | `deepseek-v4-pro` | **Low** (`DEEPSEEK_REASONING_OPTIONS`) | 650 |
-| Backend | `deepseek-v4-pro` | Off | 500 |
+| Backend | `deepseek-v4-pro` | Off | 600 |
 | Frontend | `deepseek-v4-flash` | Off | 500 |
-| Reviewer | `deepseek-v4-flash` | Off | 450 |
+| Reviewer | `deepseek-v4-flash` | Off | 600 |
 
-Configured in `src/ai/agents/config.ts`. PM, backend, frontend, and reviewer use `DEEPSEEK_CHAT_OPTIONS` (`thinking: disabled`). Architect uses low-effort reasoning for deeper technical turns without long hidden waits.
+Configured in `src/ai/agents/config.ts` (base caps). **Debate turns** override via `getTurnMaxOutputTokens()` in `run-simulation.ts`. PM, backend, frontend, and reviewer use `DEEPSEEK_CHAT_OPTIONS` (`thinking: disabled`). Architect uses low-effort reasoning for deeper technical turns without long hidden waits.
 
 **Debate style:** Short Slack-like turns (~80–140 words), semantic section headings (no hardcoded English titles), no markdown tables — see `src/ai/prompts/shared.ts`. Full detail lives in post-debate artifacts.
 
@@ -49,20 +49,36 @@ Configured in `src/ai/agents/config.ts`. PM, backend, frontend, and reviewer use
 - Empty agent stream → fallback to `result.text` (reasoning models may not emit `textStream` deltas)
 - Still empty → one retry on `deepseek-v4-flash` with chat options (no reasoning) and doubled token budget
 - Stream errors logged via `onError`
+- Reviewer decision parsed from **raw** stream text before `normalizeAgentPersistedText` strips `[APPROVE]` / `[REJECT: role]` tags
+- Artifact synthesis runs in `/api/simulate` **before** the `done` SSE (avoids client polling 404s during generation)
+
+### Tool calling *(2026-05-24)*
+
+Agents can invoke tools during debate turns (`streamText` + `agentTools`, max 3 steps per turn).
+
+| Tool | Used by | Purpose |
+|------|---------|---------|
+| `check_npm_package` | Architect (software prompts) | Verify npm package name + latest version before recommending a stack |
+| `search_technical_norm` | Compliance expert (physical / hybrid backend) | Look up DTU, ERP, fire-safety norms |
+
+- Registry: `src/ai/tools/registry.ts`
+- SSE: `tool_start` (name + args), `tool_end` — shapes in `src/lib/simulation-stream.ts`
+- UI: live pills on streaming messages (`tool-activity-label.ts`, French labels; `activeTools` on `SimulationMessage`)
+- Stream cleanup: `src/ai/orchestration/agent-stream-text.ts` strips meta-commentary (“Let me check…”), inline tool narration, and normalizes glued `##` headings before display/persist
 
 ### Dynamic team templates *(2026-05-24)*
 
-Before debate, `classifyProjectTeamTemplate()` (flash + structured output) picks a template from the prompt — no need to write “sans logiciel” explicitly.
+Before debate, `classifyProjectTeamTemplate()` picks a template from the prompt — no need to write “sans logiciel” explicitly. **Keyword pre-check:** if both software and physical keywords appear in the prompt, template is forced to `hybrid` before the LLM call.
 
 | Template | When | Slot titles (examples) | Prompts |
 |----------|------|------------------------|---------|
 | `software` | Apps, SaaS, APIs, dashboards | Product Manager, Architect, Backend/Frontend Developer | `src/ai/prompts/*.ts` |
 | `physical` | Construction, renovation, compliance, field work | Chef de projet travaux, Ingénieur technique, Expert conformité, Planning budget & risques | `src/ai/prompts/physical/*.ts` |
-| `hybrid` | Physical scope + software component | Mixed titles | Software prompts (fallback) |
+| `hybrid` | Physical scope + software component | Mixed titles | Software prompts; **backend slot** uses physical compliance expert when physical keywords are present |
 
 - Config: `src/ai/agents/team-templates.ts`
-- Classification: `src/ai/orchestration/classify-project.ts`
-- Routing: `src/ai/prompts/index.ts` (`getAgentSystemPrompt` / `getAgentTurnPrompt`)
+- Classification: `src/ai/orchestration/classify-project.ts` (keyword + LLM; hybrid keyword override)
+- Routing: `src/ai/prompts/index.ts` (`getAgentSystemPrompt` / `getAgentTurnPrompt`; hybrid backend → compliance expert when `hasPhysicalKeywords(productIdea)`)
 - Artifact guidelines per template: `src/ai/artifacts/artifact-templates.ts` (software tabs: Requirements…; physical: Scope, Technical, Execution, Review)
 - SSE `team_ready` sends full roster (names + titles) immediately after classification so the UI shows correct role labels before agents speak
 
@@ -140,7 +156,7 @@ Before debate, `classifyProjectTeamTemplate()` (flash + structured output) picks
 
 - [x] Sequential orchestration (`src/ai/orchestration/run-simulation.ts`)
 - [x] Shared transcript context (`build-messages.ts`, role prompts per agent)
-- [x] SSE: `run_started`, `team_ready`, `agent_start`, `text-delta`, `agent_end`, `artifacts_*`, `done`, `error`
+- [x] SSE: `run_started`, `team_ready`, `agent_start`, `text-delta`, `tool_start`, `tool_end`, `agent_end`, `artifacts_start`, `done`, `error`
 - [x] `GET /api/runs` for sidebar recent list
 - [x] `DELETE /api/runs/[id]` — delete run from sidebar
 - [x] `/runs/[id]` loads messages + artifacts from DB
@@ -174,7 +190,7 @@ Before debate, `classifyProjectTeamTemplate()` (flash + structured output) picks
 - [x] `ArtifactPanel` — four tabs, card sections, normalized bullets (`format-artifact.ts`)
 - [x] Tab UX — role-colored active state, press scale, content fade-in (`artifact-tab-styles.ts`, `globals.css`)
 - [x] Responsive tabs — wide panel: four columns in one row; narrow artifact panel: **2×2 grid** (`@container/artifact-panel`, `@min-[480px]/artifact-panel`)
-- [x] SSE `artifacts_start` / `artifacts_ready` / `artifacts_failed`
+- [x] SSE `artifacts_start`; client polls `GET /api/runs/[id]/artifacts` after `done` (synthesis completes server-side before `done` is sent)
 - [x] `GET /api/runs/[id]/artifacts`
 - [x] Live workspace derives `generating` when debate ends before SSE
 
@@ -196,7 +212,7 @@ Before debate, `classifyProjectTeamTemplate()` (flash + structured output) picks
 - [x] **Sheet UI** — `src/components/ui/sheet.tsx` (Radix Dialog) for mobile drawers; accessible `SheetTitle` on all sheets
 - [x] **Hydration stability** — `suppressHydrationWarning` on textarea; stable `formatMessageTime()` (`de-DE`, UTC) for SSR/client parity
 - [x] **Parse reviewer quotes** → `QuotedBlock` UI (`parse-message-blocks.ts`)
-- [x] **Export run as Markdown** — header button + `downloadRunMarkdown()` (`lib/export/run-markdown.ts`)
+- [x] **Export run as Markdown** — header button + `exportRunMarkdown()` (`lib/export/run-markdown.ts`): client-side markdown from run data; Chrome/Edge uses native **Save As** (`showSaveFilePicker`); other browsers fall back to blob download. Optional direct download: `GET /api/runs/[id]/export`
 - [x] **Loading skeletons** — message thread + artifact panel while bootstrapping / generating
 - [x] **Regenerate artifacts** — `POST /api/runs/[id]/artifacts` re-synthesizes from saved debate; UI in artifact panel header + unavailable placeholder
 
@@ -238,7 +254,17 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 - [x] **`team_ready` SSE** — client shows correct role titles and artifact tab labels immediately after classification.
 - [x] **Dynamic UI labels** — debate stepper, typing indicator, and artifact tabs use roster titles (not hardcoded “Backend Developer”).
 
-**Not yet:** dedicated `hybrid` prompt set (uses software prompts); DevOps agent (Phase 9).
+**Not yet:** full dedicated `hybrid` prompt set (partial: compliance backend routing when physical keywords detected); DevOps agent (Phase 9).
+
+### Phase 6+++ — Tool calling, orchestration stability, export *(shipped 2026-05-24)*
+
+- [x] **Agent tools** — `check_npm_package`, `search_technical_norm`; `fullStream` loop emits `tool_start` / `tool_end` SSE; live UI badges (French labels).
+- [x] **Stream text normalization** — `agent-stream-text.ts`: strip meta-commentary and tool narration, architect preamble buffer, markdown heading fix, separate stream vs persist text.
+- [x] **Debate token tuning** — role-aware `getTurnMaxOutputTokens()` (PM/reviewer/backend 600, architect 650, frontend 500).
+- [x] **Hybrid classification** — keyword pre-detection forces `hybrid`; backend slot routes to physical compliance expert when physical keywords present.
+- [x] **Artifact timing** — `regenerateRunArtifacts()` awaited in `/api/simulate` before `done` SSE (removed fire-and-forget race).
+- [x] **Reviewer fix** — parse `[APPROVE]` / `[REJECT]` from raw stream text before tag stripping.
+- [x] **Export reliability** — `exportRunMarkdown()` with File System Access API + blob fallback; stable SSR (no `Date.now()` in initial `href`); `GET /api/runs/[id]/export` for direct links.
 
 **Perf note:** Lighthouse and field metrics on `next dev` are **not representative** — always verify with `npm run build && npm start` before judging LCP/TBT.
 
@@ -250,11 +276,11 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 
 **Guide:** [DEPLOYMENT.md](./DEPLOYMENT.md)
 
-- [ ] Link Vercel project + Neon integration *(dashboard — follow DEPLOYMENT.md)*
-- [ ] Env: `DEEPSEEK_API_KEY`, `DATABASE_URL` (preview + production) *(dashboard)*
+- [x] Link Vercel project + Neon integration *(follow [DEPLOYMENT.md](./DEPLOYMENT.md))* — Neon linked in Vercel; `DATABASE_URL` via integration / dashboard.
+- [x] Env: `DEEPSEEK_API_KEY`, `DATABASE_URL` (preview + production) — set on Vercel for preview + production scopes.
 - [x] **`maxDuration`** — `runtime = "nodejs"` and `maxDuration = 300` on `/api/simulate` and `POST /api/runs/[id]/artifacts`; align with [Vercel plan limits](https://vercel.com/docs/functions/limitations) *(upgrade if Hobby caps below 300s)*.
 - [x] **`prisma migrate deploy`** — runs during `npm run build` when `DATABASE_URL` is set (`scripts/prisma-migrate-deploy-if-url.mjs`); skipped in CI/no-DB contexts with a warning.
-- [ ] Smoke test preview URL end-to-end *(after first deploy)*.
+- [x] Smoke test preview URL end-to-end — production exercised end-to-end after deploy (`https://ai-engineering-team-simulator.vercel.app`).
 
 ---
 
@@ -273,7 +299,7 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 **Goal:** Differentiation and depth.
 
 - [ ] DevOps agent in pipeline
-- [ ] Dedicated hybrid prompts (physical + software in one debate)
+- [ ] Dedicated hybrid prompts (physical + software in one debate — partial routing exists today)
 - [ ] User-selectable team size / agents (templates are automatic today)
 - [ ] Share run via public link
 - [ ] Cost / token usage display per run
@@ -293,6 +319,7 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 | `/api/runs/[id]` | DELETE | Delete run and related rows |
 | `/api/runs/[id]/artifacts` | GET | Artifact bundle for a run |
 | `/api/runs/[id]/artifacts` | POST | Regenerate artifacts from saved debate |
+| `/api/runs/[id]/export` | GET | Download run as Markdown (`Content-Disposition: attachment`) |
 | _(Server Actions)_ | — | `regenerateRunArtifactsAction`, `deleteRunAction` — used on saved-run UI; invalidate via `revalidatePath` |
 
 ---
@@ -305,13 +332,14 @@ src/
   ai/
     agents/               # config, roster, team-templates.ts
     artifacts/            # generate-run-artifacts, templates (per templateId), transcript
-    orchestration/        # run-simulation.ts, classify-project.ts
+    orchestration/        # run-simulation.ts, classify-project.ts, agent-stream-text.ts
     prompts/              # software prompts + physical/ subfolder; index routes by templateId
+    tools/                # agentTools registry (npm, technical norms)
     context/              # build-messages.ts (language directive)
   features/
     artifacts/            # ArtifactPanel (+ static), debate stepper, tab labels per template
-    simulation/           # stream hook, team-roster-preview, typing indicator
-    workspace/            # AppShell, SavedRunWorkspace, sidebar SSR on workspace page
+    simulation/           # stream hook, tool-activity-label, team-roster-preview, typing indicator
+    workspace/            # AppShell, SavedRunWorkspace, export-run-button, sidebar SSR on workspace page
   lib/
     db/                   # Prisma helpers (incl. listRecentRunsForSidebar)
     export/               # run-markdown.ts
@@ -351,6 +379,9 @@ Phase 8 (auth, if needed) → Phase 9 (stretch), or iterate on UX/perf post-laun
 
 | Date | Change |
 |------|--------|
+| 2026-05-26 | Phase 7: smoke-tested production preview URL end-to-end ([Team Sim production](https://ai-engineering-team-simulator.vercel.app)). |
+| 2026-05-26 | Phase 7 dashboard: Vercel ↔ Neon linked; `DEEPSEEK_API_KEY` and `DATABASE_URL` on preview + production (already in repo: `maxDuration`, `prisma migrate deploy` during build when `DATABASE_URL` set, [DEPLOYMENT.md](./DEPLOYMENT.md)). |
+| 2026-05-24 | **Tool calling + stability:** agent tools (npm + norm lookup), `tool_start`/`tool_end` SSE + UI badges, `agent-stream-text.ts` normalization, role-aware debate tokens, hybrid keyword classification + compliance backend routing, artifact synthesis before `done` SSE, reviewer raw-text decision parse, export via `showSaveFilePicker` + blob fallback + `GET /api/runs/[id]/export`. |
 | 2026-05-24 | **Adaptive teams:** LLM classification (`software` / `physical` / `hybrid`), team templates, physical prompts, localized debate + artifacts, `team_ready` SSE, dynamic UI role labels, workspace sidebar SSR, architect stream resilience (`result.text` + flash retry). |
 | 2026-05-22 | Phase 7 **shipped**: production at [ai-engineering-team-simulator.vercel.app](https://ai-engineering-team-simulator.vercel.app); README + DEPLOYMENT + MASTERPLAN updated. |
 | 2026-05-22 | Phase 7 (repo): `DEPLOYMENT.md`, `.env.example`, build runs `prisma migrate deploy` when `DATABASE_URL` is set (`scripts/prisma-migrate-deploy-if-url.mjs`); MASTERPLAN Phase 7 checklist + README deploy section. |
@@ -365,4 +396,4 @@ Phase 8 (auth, if needed) → Phase 9 (stretch), or iterate on UX/perf post-laun
 
 ---
 
-*Last updated: 2026-05-24*
+*Last updated: 2026-05-26 (Phase 7 complete incl. production smoke test)*

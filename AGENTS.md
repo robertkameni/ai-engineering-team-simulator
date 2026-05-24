@@ -12,7 +12,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | React | 19 — use `React.SubmitEvent`, not deprecated `FormEvent` |
 | AI | Vercel AI SDK 6 + `@ai-sdk/deepseek`, `streamText`, `maxOutputTokens` |
 | Agents | Fixed pipeline slots: PM → Architect → Backend → Frontend → Reviewer. **Template** (`software` \| `physical` \| `hybrid`) chosen by `classifyProjectTeamTemplate()` before debate. Random names per run via `createSimulationRoster(templateId)` + `team-roster` artifact (`templateId` persisted). |
-| DeepSeek | **v4 mixed** — PM/FE/reviewer: `deepseek-v4-flash`; architect + backend: `deepseek-v4-pro`. PM, backend, frontend, reviewer use `DEEPSEEK_CHAT_OPTIONS` (`thinking: disabled`). Architect uses `DEEPSEEK_REASONING_OPTIONS` with `reasoningEffort: "low"`. Output caps (tokens): PM 450, AR 650, BE 500, FE 500, RV 450 — see `src/ai/agents/config.ts`. Empty architect stream → `result.text` fallback, then one flash/chat retry in `run-simulation.ts`. [API docs](https://api-docs.deepseek.com) |
+| DeepSeek | **v4 mixed** — PM/FE/reviewer: `deepseek-v4-flash`; architect + backend: `deepseek-v4-pro`. PM, backend, frontend, reviewer use `DEEPSEEK_CHAT_OPTIONS` (`thinking: disabled`). Architect uses `DEEPSEEK_REASONING_OPTIONS` with `reasoningEffort: "low"`. **Debate turn** output caps (tokens, via `getTurnMaxOutputTokens()` in `run-simulation.ts`): PM 600, AR 650, BE 600, FE 500, RV 600 — base values in `src/ai/agents/config.ts`. Empty architect stream → `result.text` fallback, then one flash/chat retry in `run-simulation.ts`. [API docs](https://api-docs.deepseek.com) |
 | DB | **Prisma 7** + `prisma.config.ts` + `@prisma/adapter-neon` |
 | Prisma client | Generated to `src/generated/prisma` — import from `@/generated/prisma/client` |
 | DB access | `src/lib/prisma.ts` (`server-only`) + `src/lib/db/*` helpers |
@@ -21,12 +21,15 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Simulation behavior
 
-- **Classification:** `src/ai/orchestration/classify-project.ts` — flash LLM picks template from product idea; fallback `software`.
-- **Templates:** `src/ai/agents/team-templates.ts` — same five slot keys, different display titles per template. `physical` uses `src/ai/prompts/physical/`; `hybrid` currently uses software prompts.
-- **Prompt routing:** `src/ai/prompts/index.ts` — `getAgentSystemPrompt` / `getAgentTurnPrompt` take `templateId`.
+- **Classification:** `src/ai/orchestration/classify-project.ts` — keyword hybrid pre-check + flash LLM picks template from product idea; fallback `software`.
+- **Templates:** `src/ai/agents/team-templates.ts` — same five slot keys, different display titles per template. `physical` uses `src/ai/prompts/physical/`; `hybrid` uses software prompts with **backend → compliance expert** when physical keywords are in the product idea (`prompts/index.ts`).
+- **Prompt routing:** `src/ai/prompts/index.ts` — `getAgentSystemPrompt` / `getAgentTurnPrompt` take `templateId` + `productIdea`.
 - **Language:** Agents and artifacts match the product idea language (`LANGUAGE_MATCH_DIRECTIVE` in `build-messages.ts`; artifact titles via `ARTIFACT_LANGUAGE_DIRECTIVE`).
-- **Debate style:** Short Slack-like turns (~80–140 words), semantic section headings (no hardcoded English `##` titles), no markdown tables — `src/ai/prompts/shared.ts`.
-- **SSE events:** `run_started`, `team_ready`, `agent_start`, `text-delta`, `agent_end`, `artifacts_start`, `done`, `error` — shapes in `src/lib/simulation-stream.ts`. Emit `team_ready` right after classification so UI shows correct role titles immediately.
+- **Debate style:** Short Slack-like turns (~80–140 words), semantic section headings (no hardcoded English `##` titles), no markdown tables — `src/ai/prompts/shared.ts`. Anti meta-commentary rule in `buildDiscussionDepthRules`.
+- **Tools:** `src/ai/tools/registry.ts` — `check_npm_package` (architect), `search_technical_norm` (compliance expert). Max 3 steps per turn (`stopWhen: stepCountIs(3)`).
+- **Stream text:** `src/ai/orchestration/agent-stream-text.ts` — strip tool narration / meta-text, normalize headings, buffer architect preambles; reviewer decision parsed from raw text before tag stripping.
+- **SSE events:** `run_started`, `team_ready`, `agent_start`, `text-delta`, `tool_start`, `tool_end`, `agent_end`, `artifacts_start`, `done`, `error` — shapes in `src/lib/simulation-stream.ts`. Emit `team_ready` right after classification. Artifact synthesis completes in `/api/simulate` before `done`.
+- **Export:** `exportRunMarkdown()` in `src/lib/export/run-markdown.ts` — client-side markdown; `showSaveFilePicker` on Chrome/Edge; blob fallback elsewhere. Optional `GET /api/runs/[id]/export`.
 
 ## Conventions
 

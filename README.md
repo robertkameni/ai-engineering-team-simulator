@@ -31,16 +31,18 @@ Open [http://localhost:3000](http://localhost:3000).
 1. Enter a product or project idea on `/` → `/workspace?prompt=...`
 2. The server classifies the idea (`software` | `physical` | `hybrid`) and assembles the matching team
 3. Five agents debate sequentially (short Slack-style turns, ~80–140 words)
-4. Artifacts synthesize after the debate (requirements/scope, architecture/technical, implementation/execution, review)
-5. Run persists to Neon; sidebar lists recent history; `/runs/[id]` replays the saved debate
+4. During debate, agents may call tools (npm package lookup, technical norm search) — live activity pills appear on streaming messages
+5. Artifacts synthesize after the debate (requirements/scope, architecture/technical, implementation/execution, review)
+6. Run persists to Neon; sidebar lists recent history; `/runs/[id]` replays the saved debate
+7. **Export** any run as Markdown from the header (Chrome/Edge: native Save As dialog; other browsers: direct download)
 
 **Examples**
 
 | Prompt type | Template | What you get |
 |-------------|----------|--------------|
-| SaaS HR scheduling app | `software` | PM scope, system design, backend/frontend plans, code-oriented review |
+| SaaS HR scheduling app | `software` | PM scope, system design, backend/frontend plans, code-oriented review; architect verifies npm packages |
 | School plumbing renovation | `physical` | Work package, technical/conformity planning, budget phasing — no software stack |
-| Renovation + tracking app | `hybrid` | Software-oriented debate (hybrid uses software prompts today) |
+| DTU compliance app + BIM scope | `hybrid` | Software-oriented debate; backend slot uses compliance expert when physical keywords are detected |
 
 ## Scripts
 
@@ -67,4 +69,4 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Vercel + Neon env vars, build/migra
 
 ---
 
-*README last updated: 2026-05-24 — dynamic team templates, localization, workspace sidebar SSR.*
+*README last updated: 2026-05-24 — tool calling, hybrid routing, export (Save As), orchestration stability.*
