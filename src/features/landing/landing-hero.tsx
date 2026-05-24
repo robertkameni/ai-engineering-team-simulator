@@ -33,7 +33,7 @@ export function LandingHero({ examplePrompts }: LandingHeroProps) {
       key={motionKey}
       className="relative z-10 flex w-full max-w-2xl flex-col items-center text-center"
     >
-      <div className="landing-rise landing-delay-0 glass-card mb-6 flex items-center gap-2 rounded-full px-4 py-1.5 text-caption text-muted-foreground">
+      <div className="landing-rise landing-delay-0 glass-card mt-4 mb-6 flex items-center gap-2 rounded-full px-4 py-1.5 text-caption text-muted-foreground">
         <span className="landing-live-dot" aria-hidden />
         <Sparkles className="size-3.5 text-agent-pm pulse-glow" />
         Multi-agent engineering simulator
