@@ -12,6 +12,7 @@ import type { TeamRosterPreview } from "@/features/simulation/team-roster-previe
 import { Sidebar } from "@/features/workspace/sidebar";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { WorkspaceMobileContext } from "@/features/workspace/workspace-mobile-context";
+import { SiteFooter } from "@/components/site-footer";
 import { useMinWidth } from "@/lib/use-media-query";
 
 const SidebarMobileSheet = dynamic(
@@ -107,6 +108,7 @@ export function AppShell({
             <ArtifactPanel {...artifactPanelProps} layout="inline" />
           ) : null}
         </div>
+        <SiteFooter />
       </div>
 
       {sidebarSheetReady ? (

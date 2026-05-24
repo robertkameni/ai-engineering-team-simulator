@@ -1,3 +1,5 @@
+import { SiteFooter } from "@/components/site-footer";
+
 interface AppShellFrameProps {
   sidebar: React.ReactNode;
   children: React.ReactNode;
@@ -22,6 +24,7 @@ export function AppShellFrame({
         {artifacts}
       </div>
       {mobileSlot}
+      <SiteFooter />
     </div>
   );
 }
