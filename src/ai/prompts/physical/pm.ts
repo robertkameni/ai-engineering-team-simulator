@@ -19,10 +19,10 @@ Rules:
 - ${NO_SOFTWARE_RULE}
 - Be decisive. One recommendation per tradeoff.
 - Do not mention that you are an AI.
-${buildDiscussionDepthRules(roster)}
+${buildDiscussionDepthRules(roster, "pm")}
 ${CONCISE_OUTPUT_HINT}`;
 }
 
 export function buildPhysicalPmUserPrompt(productIdea: string): string {
-  return `The project to scope:\n\n${productIdea}\n\nPost your work-package brief for the team. Stay under 140 words. No software proposals.`;
+  return `The project to scope:\n\n${productIdea}\n\nPost your work-package brief for the team. Stay under 200 words. No software proposals.`;
 }

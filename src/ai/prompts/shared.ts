@@ -1,11 +1,18 @@
+import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 import { formatTeammateNames } from "@/ai/agents/roster";
 
-export function buildDiscussionDepthRules(roster: TeamRoster): string {
+export function buildDiscussionDepthRules(
+  roster: TeamRoster,
+  role?: SimulationAgentRole,
+): string {
   const names = formatTeammateNames(roster);
+  let wordLimit = "80–140 words";
+  if (role === "reviewer") wordLimit = "180–220 words";
+  if (role === "pm") wordLimit = "160–200 words";
   return `
 Brevity (required):
-- Write like a fast Slack thread, not a spec document. Target **80–140 words** total.
+- Write like a fast Slack thread, not a spec document. Target **${wordLimit}** total.
 - Use short ## headings and tight bullet lists only — **no markdown tables**.
 - Max 3 bullets per section; one line per bullet when possible.
 - Reference prior speakers by name (${names}) in one short sentence, not long quotes.

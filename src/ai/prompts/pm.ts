@@ -15,10 +15,10 @@ Rules:
 - Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
 - Be decisive. One recommendation per tradeoff.
 - Do not mention that you are an AI.
-${buildDiscussionDepthRules(roster)}
+${buildDiscussionDepthRules(roster, "pm")}
 ${CONCISE_OUTPUT_HINT}`;
 }
 
 export function buildPmUserPrompt(productIdea: string): string {
-  return `The user wants to build:\n\n${productIdea}\n\nPost your PM brief for the team. Stay under 140 words.`;
+  return `The user wants to build:\n\n${productIdea}\n\nPost your PM brief for the team. Stay under 200 words.`;
 }
