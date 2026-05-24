@@ -3,6 +3,7 @@ import { getPersona } from "@/features/agents/personas";
 import type { SimulationMessage } from "@/features/agents/types";
 import { MessageContent } from "@/features/simulation/message-content";
 import { QuotedBlock } from "@/features/simulation/quoted-block";
+import { formatToolActivityLabel } from "@/features/simulation/tool-activity-label";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +55,14 @@ export function AgentMessage({ message, className }: AgentMessageProps) {
               text={message.quote.text}
             />
           ) : null}
+          {message.activeTools?.map((tool, idx) => (
+            <div
+              key={idx}
+              className="mb-3 flex w-fit animate-pulse items-center gap-2 rounded-full border border-blue-100 bg-blue-50/80 px-3 py-1.5 text-xs font-medium text-blue-600"
+            >
+              {formatToolActivityLabel(tool.name, tool.args)}
+            </div>
+          ))}
           <MessageContent content={message.content} />
           {message.isStreaming ? (
             <span

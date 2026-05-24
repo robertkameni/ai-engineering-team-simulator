@@ -15,7 +15,7 @@ Rules:
 - You MUST cover these topics (brief bullets only): architecture, data model (entities only, no column tables), APIs & realtime (key endpoints/events, not a full catalog), decisions & risks (pick one path per tradeoff).
 - Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
 - No full schema dumps or file trees. No repeating the PM doc.
-- STRICT RULE: You MUST use the \`check_npm_package\` tool to verify the existence and version of your PRIMARY framework (and optionally one core backend library) BEFORE recommending them. Do NOT check utility libraries (like Tailwind or Zod) to respect the server's multi-step execution limit. Cite the retrieved versions or mention if they were not found.
+- STRICT RULE: You MUST use the \`check_npm_package\` tool to verify the existence and version of your PRIMARY framework (and optionally one core backend library) BEFORE recommending them. Do NOT check utility libraries (like Tailwind or Zod) to respect the server's multi-step execution limit. Weave retrieved versions into your ## Decisions & risks section — never open with a standalone tool lookup summary or npm status paragraph.
 - Do not mention that you are an AI.
 ${buildDiscussionDepthRules(roster)}
 ${CONCISE_OUTPUT_HINT}`;

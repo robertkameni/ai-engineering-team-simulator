@@ -50,18 +50,102 @@ export function buildRunMarkdown(run: MockRun): string {
   return lines.join("\n").trimEnd() + "\n";
 }
 
-export function downloadRunMarkdown(run: MockRun) {
-  const markdown = buildRunMarkdown(run);
-  const slug = run.title
+export function buildRunMarkdownFilename(title: string, exportId?: number): string {
+  const slug = title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 48);
-  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+  const base = slug || "simulation-run";
+  return exportId ? `${base}-${exportId}.md` : `${base}.md`;
+}
+
+export function buildRunExportUrl(runId: string, exportId?: number): string {
+  const base = `/api/runs/${encodeURIComponent(runId)}/export`;
+  return exportId != null ? `${base}?t=${exportId}` : base;
+}
+
+export function buildRunExportPayload(run: MockRun, exportId: number = Date.now()) {
+  const markdown = `${buildRunMarkdown(run)}<!-- export-id: ${exportId} -->\n`;
+  const filename = buildRunMarkdownFilename(run.title, exportId);
+  return { markdown, filename, exportId };
+}
+
+function downloadMarkdownFile(markdown: string, filename: string) {
+  const blob = new Blob([markdown], { type: "application/octet-stream" });
   const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `${slug || "simulation-run"}.md`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  globalThis.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+function canUseNativeSavePicker(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    "showSaveFilePicker" in window &&
+    typeof (window as Window & { showSaveFilePicker?: unknown }).showSaveFilePicker ===
+      "function"
+  );
+}
+
+async function saveMarkdownWithNativePicker(
+  markdown: string,
+  filename: string,
+): Promise<boolean> {
+  if (!canUseNativeSavePicker()) {
+    return false;
+  }
+
+  const showSaveFilePicker = (
+    window as unknown as {
+      showSaveFilePicker: (options: {
+        suggestedName: string;
+        types: Array<{
+          description: string;
+          accept: Record<string, string[]>;
+        }>;
+      }) => Promise<FileSystemFileHandle>;
+    }
+  ).showSaveFilePicker;
+
+  try {
+    const handle = await showSaveFilePicker({
+      suggestedName: filename,
+      types: [
+        {
+          description: "Markdown document",
+          accept: { "text/markdown": [".md"] },
+        },
+      ],
+    });
+    const writable = await handle.createWritable();
+    await writable.write(markdown);
+    await writable.close();
+    return true;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return true;
+    }
+    return false;
+  }
+}
+
+export async function exportRunMarkdown(run: MockRun): Promise<void> {
+  const { markdown, filename } = buildRunExportPayload(run);
+
+  const savedWithPicker = await saveMarkdownWithNativePicker(markdown, filename);
+  if (savedWithPicker) {
+    return;
+  }
+
+  downloadMarkdownFile(markdown, filename);
+}
+
+export function canExportRunFromServer(run: MockRun): boolean {
+  return Boolean(run.id && run.id !== "live");
 }

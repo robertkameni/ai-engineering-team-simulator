@@ -208,9 +208,40 @@ export function useSimulationStream() {
                   agentTitle: event.title,
                   content: "",
                   isStreaming: true,
+                  activeTools: [],
                   createdAt: formatMessageTime(new Date()),
                 },
               ]);
+            } else if (event.type === "tool_start") {
+              const activeId = activeMessageIdRef.current;
+              if (!activeId) continue;
+
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === activeId
+                    ? {
+                        ...message,
+                        activeTools: [
+                          ...(message.activeTools ?? []),
+                          { name: event.toolName, args: event.args },
+                        ],
+                      }
+                    : message,
+                ),
+              );
+            } else if (event.type === "tool_end") {
+              const activeId = activeMessageIdRef.current;
+              if (!activeId) continue;
+
+              setMessages((prev) =>
+                prev.map((message) => {
+                  if (message.id !== activeId) return message;
+                  const tools = [...(message.activeTools ?? [])];
+                  const index = tools.findIndex((tool) => tool.name === event.toolName);
+                  if (index !== -1) tools.splice(index, 1);
+                  return { ...message, activeTools: tools };
+                }),
+              );
             } else if (event.type === "text-delta") {
               const activeId = activeMessageIdRef.current;
               
@@ -230,7 +261,7 @@ export function useSimulationStream() {
                 setMessages((prev) =>
                   prev.map((message) =>
                     message.id === activeId
-                      ? { ...message, isStreaming: false }
+                      ? { ...message, isStreaming: false, activeTools: [] }
                       : message,
                   ),
                 );
@@ -244,7 +275,19 @@ export function useSimulationStream() {
               setError(event.message);
               setStatus("failed");
               setActiveAgent(null);
-              
+
+              const activeId = activeMessageIdRef.current;
+              if (activeId) {
+                setMessages((prev) =>
+                  prev.map((message) =>
+                    message.id === activeId
+                      ? { ...message, isStreaming: false, activeTools: [] }
+                      : message,
+                  ),
+                );
+                activeMessageIdRef.current = null;
+              }
+
               if (currentRunId) {
                 await loadArtifacts(currentRunId);
               } else {

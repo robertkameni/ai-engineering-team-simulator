@@ -12,9 +12,12 @@ import { buildAgentMessages } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { classifyProjectTeamTemplate } from "@/ai/orchestration/classify-project";
 import {
+  getAgentStreamDisplayText,
+  normalizeAgentPersistedText,
+} from "@/ai/orchestration/agent-stream-text";
+import {
   MAX_SIMULATION_TURNS,
   parseReviewerDecision,
-  reviewerVisibleText,
   stripReviewerDecisionTag,
 } from "@/ai/orchestration/reviewer-decision";
 import { getAgentSystemPrompt } from "@/ai/prompts";
@@ -33,6 +36,31 @@ import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
 const STREAM_HEARTBEAT_MS = 15_000;
 const AGENT_TURN_FALLBACK = "[Tool Error: Agent failed to respond]";
+
+function getTurnMaxOutputTokens(role: SimulationAgentRole): number {
+  switch (role) {
+    case "pm":
+    case "reviewer":
+      return 600;
+    case "architect":
+      return 650;
+    case "frontend":
+      return 500;
+    case "backend":
+      return 600;
+    default:
+      return 400;
+  }
+}
+
+function withTurnTokenLimit(
+  role: SimulationAgentRole,
+): ReturnType<typeof getAgentConfig> {
+  return {
+    ...getAgentConfig(role),
+    maxOutputTokens: getTurnMaxOutputTokens(role),
+  };
+}
 
 export async function runSimulation(
   productIdea: string,
@@ -106,7 +134,12 @@ export async function runSimulation(
         emitFallbackAgentTurn(role, member.name, member.title, fullText, notify);
       }
 
-      const contentToPersist = stripReviewerDecisionTag(fullText);
+      const contentToPersist =
+        role === "reviewer"
+          ? stripReviewerDecisionTag(
+              normalizeAgentPersistedText(role, fullText),
+            )
+          : normalizeAgentPersistedText(role, fullText);
 
       transcript.push({
         role,
@@ -166,7 +199,6 @@ export async function runSimulation(
     artifactPhaseStarted = true;
 
     notify({ type: "artifacts_start" });
-    notify({ type: "done", runId: run.id });
     return run.id;
   } catch (error) {
     await reconcileRunFailure(run.id, {
@@ -207,7 +239,7 @@ async function streamAgentTurn({
   templateId: TeamTemplateId;
   send: (event: SimulationStreamEvent) => void;
 }): Promise<string> {
-  const config = getAgentConfig(role);
+  const config = withTurnTokenLimit(role);
   const member = getTeamMember(roster, role);
 
   send({
@@ -262,6 +294,14 @@ async function streamAgentTurn({
     );
   }
 
+  const persisted = normalizeAgentPersistedText(role, fullText);
+  if (!persisted.trim()) {
+    send({ type: "agent_end", role });
+    throw new Error(
+      `${member.name} (${role}) returned no visible output after normalization.`,
+    );
+  }
+
   send({ type: "agent_end", role });
   return fullText.trim();
 }
@@ -272,8 +312,7 @@ function emitVisibleDelta(
   emittedLength: number,
   send: (event: SimulationStreamEvent) => void,
 ): number {
-  const visible =
-    role === "reviewer" ? reviewerVisibleText(fullText) : fullText;
+  const visible = getAgentStreamDisplayText(role, fullText);
   const delta = visible.slice(emittedLength);
   if (delta) {
     send({ type: "text-delta", role, delta });
@@ -303,7 +342,7 @@ async function collectAgentStream({
 }): Promise<string> {
   const result = streamText({
     model: getDeepSeekModel(config.model),
-    system: getAgentSystemPrompt(role, roster, templateId),
+    system: getAgentSystemPrompt(role, roster, templateId, productIdea),
     messages: buildAgentMessages(role, productIdea, transcript, roster),
     maxOutputTokens: config.maxOutputTokens,
     temperature: config.temperature,
@@ -321,9 +360,29 @@ async function collectAgentStream({
   let emittedLength = 0;
   let lastHeartbeatAt = Date.now();
   try {
-    for await (const delta of result.textStream) {
-      fullText += delta;
-      emittedLength = emitVisibleDelta(role, fullText, emittedLength, send);
+    for await (const part of result.fullStream) {
+      if (part.type === "text-delta") {
+        fullText += part.text;
+        emittedLength = emitVisibleDelta(role, fullText, emittedLength, send);
+      } else if (part.type === "tool-call") {
+        const toolPart = part as {
+          toolName: string;
+          input?: unknown;
+          args?: unknown;
+        };
+        send({
+          type: "tool_start",
+          role,
+          toolName: toolPart.toolName,
+          args: toolPart.input ?? toolPart.args,
+        });
+      } else if (part.type === "tool-result") {
+        send({
+          type: "tool_end",
+          role,
+          toolName: part.toolName,
+        });
+      }
 
       const now = Date.now();
       if (now - lastHeartbeatAt >= STREAM_HEARTBEAT_MS) {
@@ -341,9 +400,9 @@ async function collectAgentStream({
     }
   } catch (error) {
     if (fullText.trim()) {
-      return fullText;
+      return fullText.trim();
     }
     throw error;
   }
-  return fullText;
+  return fullText.trim();
 }

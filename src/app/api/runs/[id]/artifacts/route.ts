@@ -16,7 +16,7 @@ interface RouteParams {
 }
 
 async function getRunForArtifacts(runId: string) {
-  let run = await getRunWithMessages(runId);
+  const run = await getRunWithMessages(runId);
   if (!run) return null;
 
   const reconciled = await reconcileStaleRunIfNeeded({
@@ -27,16 +27,19 @@ async function getRunForArtifacts(runId: string) {
     messageCount: run.messages.length,
   });
 
-  if (reconciled) {
-    run = await getRunWithMessages(runId);
-    if (!run) {
-      console.warn("Artifacts lookup: run missing after stale reconcile", {
-        runId,
-      });
-    }
+  if (!reconciled) {
+    return run;
   }
 
-  return run;
+  const refreshed = await getRunWithMessages(runId);
+  if (!refreshed) {
+    console.warn("Artifacts lookup: run missing after stale reconcile", {
+      runId,
+    });
+    return run;
+  }
+
+  return refreshed;
 }
 
 export async function GET(_request: Request, { params }: RouteParams) {

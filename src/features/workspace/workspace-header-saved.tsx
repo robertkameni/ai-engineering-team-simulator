@@ -1,28 +1,13 @@
 import Link from "next/link";
-import dynamic from "next/dynamic";
 import { Home } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { RunStatusPill } from "@/features/simulation/run-status-pill";
+import { ExportRunButton } from "@/features/workspace/export-run-button";
 import type { MockRun } from "@/features/agents/types";
 import type { RunStatus } from "@/features/agents/types";
 import { cn } from "@/lib/utils";
 import { SavedRunMobileActions } from "./saved-run-mobile-actions";
-
-const ExportRunButton = dynamic(
-  () =>
-    import("@/features/workspace/export-run-button").then(
-      (module) => module.ExportRunButton,
-    ),
-  {
-    loading: () => (
-      <div
-        className="glass-card h-8 w-8 shrink-0 rounded-md border border-glass-border"
-        aria-hidden
-      />
-    ),
-  },
-);
 
 interface WorkspaceHeaderSavedProps {
   title: string;

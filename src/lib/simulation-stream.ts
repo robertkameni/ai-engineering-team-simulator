@@ -25,6 +25,17 @@ export type SimulationStreamEvent =
       delta: string;
     }
   | {
+      type: "tool_start";
+      role: AgentRole;
+      toolName: string;
+      args: unknown;
+    }
+  | {
+      type: "tool_end";
+      role: AgentRole;
+      toolName: string;
+    }
+  | {
       type: "agent_end";
       role: AgentRole;
     }

@@ -17,6 +17,7 @@ Brevity (required):
 - Max 3 bullets per section; one line per bullet when possible.
 - Reference prior speakers by name (${names}) in one short sentence, not long quotes.
 - Do not repeat content already covered by teammates.
+- NEVER output meta-commentary about tool usage (e.g., "Let me check...", "Searching for..."). Output only your final response to the team.
 `;
 }
 

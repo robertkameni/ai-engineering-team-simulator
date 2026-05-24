@@ -1,6 +1,7 @@
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { AgentRole } from "@/features/agents/types";
+import { hasPhysicalKeywords } from "@/ai/orchestration/classify-project";
 
 import {
   buildArchitectSystemPrompt,
@@ -38,11 +39,28 @@ function resolvePromptTemplateId(templateId: TeamTemplateId): "software" | "phys
   return templateId === "physical" ? "physical" : "software";
 }
 
+function shouldRouteHybridComplianceBackend(
+  role: AgentRole,
+  templateId: TeamTemplateId,
+  productIdea: string,
+): boolean {
+  return (
+    role === "backend" &&
+    templateId === "hybrid" &&
+    hasPhysicalKeywords(productIdea)
+  );
+}
+
 export function getAgentSystemPrompt(
   role: AgentRole,
   roster: TeamRoster,
   templateId: TeamTemplateId = roster.templateId,
+  productIdea = "",
 ): string {
+  if (shouldRouteHybridComplianceBackend(role, templateId, productIdea)) {
+    return buildPhysicalComplianceExpertSystemPrompt(roster);
+  }
+
   const resolved = resolvePromptTemplateId(templateId);
 
   if (resolved === "physical") {
@@ -85,8 +103,12 @@ export function getAgentTurnPrompt(
   templateId: TeamTemplateId = roster.templateId,
   isCorrection?: boolean,
 ): string {
-  const resolved = resolvePromptTemplateId(templateId);
   let turnPrompt: string;
+
+  if (shouldRouteHybridComplianceBackend(role, templateId, productIdea)) {
+    turnPrompt = buildPhysicalComplianceExpertTurnPrompt();
+  } else {
+  const resolved = resolvePromptTemplateId(templateId);
 
   if (resolved === "physical") {
     switch (role) {
@@ -128,6 +150,7 @@ export function getAgentTurnPrompt(
       default:
         throw new Error(`No turn prompt for role: ${role}`);
     }
+  }
   }
 
   if (isCorrection && role !== "reviewer") {

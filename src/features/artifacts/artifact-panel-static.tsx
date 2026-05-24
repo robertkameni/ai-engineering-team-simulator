@@ -79,7 +79,7 @@ export function ArtifactPanelStatic({
 
           <div
             className={cn(
-              "artifact-static-labels min-w-0 shrink-0 px-4 pt-3 @max-sm/artifact-panel:pb-3",
+              "artifact-static-labels mb-2 min-w-0 shrink-0 px-3 pt-3 @max-sm/artifact-panel:pb-3",
               ARTIFACT_TAB_LIST_CLASS,
             )}
             role="tablist"

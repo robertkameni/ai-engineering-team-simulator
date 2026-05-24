@@ -23,9 +23,34 @@ const DEFAULT_CLASSIFICATION: ProjectClassification = {
   domainHint: "software product",
 };
 
+const SOFTWARE_KEYWORD_PATTERN =
+  /\b(next\.?js|sveltekit|react|vue|angular|node\.?js|typescript|javascript|orm|prisma|drizzle|api|saas|dashboard|backend|frontend|framework|database|postgresql|mongodb|software|logiciel|app)\b/i;
+
+const PHYSICAL_KEYWORD_PATTERN =
+  /\b(dtu|erp|ventilation|plomberie|incendie|conformit[eé]|r[eé]glement|b[aâ]timent|infrastructure|r[eé]seau|[eé]vacuation|sanitaire|travaux|chantier|norme)\b/i;
+
+export function hasSoftwareKeywords(productIdea: string): boolean {
+  return SOFTWARE_KEYWORD_PATTERN.test(productIdea);
+}
+
+export function hasPhysicalKeywords(productIdea: string): boolean {
+  return PHYSICAL_KEYWORD_PATTERN.test(productIdea);
+}
+
+export function isKeywordHybridProject(productIdea: string): boolean {
+  return hasSoftwareKeywords(productIdea) && hasPhysicalKeywords(productIdea);
+}
+
 export async function classifyProjectTeamTemplate(
   productIdea: string,
 ): Promise<ProjectClassification> {
+  if (isKeywordHybridProject(productIdea)) {
+    return {
+      templateId: "hybrid",
+      domainHint: "hybrid software and physical project",
+    };
+  }
+
   try {
     const result = await generateText({
       model: getDeepSeekModel("deepseek-v4-flash"),
@@ -52,8 +77,11 @@ Rules:
     });
 
     if (result.output && isTeamTemplateId(result.output.templateId)) {
+      const templateId = isKeywordHybridProject(productIdea)
+        ? "hybrid"
+        : result.output.templateId;
       return {
-        templateId: result.output.templateId,
+        templateId,
         domainHint: result.output.domainHint.trim() || DEFAULT_CLASSIFICATION.domainHint,
       };
     }

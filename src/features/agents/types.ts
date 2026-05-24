@@ -34,6 +34,7 @@ export interface SimulationMessage {
     text: string;
   };
   isStreaming?: boolean;
+  activeTools?: { name: string; args: unknown }[];
   createdAt: string;
 }
 
