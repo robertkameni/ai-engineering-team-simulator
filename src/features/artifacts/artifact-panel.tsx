@@ -14,9 +14,9 @@ import { SheetClose } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import {
-  ARTIFACT_TAB_CONFIG,
   ARTIFACT_TAB_LIST_CLASS,
   ARTIFACT_TAB_TRIGGER_BASE,
+  getArtifactTabConfig,
 } from "@/features/artifacts/artifact-tab-styles";
 import {
   artifactPanelSubtitle,
@@ -27,6 +27,7 @@ import type {
   RunArtifacts,
 } from "@/features/artifacts/types";
 import type { AgentRole } from "@/features/agents/types";
+import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 import { cn } from "@/lib/utils";
 
 interface ArtifactPanelProps {
@@ -36,8 +37,9 @@ interface ArtifactPanelProps {
   regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;
   debateProgress?: DebateProgress;
-  debateMessages?: { role: AgentRole; isStreaming?: boolean }[];
+  debateMessages?: { role: AgentRole; isStreaming?: boolean; agentTitle?: string }[];
   activeAgent?: AgentRole | null;
+  teamRoster?: TeamRosterPreview | null;
 }
 
 export function ArtifactPanel({
@@ -49,11 +51,13 @@ export function ArtifactPanel({
   debateProgress,
   debateMessages,
   activeAgent = null,
+  teamRoster = null,
 }: ArtifactPanelProps) {
   const isReady = status === "ready" && artifacts != null;
   const isSheet = layout === "sheet";
   const showRegenerate = canRegenerateArtifacts && regenerateRunId != null;
   const subtitle = artifactPanelSubtitle(status, debateProgress);
+  const artifactTabs = getArtifactTabConfig(teamRoster?.templateId ?? "software");
 
   return (
     <aside
@@ -99,7 +103,7 @@ export function ArtifactPanel({
         >
           <div className="min-w-0 shrink-0 px-4 pt-3 @max-sm/artifact-panel:pb-3">
             <TabsList className={ARTIFACT_TAB_LIST_CLASS}>
-              {ARTIFACT_TAB_CONFIG.map((tab) => (
+              {artifactTabs.map((tab) => (
                 <TabsTrigger
                   key={tab.value}
                   value={tab.value}
@@ -112,7 +116,7 @@ export function ArtifactPanel({
             </TabsList>
           </div>
 
-          {ARTIFACT_TAB_CONFIG.map((tab) => (
+          {artifactTabs.map((tab) => (
             <TabsContent
               key={tab.value}
               value={tab.value}
@@ -139,6 +143,7 @@ export function ArtifactPanel({
           debateProgress={debateProgress}
           debateMessages={debateMessages}
           activeAgent={activeAgent}
+          teamRoster={teamRoster}
         />
       )}
     </aside>

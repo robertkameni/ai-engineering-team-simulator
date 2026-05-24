@@ -5,12 +5,13 @@ import {
   artifactPanelSubtitle,
   debateProgressFromMessages,
 } from "@/features/artifacts/artifact-panel-phase";
-import { ARTIFACT_TAB_CONFIG, ARTIFACT_TAB_LIST_CLASS, ARTIFACT_TAB_TRIGGER_STATIC } from "@/features/artifacts/artifact-tab-styles";
+import { ARTIFACT_TAB_LIST_CLASS, ARTIFACT_TAB_TRIGGER_STATIC, getArtifactTabConfig } from "@/features/artifacts/artifact-tab-styles";
 import type {
   ArtifactsPanelStatus,
   RunArtifacts,
 } from "@/features/artifacts/types";
 import type { AgentRole } from "@/features/agents/types";
+import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 import { cn } from "@/lib/utils";
 
 interface ArtifactPanelStaticProps {
@@ -18,7 +19,8 @@ interface ArtifactPanelStaticProps {
   status?: ArtifactsPanelStatus;
   regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;
-  debateMessages?: { role: AgentRole; isStreaming?: boolean }[];
+  debateMessages?: { role: AgentRole; isStreaming?: boolean; agentTitle?: string }[];
+  teamRoster?: TeamRosterPreview | null;
 }
 
 /** Server artifact panel — CSS tabs + native scroll (no Radix). */
@@ -28,11 +30,13 @@ export function ArtifactPanelStatic({
   regenerateRunId,
   canRegenerateArtifacts = false,
   debateMessages = [],
+  teamRoster = null,
 }: ArtifactPanelStaticProps) {
   const isReady = status === "ready" && artifacts != null;
   const showRegenerate = canRegenerateArtifacts && regenerateRunId != null;
   const debateProgress = debateProgressFromMessages(debateMessages, null);
   const subtitle = artifactPanelSubtitle(status, debateProgress);
+  const artifactTabs = getArtifactTabConfig(teamRoster?.templateId ?? "software");
 
   return (
     <aside
@@ -56,7 +60,7 @@ export function ArtifactPanelStatic({
 
       {isReady ? (
         <div className="artifact-static-tabs flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          {ARTIFACT_TAB_CONFIG.map((tab, index) => (
+          {artifactTabs.map((tab, index) => (
             <input
               key={tab.value}
               type="radio"
@@ -77,7 +81,7 @@ export function ArtifactPanelStatic({
             role="tablist"
             aria-label="Artifact categories"
           >
-            {ARTIFACT_TAB_CONFIG.map((tab) => (
+            {artifactTabs.map((tab) => (
               <label
                 key={tab.value}
                 htmlFor={`artifact-tab-${tab.value}`}
@@ -90,7 +94,7 @@ export function ArtifactPanelStatic({
           </div>
 
           <div className="artifact-static-panels flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            {ARTIFACT_TAB_CONFIG.map((tab) => (
+            {artifactTabs.map((tab) => (
               <div
                 key={tab.value}
                 role="tabpanel"
@@ -109,6 +113,7 @@ export function ArtifactPanelStatic({
           canRegenerateArtifacts={canRegenerateArtifacts}
           debateProgress={debateProgress}
           debateMessages={debateMessages}
+          teamRoster={teamRoster}
         />
       )}
     </aside>

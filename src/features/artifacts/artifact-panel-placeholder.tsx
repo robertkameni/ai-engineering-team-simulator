@@ -6,14 +6,16 @@ import type { DebateProgress } from "@/features/artifacts/artifact-panel-phase";
 import { DebateProgressStepper } from "@/features/artifacts/debate-progress-stepper";
 import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
 import type { AgentRole } from "@/features/agents/types";
+import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 
 export interface ArtifactPanelPlaceholderProps {
   status: ArtifactsPanelStatus;
   regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;
   debateProgress?: DebateProgress;
-  debateMessages?: { role: AgentRole; isStreaming?: boolean }[];
+  debateMessages?: { role: AgentRole; isStreaming?: boolean; agentTitle?: string }[];
   activeAgent?: AgentRole | null;
+  teamRoster?: TeamRosterPreview | null;
 }
 
 export function ArtifactPanelPlaceholder({
@@ -23,6 +25,7 @@ export function ArtifactPanelPlaceholder({
   debateProgress,
   debateMessages,
   activeAgent = null,
+  teamRoster = null,
 }: ArtifactPanelPlaceholderProps) {
   if (status === "generating") {
     return (
@@ -53,6 +56,7 @@ export function ArtifactPanelPlaceholder({
         <DebateProgressStepper
           messages={debateMessages}
           activeAgent={activeAgent}
+          teamRoster={teamRoster}
         />
       ) : status === "pending" ? (
         <span className="pulse-glow size-2.5 rounded-full bg-agent-architect" />

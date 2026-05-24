@@ -13,6 +13,7 @@ import { buildAgentMessages } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { classifyProjectTeamTemplate } from "@/ai/orchestration/classify-project";
 import { getAgentSystemPrompt } from "@/ai/prompts";
+import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import { getDeepSeekModel } from "@/ai/providers";
 import { updateArtifactStatus } from "@/lib/db/artifact-status";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
@@ -56,6 +57,18 @@ export async function runSimulation(
     };
 
     notify({ type: "run_started", runId: run.id });
+    notify({
+      type: "team_ready",
+      templateId: classification.templateId,
+      members: SIMULATION_AGENT_ORDER.map((role) => {
+        const member = getTeamMember(roster, role);
+        return {
+          role,
+          name: member.name,
+          title: member.title,
+        };
+      }),
+    });
 
     for (const role of SIMULATION_AGENT_ORDER) {
       if (!isSimulationAgent(role)) continue;
@@ -147,7 +160,9 @@ async function streamAgentTurn({
     });
 
     if (!fullText.trim()) {
-      console.warn(`Empty response for ${role}, retrying with expanded budget`);
+      console.warn(
+        `${role}: empty stream, retrying with chat model (no reasoning)`,
+      );
       fullText = await collectAgentStream({
         runId,
         role,
@@ -157,7 +172,9 @@ async function streamAgentTurn({
         templateId,
         config: {
           ...config,
+          model: "deepseek-v4-flash",
           maxOutputTokens: Math.max(config.maxOutputTokens * 2, 900),
+          deepseek: DEEPSEEK_CHAT_OPTIONS,
         },
         send,
       });
@@ -206,6 +223,9 @@ async function collectAgentStream({
     providerOptions: {
       deepseek: config.deepseek,
     },
+    onError({ error }) {
+      console.error(`Stream error for ${role}:`, error);
+    },
   });
 
   let fullText = "";
@@ -219,6 +239,14 @@ async function collectAgentStream({
       if (now - lastHeartbeatAt >= STREAM_HEARTBEAT_MS) {
         await touchRunActivity(runId);
         lastHeartbeatAt = now;
+      }
+    }
+
+    if (!fullText.trim()) {
+      const resolved = await result.text;
+      if (resolved.trim()) {
+        fullText = resolved;
+        send({ type: "text-delta", role, delta: resolved });
       }
     }
   } catch (error) {

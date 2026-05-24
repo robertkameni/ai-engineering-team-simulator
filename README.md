@@ -1,6 +1,11 @@
 # AI Engineering Team Simulator
 
-Multi-agent product debate simulator: describe an idea, watch PM → Architect → Backend → Frontend → Reviewer discuss it with streaming replies, persisted runs, and structured artifacts (requirements, architecture, implementation, review).
+Multi-agent product debate simulator: describe an idea, watch a team debate it with streaming replies, persisted runs, and structured artifacts.
+
+The simulator **auto-detects** whether your idea is a **software product**, a **physical / operational project** (construction, renovation, compliance), or **hybrid**, and adapts role titles, prompts, and artifact labels accordingly. Agents respond in the **same language** as your prompt (French, German, English, etc.).
+
+**Default software pipeline:** PM → Architect → Backend → Frontend → Reviewer  
+**Physical pipeline (same 5 slots, different roles):** Chef de projet travaux → Ingénieur technique → Expert conformité → Planning & budget → Reviewer
 
 **Stack:** Next.js 16 (App Router), React 19, Tailwind 4, Prisma 7 + Neon, Vercel AI SDK + DeepSeek. Conventions live in [AGENTS.md](./AGENTS.md).
 
@@ -21,6 +26,22 @@ Open [http://localhost:3000](http://localhost:3000).
 
 - **Recommended:** Lighthouse and perf checks on **`npm run build && npm run start`**, not `next dev`.
 
+## How it works
+
+1. Enter a product or project idea on `/` → `/workspace?prompt=...`
+2. The server classifies the idea (`software` | `physical` | `hybrid`) and assembles the matching team
+3. Five agents debate sequentially (short Slack-style turns, ~80–140 words)
+4. Artifacts synthesize after the debate (requirements/scope, architecture/technical, implementation/execution, review)
+5. Run persists to Neon; sidebar lists recent history; `/runs/[id]` replays the saved debate
+
+**Examples**
+
+| Prompt type | Template | What you get |
+|-------------|----------|--------------|
+| SaaS HR scheduling app | `software` | PM scope, system design, backend/frontend plans, code-oriented review |
+| School plumbing renovation | `physical` | Work package, technical/conformity planning, budget phasing — no software stack |
+| Renovation + tracking app | `hybrid` | Software-oriented debate (hybrid uses software prompts today) |
+
 ## Scripts
 
 | Command | Purpose |
@@ -32,7 +53,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run db:migrate` | `prisma migrate dev` |
 | `npm run db:migrate:deploy` | `prisma migrate deploy` |
 
-## Deploy (Phase 7)
+## Deploy
 
 See **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Vercel + Neon env vars, build/migrations, smoke test checklist.
 
@@ -46,4 +67,4 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Vercel + Neon env vars, build/migra
 
 ---
 
-*README last aligned with MASTERPLAN: Phase 7 production URL.*
+*README last updated: 2026-05-24 — dynamic team templates, localization, workspace sidebar SSR.*

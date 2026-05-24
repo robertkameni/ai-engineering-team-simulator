@@ -7,13 +7,19 @@ import { cn } from "@/lib/utils";
 interface AgentTypingIndicatorProps {
   role: AgentRole;
   label?: string;
+  agentName?: string;
+  agentTitle?: string;
 }
 
 export function AgentTypingIndicator({
   role,
   label = "Writing…",
+  agentName,
+  agentTitle,
 }: AgentTypingIndicatorProps) {
   const persona = getPersona(role);
+  const displayName = agentName ?? persona.name;
+  const displayTitle = agentTitle ?? persona.title;
 
   return (
     <div
@@ -23,13 +29,13 @@ export function AgentTypingIndicator({
       <AgentAvatar role={role} />
       <div className="glass-card flex flex-wrap items-center gap-1.5 rounded-xl px-3 py-2 @md/workspace-main:gap-2">
         <span className="text-body font-semibold text-foreground">
-          {persona.name}
+          {displayName}
         </span>
         <Badge
           variant="outline"
           className={cn("text-[10px] font-medium", persona.badgeClass)}
         >
-          {persona.title}
+          {displayTitle}
         </Badge>
         <span className="flex items-center gap-1.5 text-caption text-muted-foreground">
           <span className="pulse-glow size-1.5 rounded-full bg-agent-architect" />

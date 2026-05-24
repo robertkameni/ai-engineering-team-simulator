@@ -1,6 +1,8 @@
-import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
+import { SIMULATION_AGENT_ORDER, type SimulationAgentRole } from "@/ai/agents/config";
 import { getPersona } from "@/features/agents/personas";
 import type { AgentRole } from "@/features/agents/types";
+import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
+import { teamMemberPreview } from "@/features/simulation/team-roster-preview";
 import { cn } from "@/lib/utils";
 
 type StepState = "complete" | "active" | "upcoming";
@@ -14,6 +16,7 @@ interface DebateProgressMessage {
 interface DebateProgressStepperProps {
   messages: DebateProgressMessage[];
   activeAgent: AgentRole | null;
+  teamRoster?: TeamRosterPreview | null;
 }
 
 function stepState(
@@ -28,22 +31,28 @@ function stepState(
 }
 
 function roleTitle(
-  role: AgentRole,
+  role: SimulationAgentRole,
   messages: DebateProgressMessage[],
+  teamRoster?: TeamRosterPreview | null,
 ): string {
-  return messages.find((entry) => entry.role === role)?.agentTitle ?? getPersona(role).title;
+  return (
+    messages.find((entry) => entry.role === role)?.agentTitle ??
+    teamMemberPreview(teamRoster, role)?.title ??
+    getPersona(role).title
+  );
 }
 
 export function DebateProgressStepper({
   messages,
   activeAgent,
+  teamRoster,
 }: DebateProgressStepperProps) {
   return (
     <ol className="flex w-full max-w-xs flex-col gap-2 text-left">
       {SIMULATION_AGENT_ORDER.map((role) => {
         const persona = getPersona(role);
         const state = stepState(role, messages, activeAgent);
-        const title = roleTitle(role, messages);
+        const title = roleTitle(role, messages, teamRoster);
 
         return (
           <li

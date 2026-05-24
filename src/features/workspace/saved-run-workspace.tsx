@@ -8,11 +8,13 @@ import { WorkspaceHeaderSaved } from "@/features/workspace/workspace-header-save
 import { WorkspaceMain } from "@/features/workspace/workspace-main";
 import type { MockRun } from "@/features/agents/types";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
+import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 
 interface SavedRunWorkspaceProps {
   run: MockRun;
   pathname: string;
   initialRecentRuns: SidebarRunItemData[];
+  teamRoster?: TeamRosterPreview | null;
   regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;
 }
@@ -22,6 +24,7 @@ export function SavedRunWorkspace({
   run,
   pathname,
   initialRecentRuns,
+  teamRoster = null,
   regenerateRunId,
   canRegenerateArtifacts = false,
 }: SavedRunWorkspaceProps) {
@@ -57,6 +60,7 @@ export function SavedRunWorkspace({
                 isStreaming: message.isStreaming,
                 agentTitle: message.agentTitle,
               }))}
+              teamRoster={teamRoster}
             />
           ) : null
         }

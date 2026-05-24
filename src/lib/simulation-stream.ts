@@ -1,3 +1,5 @@
+import type { SimulationAgentRole } from "@/ai/agents/config";
+import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { AgentRole } from "@/features/agents/types";
 
 /** Shared SSE event shapes (client + server). */
@@ -5,6 +7,11 @@ export type SimulationStreamEvent =
   | {
       type: "run_started";
       runId: string;
+    }
+  | {
+      type: "team_ready";
+      templateId: TeamTemplateId;
+      members: { role: SimulationAgentRole; name: string; title: string }[];
     }
   | {
       type: "agent_start";

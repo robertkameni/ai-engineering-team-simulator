@@ -1,5 +1,28 @@
 import type { ArtifactType } from "@/features/artifacts/artifact-constants";
+import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import { cn } from "@/lib/utils";
+
+const ARTIFACT_TAB_LABELS: Record<TeamTemplateId, Record<ArtifactType, string>> =
+  {
+    software: {
+      requirements: "Requirements",
+      architecture: "Architecture",
+      implementation: "Implementation",
+      review: "Review",
+    },
+    physical: {
+      requirements: "Scope",
+      architecture: "Technical",
+      implementation: "Execution",
+      review: "Review",
+    },
+    hybrid: {
+      requirements: "Scope",
+      architecture: "Architecture",
+      implementation: "Delivery",
+      review: "Review",
+    },
+  };
 
 export const ARTIFACT_TAB_CONFIG: {
   value: ArtifactType;
@@ -43,6 +66,14 @@ export const ARTIFACT_TAB_CONFIG: {
     ),
   },
 ];
+
+export function getArtifactTabConfig(templateId: TeamTemplateId = "software") {
+  const labels = ARTIFACT_TAB_LABELS[templateId];
+  return ARTIFACT_TAB_CONFIG.map((tab) => ({
+    ...tab,
+    label: labels[tab.value],
+  }));
+}
 
 export const ARTIFACT_TAB_LIST_CLASS = cn(
   "grid w-full min-w-0 grid-cols-2 gap-1.5 rounded-lg border border-border/60 bg-surface-2/40 p-1",

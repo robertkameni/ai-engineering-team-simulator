@@ -7,6 +7,7 @@ import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
 import type { ArtifactsPanelStatus, RunArtifacts } from "@/features/artifacts/types";
 import type { AgentRole, RunStatus, SimulationMessage } from "@/features/agents/types";
 import { parseSimulationEvent } from "@/lib/simulation-stream";
+import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 
 import { formatMessageTime } from "@/lib/format-time";
 
@@ -43,6 +44,7 @@ export function useSimulationStream() {
   const [artifacts, setArtifacts] = useState<RunArtifacts | null>(null);
   const [artifactsStatus, setArtifactsStatus] =
     useState<ArtifactsPanelStatus>("idle");
+  const [teamRoster, setTeamRoster] = useState<TeamRosterPreview | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const activeMessageIdRef = useRef<string | null>(null);
 
@@ -119,6 +121,7 @@ export function useSimulationStream() {
       setActiveAgent(null);
       setArtifacts(null);
       setArtifactsStatus("pending");
+      setTeamRoster(null);
       activeMessageIdRef.current = null;
       let currentRunId: string | null = null;
 
@@ -164,6 +167,11 @@ export function useSimulationStream() {
               currentRunId = event.runId;
               setRunId(event.runId);
               setArtifactsStatus("pending");
+            } else if (event.type === "team_ready") {
+              setTeamRoster({
+                templateId: event.templateId,
+                members: event.members,
+              });
             } else if (event.type === "agent_start") {
               setActiveAgent(event.role);
               const id = crypto.randomUUID();
@@ -269,6 +277,7 @@ export function useSimulationStream() {
     setStatus("idle");
     setActiveAgent(null);
     setArtifactsStatus("idle");
+    setTeamRoster(null);
   }, []);
 
   return {
@@ -279,6 +288,7 @@ export function useSimulationStream() {
     activeAgent,
     artifacts,
     artifactsStatus: panelArtifactsStatus,
+    teamRoster,
     start,
     cancel,
   };

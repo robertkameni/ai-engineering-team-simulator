@@ -7,6 +7,8 @@ import {
   getRunForWorkspace,
   listRecentRunsForSidebar,
 } from "@/lib/db/runs";
+import { getTeamRoster } from "@/lib/db/team-roster";
+import { rosterToPreview } from "@/features/simulation/team-roster-preview";
 
 interface RunPageProps {
   params: Promise<{ id: string }>;
@@ -25,9 +27,10 @@ export async function generateMetadata({
 
 export default async function RunPage({ params }: RunPageProps) {
   const { id } = await params;
-  const [run, recentRuns] = await Promise.all([
+  const [run, recentRuns, teamRosterRecord] = await Promise.all([
     getCachedRun(id),
     listRecentRunsForSidebar(12),
+    getTeamRoster(id),
   ]);
 
   if (!run) {
@@ -45,6 +48,9 @@ export default async function RunPage({ params }: RunPageProps) {
       regenerateRunId={canRegenerateArtifacts ? run.id : undefined}
       canRegenerateArtifacts={canRegenerateArtifacts}
       initialRecentRuns={recentRuns}
+      teamRoster={
+        teamRosterRecord != null ? rosterToPreview(teamRosterRecord) : null
+      }
     />
   );
 }

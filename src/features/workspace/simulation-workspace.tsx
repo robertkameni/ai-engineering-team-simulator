@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
+import { isSimulationAgent } from "@/ai/agents/config";
 import type { MockRun } from "@/features/agents/types";
 import { AppShell } from "@/features/workspace/app-shell";
 import { WorkspaceMain } from "@/features/workspace/workspace-main";
@@ -12,6 +13,7 @@ import { SimulationErrorBanner } from "@/features/simulation/simulation-error-ba
 import { AgentTypingIndicator } from "@/features/simulation/agent-typing-indicator";
 import { debateProgressFromMessages } from "@/features/artifacts/artifact-panel-phase";
 import { useSimulationStream } from "@/features/simulation/use-simulation-stream";
+import { teamMemberPreview } from "@/features/simulation/team-roster-preview";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { useWorkspaceMobile } from "@/features/workspace/workspace-mobile-context";
 
@@ -34,6 +36,7 @@ export function SimulationWorkspace({
     activeAgent,
     artifacts,
     artifactsStatus,
+    teamRoster,
     start,
   } = useSimulationStream();
 
@@ -95,6 +98,12 @@ export function SimulationWorkspace({
     ],
   );
 
+  const activeMember =
+    activeAgent != null && isSimulationAgent(activeAgent)
+      ? teamMemberPreview(teamRoster, activeAgent)
+      : undefined;
+  const bootstrappingMember = teamMemberPreview(teamRoster, "pm");
+
   return (
     <AppShell
       artifacts={artifacts}
@@ -103,6 +112,7 @@ export function SimulationWorkspace({
       debateProgress={debateProgress}
       debateMessages={messages}
       activeAgent={activeAgent}
+      teamRoster={teamRoster}
     >
       <WorkspaceHeader
         title={title}
@@ -120,12 +130,19 @@ export function SimulationWorkspace({
           />
         ) : null}
         {showBootstrapping ? (
-          <AgentTypingIndicator role="pm" label="Assembling the team…" />
+          <AgentTypingIndicator
+            role="pm"
+            label="Assembling the team…"
+            agentName={bootstrappingMember?.name}
+            agentTitle={bootstrappingMember?.title}
+          />
         ) : null}
         {showHandoff && activeAgent ? (
           <AgentTypingIndicator
             role={activeAgent}
             label="Preparing contribution…"
+            agentName={activeMember?.name}
+            agentTitle={activeMember?.title}
           />
         ) : null}
         <MessageThread

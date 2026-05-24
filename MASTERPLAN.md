@@ -27,23 +27,44 @@ A **multi-agent engineering simulator**: the user describes a product idea; AI t
 
 ### Agent pipeline (per run)
 
-Order: **PM → Architect → Backend Developer → Frontend Developer → Reviewer**
+Order (fixed slots): **PM → Architect → Backend → Frontend → Reviewer**
 
 | Role | Model | Thinking | Max output tokens |
 |------|--------|----------|-------------------|
 | PM | `deepseek-v4-flash` | Off | 450 |
-| Architect | `deepseek-v4-pro` | Off (chat only — visible stream) | 650 |
+| Architect | `deepseek-v4-pro` | **Low** (`DEEPSEEK_REASONING_OPTIONS`) | 650 |
 | Backend | `deepseek-v4-pro` | Off | 500 |
 | Frontend | `deepseek-v4-flash` | Off | 500 |
 | Reviewer | `deepseek-v4-flash` | Off | 450 |
 
-Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` (`thinking: disabled`) so tokens go to visible debate text, not hidden reasoning.
+Configured in `src/ai/agents/config.ts`. PM, backend, frontend, and reviewer use `DEEPSEEK_CHAT_OPTIONS` (`thinking: disabled`). Architect uses low-effort reasoning for deeper technical turns without long hidden waits.
 
-**Debate style:** Short Slack-like turns (~80–140 words), no markdown tables — see `src/ai/prompts/shared.ts`. Full detail lives in post-debate artifacts.
+**Debate style:** Short Slack-like turns (~80–140 words), semantic section headings (no hardcoded English titles), no markdown tables — see `src/ai/prompts/shared.ts`. Full detail lives in post-debate artifacts.
 
-**Team names:** Randomized per run via `createSimulationRoster()`; stored as `team-roster` artifact + `Message.agentName`.
+**Language:** Agents and artifacts match the product idea’s language (`LANGUAGE_MATCH_DIRECTIVE` in `build-messages.ts`; localized artifact section titles via `ARTIFACT_LANGUAGE_DIRECTIVE`).
 
-**Resilience:** Empty agent stream → one retry with doubled token budget (`run-simulation.ts`).
+**Team names:** Randomized per run via `createSimulationRoster(templateId)`; stored as `team-roster` artifact (includes `templateId`) + `Message.agentName`.
+
+**Resilience (`run-simulation.ts`):**
+- Empty agent stream → fallback to `result.text` (reasoning models may not emit `textStream` deltas)
+- Still empty → one retry on `deepseek-v4-flash` with chat options (no reasoning) and doubled token budget
+- Stream errors logged via `onError`
+
+### Dynamic team templates *(2026-05-24)*
+
+Before debate, `classifyProjectTeamTemplate()` (flash + structured output) picks a template from the prompt — no need to write “sans logiciel” explicitly.
+
+| Template | When | Slot titles (examples) | Prompts |
+|----------|------|------------------------|---------|
+| `software` | Apps, SaaS, APIs, dashboards | Product Manager, Architect, Backend/Frontend Developer | `src/ai/prompts/*.ts` |
+| `physical` | Construction, renovation, compliance, field work | Chef de projet travaux, Ingénieur technique, Expert conformité, Planning budget & risques | `src/ai/prompts/physical/*.ts` |
+| `hybrid` | Physical scope + software component | Mixed titles | Software prompts (fallback) |
+
+- Config: `src/ai/agents/team-templates.ts`
+- Classification: `src/ai/orchestration/classify-project.ts`
+- Routing: `src/ai/prompts/index.ts` (`getAgentSystemPrompt` / `getAgentTurnPrompt`)
+- Artifact guidelines per template: `src/ai/artifacts/artifact-templates.ts` (software tabs: Requirements…; physical: Scope, Technical, Execution, Review)
+- SSE `team_ready` sends full roster (names + titles) immediately after classification so the UI shows correct role labels before agents speak
 
 ---
 
@@ -119,7 +140,7 @@ Configured in `src/ai/agents/config.ts`. All agents use `DEEPSEEK_CHAT_OPTIONS` 
 
 - [x] Sequential orchestration (`src/ai/orchestration/run-simulation.ts`)
 - [x] Shared transcript context (`build-messages.ts`, role prompts per agent)
-- [x] SSE: `run_started`, `agent_start`, `text-delta`, `agent_end`, `artifacts_*`, `done`, `error`
+- [x] SSE: `run_started`, `team_ready`, `agent_start`, `text-delta`, `agent_end`, `artifacts_*`, `done`, `error`
 - [x] `GET /api/runs` for sidebar recent list
 - [x] `DELETE /api/runs/[id]` — delete run from sidebar
 - [x] `/runs/[id]` loads messages + artifacts from DB
@@ -202,7 +223,22 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 - [x] **`ArtifactPanelStatic`** — artifact tabs without Radix on desktop saved-run path (CSS radios + `:has()` / `globals.css`); native scroll inside panels; **`ArtifactSections`** shared with client `ArtifactPanel`.
 - [x] **Tab bar layout fixes** — 2-column tab grid when the artifact panel is narrow, 4 columns when `@min-[480px]/artifact-panel`; wrap + `title` tooltips so long labels (e.g. Implementation) are readable without ellipsis-only UX.
 - [x] **Thin scrollbars** — global WebKit/`scrollbar-*` tuning + slimmer Radix `ScrollArea` track (`globals.css`, `components/ui/scroll-area.tsx`).
-- [x] **Live `/workspace`** — retains streaming client shell; **`PromptComposer`** code-split (`next/dynamic`); sidebar still uses **`ScrollArea`** where needed.
+- [x] **`PromptComposer`** code-split (`next/dynamic`); sidebar still uses **`ScrollArea`** where needed.
+
+### Phase 6++ — Adaptive teams, localization, and UX *(shipped 2026-05-24)*
+
+- [x] **Project classification** — `classify-project.ts` picks `software` | `physical` | `hybrid` before debate.
+- [x] **Team templates** — `team-templates.ts`; five fixed slots with dynamic titles per template; `templateId` on roster artifact.
+- [x] **Physical prompts** — `src/ai/prompts/physical/` (no software/API proposals; reviewer rejects software drift).
+- [x] **Localized output** — language-matching directive on product idea; semantic section headings; artifact titles generated in transcript language.
+- [x] **Template-aware artifacts** — `sectionGuidelinesForArtifact(templateId)` + physical focus strings in `generate-run-artifacts.ts`.
+- [x] **Architect latency** — reasoning effort `low`; handoff indicator during empty streaming turns.
+- [x] **Stream resilience** — `result.text` fallback + flash/chat retry when reasoning stream is empty.
+- [x] **Sidebar SSR on `/workspace`** — `listRecentRunsForSidebar(12)` server-rendered; loading state in `SidebarRecentRuns` (no false “No runs yet” flash).
+- [x] **`team_ready` SSE** — client shows correct role titles and artifact tab labels immediately after classification.
+- [x] **Dynamic UI labels** — debate stepper, typing indicator, and artifact tabs use roster titles (not hardcoded “Backend Developer”).
+
+**Not yet:** dedicated `hybrid` prompt set (uses software prompts); DevOps agent (Phase 9).
 
 **Perf note:** Lighthouse and field metrics on `next dev` are **not representative** — always verify with `npm run build && npm start` before judging LCP/TBT.
 
@@ -237,7 +273,8 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 **Goal:** Differentiation and depth.
 
 - [ ] DevOps agent in pipeline
-- [ ] User-selectable team size / agents
+- [ ] Dedicated hybrid prompts (physical + software in one debate)
+- [ ] User-selectable team size / agents (templates are automatic today)
 - [ ] Share run via public link
 - [ ] Cost / token usage display per run
 - [ ] E2E tests (Playwright) for critical path
@@ -266,14 +303,15 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 src/
   app/                    # Routes, API handlers (`runs/[id]` server component for replay)
   ai/
-    agents/               # config, roster
-    artifacts/            # generate-run-artifacts, templates, transcript
-    orchestration/        # run-simulation.ts
-    prompts/              # per-role system + turn prompts
+    agents/               # config, roster, team-templates.ts
+    artifacts/            # generate-run-artifacts, templates (per templateId), transcript
+    orchestration/        # run-simulation.ts, classify-project.ts
+    prompts/              # software prompts + physical/ subfolder; index routes by templateId
+    context/              # build-messages.ts (language directive)
   features/
-    artifacts/            # ArtifactPanel (+ static panel), schemas, sections, regenerate action
-    simulation/           # stream hook, thread (client + static), composer (FAB + sheet)
-    workspace/            # AppShell, SavedRunWorkspace, sidebar (client + static), mobile sheets
+    artifacts/            # ArtifactPanel (+ static), debate stepper, tab labels per template
+    simulation/           # stream hook, team-roster-preview, typing indicator
+    workspace/            # AppShell, SavedRunWorkspace, sidebar SSR on workspace page
   lib/
     db/                   # Prisma helpers (incl. listRecentRunsForSidebar)
     export/               # run-markdown.ts
@@ -313,6 +351,7 @@ Phase 8 (auth, if needed) → Phase 9 (stretch), or iterate on UX/perf post-laun
 
 | Date | Change |
 |------|--------|
+| 2026-05-24 | **Adaptive teams:** LLM classification (`software` / `physical` / `hybrid`), team templates, physical prompts, localized debate + artifacts, `team_ready` SSE, dynamic UI role labels, workspace sidebar SSR, architect stream resilience (`result.text` + flash retry). |
 | 2026-05-22 | Phase 7 **shipped**: production at [ai-engineering-team-simulator.vercel.app](https://ai-engineering-team-simulator.vercel.app); README + DEPLOYMENT + MASTERPLAN updated. |
 | 2026-05-22 | Phase 7 (repo): `DEPLOYMENT.md`, `.env.example`, build runs `prisma migrate deploy` when `DATABASE_URL` is set (`scripts/prisma-migrate-deploy-if-url.mjs`); MASTERPLAN Phase 7 checklist + README deploy section. |
 | 2026-05-22 | Phase 6+ documented: SSR saved-run workspace, static artifact panel + shared sections, sidebar SSR/static delete, regenerate server action, thin scrollbars; perf verification note (prod build). |
@@ -326,4 +365,4 @@ Phase 8 (auth, if needed) → Phase 9 (stretch), or iterate on UX/perf post-laun
 
 ---
 
-*Last updated: 2026-05-22*
+*Last updated: 2026-05-24*
