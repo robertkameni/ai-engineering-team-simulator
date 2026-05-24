@@ -88,9 +88,15 @@ function parseArtifactDocument(data: unknown): ArtifactDocument | null {
   return { sections };
 }
 
+export function isCompleteRunArtifacts(
+  artifacts: Partial<RunArtifacts>,
+): artifacts is RunArtifacts {
+  return ARTIFACT_TYPES.every((type) => artifacts[type] != null);
+}
+
 export function mapDbArtifactsToRunArtifacts(
   rows: { type: string; data: unknown }[],
-): RunArtifacts | null {
+): Partial<RunArtifacts> | null {
   const bundle = {} as Partial<RunArtifacts>;
   let found = 0;
 
@@ -104,9 +110,9 @@ export function mapDbArtifactsToRunArtifacts(
     found += 1;
   }
 
-  if (found !== ARTIFACT_TYPES.length) {
+  if (found === 0) {
     return null;
   }
 
-  return bundle as RunArtifacts;
+  return bundle;
 }

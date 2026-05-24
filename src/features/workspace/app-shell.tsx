@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 
 import { ArtifactPanel } from "@/features/artifacts/artifact-panel";
-import type { ArtifactsPanelStatus, RunArtifacts } from "@/features/artifacts/types";
+import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
 import type { DebateProgress } from "@/features/artifacts/artifact-panel-phase";
 import type { AgentRole } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
@@ -32,7 +32,7 @@ const ArtifactsMobileSheet = dynamic(
 
 interface AppShellProps {
   children: React.ReactNode;
-  artifacts?: RunArtifacts | null;
+  artifacts?: PartialRunArtifacts | null;
   artifactsStatus?: ArtifactsPanelStatus;
   regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;

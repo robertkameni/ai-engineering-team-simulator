@@ -3,19 +3,22 @@ import { ArtifactPanelPlaceholder } from "@/features/artifacts/artifact-panel-pl
 import { RegenerateArtifactsButton } from "@/features/artifacts/regenerate-artifacts-button";
 import {
   artifactPanelSubtitle,
+  countRunArtifacts,
   debateProgressFromMessages,
+  shouldShowArtifactTabs,
 } from "@/features/artifacts/artifact-panel-phase";
+import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skeleton";
 import { ARTIFACT_TAB_LIST_CLASS, ARTIFACT_TAB_TRIGGER_STATIC, getArtifactTabConfig } from "@/features/artifacts/artifact-tab-styles";
 import type {
   ArtifactsPanelStatus,
-  RunArtifacts,
+  PartialRunArtifacts,
 } from "@/features/artifacts/types";
 import type { AgentRole } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 import { cn } from "@/lib/utils";
 
 interface ArtifactPanelStaticProps {
-  artifacts?: RunArtifacts | null;
+  artifacts?: PartialRunArtifacts | null;
   status?: ArtifactsPanelStatus;
   regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;
@@ -32,10 +35,11 @@ export function ArtifactPanelStatic({
   debateMessages = [],
   teamRoster = null,
 }: ArtifactPanelStaticProps) {
-  const isReady = status === "ready" && artifacts != null;
+  const showTabs = shouldShowArtifactTabs(status, artifacts);
   const showRegenerate = canRegenerateArtifacts && regenerateRunId != null;
   const debateProgress = debateProgressFromMessages(debateMessages, null);
-  const subtitle = artifactPanelSubtitle(status, debateProgress);
+  const artifactCount = countRunArtifacts(artifacts);
+  const subtitle = artifactPanelSubtitle(status, debateProgress, artifactCount);
   const artifactTabs = getArtifactTabConfig(teamRoster?.templateId ?? "software");
 
   return (
@@ -58,7 +62,7 @@ export function ArtifactPanelStatic({
         ) : null}
       </header>
 
-      {isReady ? (
+      {showTabs ? (
         <div className="artifact-static-tabs flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {artifactTabs.map((tab, index) => (
             <input
@@ -101,7 +105,11 @@ export function ArtifactPanelStatic({
                 data-artifact-panel={tab.value}
                 className="artifact-static-panel artifact-tab-content mt-0 min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 h-[calc(100svh-7.5rem)]"
               >
-                <ArtifactSections sections={artifacts[tab.value]} />
+                {artifacts?.[tab.value] ? (
+                  <ArtifactSections sections={artifacts[tab.value]!} />
+                ) : (
+                  <ArtifactPanelSkeleton />
+                )}
               </div>
             ))}
           </div>

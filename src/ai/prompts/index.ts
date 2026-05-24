@@ -31,6 +31,9 @@ import {
   buildReviewerTurnPrompt,
 } from "@/ai/prompts/reviewer";
 
+const CORRECTION_TURN_SUFFIX =
+  "\n\nCRITICAL: The Reviewer has rejected your previous proposal. You must directly address their criticism, correct the flaws, and provide an updated plan.";
+
 function resolvePromptTemplateId(templateId: TeamTemplateId): "software" | "physical" {
   return templateId === "physical" ? "physical" : "software";
 }
@@ -80,38 +83,56 @@ export function getAgentTurnPrompt(
   productIdea: string,
   roster: TeamRoster,
   templateId: TeamTemplateId = roster.templateId,
+  isCorrection?: boolean,
 ): string {
   const resolved = resolvePromptTemplateId(templateId);
+  let turnPrompt: string;
 
   if (resolved === "physical") {
     switch (role) {
       case "pm":
-        return buildPhysicalPmUserPrompt(productIdea);
+        turnPrompt = buildPhysicalPmUserPrompt(productIdea);
+        break;
       case "architect":
-        return buildPhysicalTechnicalEngineerTurnPrompt();
+        turnPrompt = buildPhysicalTechnicalEngineerTurnPrompt();
+        break;
       case "backend":
-        return buildPhysicalComplianceExpertTurnPrompt();
+        turnPrompt = buildPhysicalComplianceExpertTurnPrompt();
+        break;
       case "frontend":
-        return buildPhysicalPlanningBudgetTurnPrompt();
+        turnPrompt = buildPhysicalPlanningBudgetTurnPrompt();
+        break;
       case "reviewer":
-        return buildPhysicalReviewerTurnPrompt(roster);
+        turnPrompt = buildPhysicalReviewerTurnPrompt(roster);
+        break;
+      default:
+        throw new Error(`No turn prompt for role: ${role}`);
+    }
+  } else {
+    switch (role) {
+      case "pm":
+        turnPrompt = buildPmUserPrompt(productIdea);
+        break;
+      case "architect":
+        turnPrompt = buildArchitectTurnPrompt();
+        break;
+      case "backend":
+        turnPrompt = buildDeveloperTurnPrompt();
+        break;
+      case "frontend":
+        turnPrompt = buildFrontendDeveloperTurnPrompt();
+        break;
+      case "reviewer":
+        turnPrompt = buildReviewerTurnPrompt(roster);
+        break;
       default:
         throw new Error(`No turn prompt for role: ${role}`);
     }
   }
 
-  switch (role) {
-    case "pm":
-      return buildPmUserPrompt(productIdea);
-    case "architect":
-      return buildArchitectTurnPrompt();
-    case "backend":
-      return buildDeveloperTurnPrompt();
-    case "frontend":
-      return buildFrontendDeveloperTurnPrompt();
-    case "reviewer":
-      return buildReviewerTurnPrompt(roster);
-    default:
-      throw new Error(`No turn prompt for role: ${role}`);
+  if (isCorrection && role !== "reviewer") {
+    turnPrompt += CORRECTION_TURN_SUFFIX;
   }
+
+  return turnPrompt;
 }

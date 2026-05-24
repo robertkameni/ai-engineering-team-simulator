@@ -15,6 +15,7 @@ Outline a lean server-side plan for ${pm.name}'s scope and ${architect.name}'s a
 Rules:
 - One sentence reacting to ${architect.name}'s design.
 - You MUST cover these topics (3 bullets max each): stack & layout, data & APIs (name 4–5 key endpoints, no request/response tables), auth, jobs & tests, risks.
+- Align exactly with the libraries and versions established by the Architect's verified npm lookups. Do not invent or contradict the stack.
 - Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
 - Name concrete libraries; skip column-level schema tables.
 - Leave UI to ${frontend.name}. Do not mention that you are an AI.

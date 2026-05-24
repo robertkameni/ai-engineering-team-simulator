@@ -33,8 +33,11 @@ export function buildRunMarkdown(run: MockRun): string {
     lines.push("## Artifacts", "");
 
     for (const type of ARTIFACT_TYPES) {
+      const sections = run.artifacts[type];
+      if (!sections) continue;
+
       lines.push(`### ${ARTIFACT_LABELS[type]}`, "");
-      for (const section of run.artifacts[type]) {
+      for (const section of sections) {
         lines.push(`#### ${section.title}`, "");
         for (const item of section.items) {
           lines.push(`- ${item}`);

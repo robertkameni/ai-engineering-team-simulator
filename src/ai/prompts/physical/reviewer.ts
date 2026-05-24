@@ -1,6 +1,6 @@
 import type { TeamRoster } from "@/ai/agents/roster";
 import { getTeamMember } from "@/ai/agents/roster";
-import { buildDiscussionDepthRules, CONCISE_OUTPUT_HINT } from "@/ai/prompts/shared";
+import { buildDiscussionDepthRules, buildImplementationQuoteHint, CONCISE_OUTPUT_HINT } from "@/ai/prompts/shared";
 
 const SOFTWARE_REJECTION_RULE =
   "CRITICAL: If any agent proposes software development, coding, or IT infrastructure, you MUST explicitly reject it and state that this is a physical/operational project.";
@@ -27,5 +27,5 @@ ${CONCISE_OUTPUT_HINT}`;
 }
 
 export function buildPhysicalReviewerTurnPrompt(roster: TeamRoster): string {
-  return `Write a short review. Quote at least two claims from the previous agents. You MUST include at least one claim from ${roster.backend.name} (Backend) or ${roster.frontend.name} (Frontend) if they have spoken. Stay under 220 words. Reject any software drift. End with [APPROVE] or [REJECT: role] on its own last line (role = pm, architect, backend, or frontend).`;
+  return `Write a short review. Quote at least two claims from the previous agents. ${buildImplementationQuoteHint(roster)} Stay under 220 words. Reject any software drift. End with [APPROVE] or [REJECT: role] on its own last line (role = pm, architect, backend, or frontend).`;
 }

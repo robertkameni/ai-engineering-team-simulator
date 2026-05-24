@@ -29,6 +29,11 @@ async function getRunForArtifacts(runId: string) {
 
   if (reconciled) {
     run = await getRunWithMessages(runId);
+    if (!run) {
+      console.warn("Artifacts lookup: run missing after stale reconcile", {
+        runId,
+      });
+    }
   }
 
   return run;
@@ -39,6 +44,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
   const run = await getRunForArtifacts(id);
 
   if (!run) {
+    console.warn("Artifacts GET: run not found", { runId: id });
     return Response.json({ error: "Run not found" }, { status: 404 });
   }
 

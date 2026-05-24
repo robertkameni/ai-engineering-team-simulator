@@ -2,7 +2,7 @@
 
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { ArtifactPanel } from "@/features/artifacts/artifact-panel";
-import type { ArtifactsPanelStatus, RunArtifacts } from "@/features/artifacts/types";
+import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
 import type { DebateProgress } from "@/features/artifacts/artifact-panel-phase";
 import type { AgentRole } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
@@ -10,7 +10,7 @@ import type { TeamRosterPreview } from "@/features/simulation/team-roster-previe
 interface ArtifactsMobileSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  artifacts?: RunArtifacts | null;
+  artifacts?: PartialRunArtifacts | null;
   status?: ArtifactsPanelStatus;
   regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;

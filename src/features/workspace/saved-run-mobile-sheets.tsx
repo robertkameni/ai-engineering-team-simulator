@@ -7,7 +7,7 @@ import { SavedRunMobileContext } from "@/features/workspace/saved-run-mobile-con
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import type {
   ArtifactsPanelStatus,
-  RunArtifacts,
+  PartialRunArtifacts,
 } from "@/features/artifacts/types";
 
 const SidebarMobileSheet = dynamic(
@@ -30,7 +30,7 @@ interface SavedRunMobileSheetsProps {
   pathname: string;
   initialRecentRuns: SidebarRunItemData[];
   showArtifactPanel: boolean;
-  artifacts: RunArtifacts | null;
+  artifacts: PartialRunArtifacts | null;
   artifactsStatus: ArtifactsPanelStatus;
   regenerateRunId?: string;
   canRegenerateArtifacts: boolean;

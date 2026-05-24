@@ -32,9 +32,19 @@ export function buildAgentMessages(
     });
   }
 
+  const isCorrection =
+    transcript.length > 0 &&
+    transcript[transcript.length - 1].role === "reviewer";
+
   messages.push({
     role: "user",
-    content: getAgentTurnPrompt(role, productIdea, roster, roster.templateId),
+    content: getAgentTurnPrompt(
+      role,
+      productIdea,
+      roster,
+      roster.templateId,
+      isCorrection,
+    ),
   });
 
   return messages;

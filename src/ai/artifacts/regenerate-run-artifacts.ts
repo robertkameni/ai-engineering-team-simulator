@@ -9,7 +9,7 @@ import { getPersona } from "@/features/agents/personas";
 import { type RunArtifacts } from "@/features/artifacts/types";
 import {
   runArtifactsOutputToBundle,
-  saveArtifactBundle,
+  saveSingleArtifact,
 } from "@/lib/db/artifacts";
 import {
   toAppArtifactStatus,
@@ -142,9 +142,11 @@ export async function regenerateRunArtifacts(
       productIdea: run.userPrompt,
       transcript: mapMessagesToTranscript(simulationMessages),
       roster,
+      onArtifactComplete: async (type, document) => {
+        await saveSingleArtifact(runId, type, document);
+      },
     });
     const bundle = runArtifactsOutputToBundle(artifactOutput);
-    await saveArtifactBundle(runId, bundle);
     await updateArtifactStatus(runId, "ready");
     if (status === "running") {
       await updateRunStatus(runId, "complete");

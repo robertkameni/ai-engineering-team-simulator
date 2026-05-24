@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
-import type { ArtifactsPanelStatus, RunArtifacts } from "@/features/artifacts/types";
+import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
 import type { AgentRole, RunStatus, SimulationMessage } from "@/features/agents/types";
 import { parseSimulationEvent } from "@/lib/simulation-stream";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
@@ -14,6 +14,51 @@ const POLL_ARTIFACT_INTERVAL_MS = 800;
 /** Match artifacts route synthesis budget (approx). */
 const POLL_ARTIFACT_MAX_MS = 320_000;
 
+type ArtifactsFetchResult =
+  | {
+      ok: true;
+      artifacts: PartialRunArtifacts | null;
+      status: ArtifactsPanelStatus;
+    }
+  | { ok: false; retryable: boolean };
+
+function isRetryableArtifactsHttpStatus(status: number): boolean {
+  return status === 404 || status === 408 || status === 429 || status >= 500;
+}
+
+async function fetchArtifactsState(id: string): Promise<ArtifactsFetchResult> {
+  let response: Response;
+  try {
+    response = await fetch(`/api/runs/${id}/artifacts`);
+  } catch {
+    return { ok: false, retryable: true };
+  }
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      retryable: isRetryableArtifactsHttpStatus(response.status),
+    };
+  }
+
+  const data = (await response.json()) as {
+    artifacts: PartialRunArtifacts | null;
+    status: ArtifactsPanelStatus;
+  };
+
+  return {
+    ok: true,
+    artifacts: data.artifacts,
+    status: data.status,
+  };
+}
+
+function waitForArtifactPoll(): Promise<void> {
+  return new Promise((resolve) =>
+    globalThis.setTimeout(resolve, POLL_ARTIFACT_INTERVAL_MS),
+  );
+}
+
 export function useSimulationStream() {
   const router = useRouter();
   const [messages, setMessages] = useState<SimulationMessage[]>([]);
@@ -21,7 +66,7 @@ export function useSimulationStream() {
   const [error, setError] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [activeAgent, setActiveAgent] = useState<AgentRole | null>(null);
-  const [artifacts, setArtifacts] = useState<RunArtifacts | null>(null);
+  const [artifacts, setArtifacts] = useState<PartialRunArtifacts | null>(null);
   const [artifactsStatus, setArtifactsStatus] =
     useState<ArtifactsPanelStatus>("idle");
   const [teamRoster, setTeamRoster] = useState<TeamRosterPreview | null>(null);
@@ -31,52 +76,59 @@ export function useSimulationStream() {
   const panelArtifactsStatus = artifactsStatus;
 
   const loadArtifacts = useCallback(async (id: string) => {
-    const response = await fetch(`/api/runs/${id}/artifacts`);
-    
-    if (!response.ok) {
-      setArtifactsStatus("unavailable");
-      return;
+    const deadline = Date.now() + POLL_ARTIFACT_MAX_MS;
+    while (Date.now() < deadline) {
+      const result = await fetchArtifactsState(id);
+      if (result.ok) {
+        setArtifacts(result.artifacts);
+        setArtifactsStatus(result.status);
+        return;
+      }
+      if (!result.retryable) {
+        setArtifactsStatus("unavailable");
+        return;
+      }
+      await waitForArtifactPoll();
     }
-
-    const data = (await response.json()) as {
-      artifacts: RunArtifacts | null;
-      status: ArtifactsPanelStatus;
-    };
-    setArtifacts(data.artifacts);
-    setArtifactsStatus(data.status);
+    setArtifactsStatus("unavailable");
   }, []);
 
   const pollArtifactsUntilSettled = useCallback(
     async (id: string): Promise<ArtifactsPanelStatus> => {
       const deadline = Date.now() + POLL_ARTIFACT_MAX_MS;
       while (Date.now() < deadline) {
-        const response = await fetch(`/api/runs/${id}/artifacts`);
-        
-        if (!response.ok) {
+        const result = await fetchArtifactsState(id);
+
+        if (!result.ok) {
+          if (result.retryable) {
+            await waitForArtifactPoll();
+            continue;
+          }
           setArtifactsStatus("unavailable");
           return "unavailable";
         }
 
-        const data = (await response.json()) as {
-          artifacts: RunArtifacts | null;
-          status: ArtifactsPanelStatus;
-        };
+        setArtifacts(result.artifacts);
+        setArtifactsStatus(result.status);
 
-        setArtifacts(data.artifacts);
-        setArtifactsStatus(data.status);
-        
-        if (data.status === "ready" || data.status === "unavailable") {
-          return data.status;
+        if (result.status === "ready" || result.status === "unavailable") {
+          return result.status;
         }
 
-        await new Promise((r) =>
-          globalThis.setTimeout(r, POLL_ARTIFACT_INTERVAL_MS),
-        );
+        await waitForArtifactPoll();
       }
-      await loadArtifacts(id);
+
+      const finalResult = await fetchArtifactsState(id);
+      if (finalResult.ok) {
+        setArtifacts(finalResult.artifacts);
+        setArtifactsStatus(finalResult.status);
+        return finalResult.status;
+      }
+
+      setArtifactsStatus("unavailable");
       return "unavailable";
     },
-    [loadArtifacts],
+    [],
   );
 
   const start = useCallback(

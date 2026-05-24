@@ -76,7 +76,7 @@ Output rules:
       model: getDeepSeekModel("deepseek-v4-flash"),
       system,
       prompt: transcriptPrompt,
-      maxOutputTokens: 1400,
+      maxOutputTokens: 1200,
       temperature: 0.2,
       output: Output.object({ schema: artifactDocumentSchema }),
       providerOptions: {
@@ -97,7 +97,7 @@ Output rules:
 
 Respond with ONLY a JSON object: { "sections": [{ "title": string, "items": string[] }] }`,
     prompt: transcriptPrompt,
-    maxOutputTokens: 1400,
+    maxOutputTokens: 1200,
     temperature: 0.2,
     providerOptions: {
       deepseek: DEEPSEEK_CHAT_OPTIONS,
@@ -135,10 +135,15 @@ export async function generateRunArtifacts({
   productIdea,
   transcript,
   roster,
+  onArtifactComplete,
 }: {
   productIdea: string;
   transcript: TranscriptEntry[];
   roster: TeamRoster;
+  onArtifactComplete?: (
+    type: ArtifactType,
+    document: ArtifactDocument,
+  ) => Promise<void> | void;
 }): Promise<RunArtifactsOutput> {
   const templateId = roster.templateId;
   const transcriptPrompt = buildTranscriptForArtifacts(
@@ -147,16 +152,17 @@ export async function generateRunArtifacts({
     roster,
   );
 
-  const output = {} as RunArtifactsOutput;
+  const entries = await Promise.all(
+    ARTIFACT_TYPES.map(async (type) => {
+      const document = await generateArtifactDocument(
+        type,
+        transcriptPrompt,
+        templateId,
+      );
+      await onArtifactComplete?.(type, document);
+      return [type, document] as const;
+    }),
+  );
 
-  for (const type of ARTIFACT_TYPES) {
-    const document = await generateArtifactDocument(
-      type,
-      transcriptPrompt,
-      templateId,
-    );
-    output[type] = document;
-  }
-
-  return output;
+  return Object.fromEntries(entries) as RunArtifactsOutput;
 }

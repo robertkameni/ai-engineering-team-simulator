@@ -1,6 +1,6 @@
 import type {
   ArtifactsPanelStatus,
-  RunArtifacts,
+  PartialRunArtifacts,
 } from "@/features/artifacts/types";
 
 export type AgentRole =
@@ -44,7 +44,7 @@ export interface MockRun {
   status: RunStatus;
   updatedAt: string;
   messages: SimulationMessage[];
-  artifacts?: RunArtifacts | null;
+  artifacts?: PartialRunArtifacts | null;
   artifactsStatus?: ArtifactsPanelStatus;
 }
 

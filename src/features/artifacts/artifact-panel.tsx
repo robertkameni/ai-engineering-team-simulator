@@ -9,6 +9,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArtifactSections } from "@/features/artifacts/artifact-sections";
 import { ArtifactPanelPlaceholder } from "@/features/artifacts/artifact-panel-placeholder";
+import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skeleton";
 import { RegenerateArtifactsButton } from "@/features/artifacts/regenerate-artifacts-button";
 import { SheetClose } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -20,18 +21,20 @@ import {
 } from "@/features/artifacts/artifact-tab-styles";
 import {
   artifactPanelSubtitle,
+  countRunArtifacts,
+  shouldShowArtifactTabs,
   type DebateProgress,
 } from "@/features/artifacts/artifact-panel-phase";
 import type {
   ArtifactsPanelStatus,
-  RunArtifacts,
+  PartialRunArtifacts,
 } from "@/features/artifacts/types";
 import type { AgentRole } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 import { cn } from "@/lib/utils";
 
 interface ArtifactPanelProps {
-  artifacts?: RunArtifacts | null;
+  artifacts?: PartialRunArtifacts | null;
   status?: ArtifactsPanelStatus;
   layout?: "inline" | "sheet";
   regenerateRunId?: string;
@@ -53,10 +56,11 @@ export function ArtifactPanel({
   activeAgent = null,
   teamRoster = null,
 }: ArtifactPanelProps) {
-  const isReady = status === "ready" && artifacts != null;
+  const showTabs = shouldShowArtifactTabs(status, artifacts);
   const isSheet = layout === "sheet";
   const showRegenerate = canRegenerateArtifacts && regenerateRunId != null;
-  const subtitle = artifactPanelSubtitle(status, debateProgress);
+  const artifactCount = countRunArtifacts(artifacts);
+  const subtitle = artifactPanelSubtitle(status, debateProgress, artifactCount);
   const artifactTabs = getArtifactTabConfig(teamRoster?.templateId ?? "software");
 
   return (
@@ -96,7 +100,7 @@ export function ArtifactPanel({
         </div>
       </header>
 
-      {isReady ? (
+      {showTabs ? (
         <Tabs
           defaultValue="requirements"
           className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
@@ -130,7 +134,11 @@ export function ArtifactPanel({
                     : "h-[calc(100svh-7.5rem)]",
                 )}
               >
-                <ArtifactSections sections={artifacts[tab.value]} />
+                {artifacts?.[tab.value] ? (
+                  <ArtifactSections sections={artifacts[tab.value]!} />
+                ) : (
+                  <ArtifactPanelSkeleton />
+                )}
               </ScrollArea>
             </TabsContent>
           ))}

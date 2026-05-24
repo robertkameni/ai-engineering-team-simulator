@@ -22,3 +22,7 @@ Brevity (required):
 
 export const CONCISE_OUTPUT_HINT =
   "Prioritize clarity and decisions over completeness. Omit nice-to-haves and implementation detail that belongs in artifacts later.";
+
+export function buildImplementationQuoteHint(roster: TeamRoster): string {
+  return `You MUST include at least one claim from ${roster.backend.name} (${roster.backend.title}) or ${roster.frontend.name} (${roster.frontend.title}) if they have spoken.`;
+}
