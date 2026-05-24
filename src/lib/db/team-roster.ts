@@ -5,6 +5,7 @@ import {
   type SimulationAgentRole,
 } from "@/ai/agents/config";
 import type { TeamMember, TeamRoster } from "@/ai/agents/roster";
+import { isTeamTemplateId } from "@/ai/agents/team-templates";
 import { prisma } from "@/lib/prisma";
 
 export const TEAM_ROSTER_ARTIFACT_TYPE = "team-roster";
@@ -33,9 +34,15 @@ export async function saveTeamRoster(runId: string, roster: TeamRoster) {
 export function parseTeamRoster(data: unknown): TeamRoster | null {
   if (data == null || typeof data !== "object") return null;
 
-  const roster = {} as TeamRoster;
+  const record = data as Record<string, unknown>;
+  const templateId = isTeamTemplateId(record.templateId)
+    ? record.templateId
+    : "software";
+
+  const roster = { templateId } as TeamRoster;
+
   for (const role of SIMULATION_AGENT_ORDER) {
-    const member = (data as Record<string, unknown>)[role];
+    const member = record[role];
     if (
       member == null ||
       typeof member !== "object" ||

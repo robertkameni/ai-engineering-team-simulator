@@ -8,5 +8,5 @@ export const DEEPSEEK_CHAT_OPTIONS = {
 /** Deep technical reasoning for architecture turns. */
 export const DEEPSEEK_REASONING_OPTIONS = {
   thinking: { type: "enabled" },
-  reasoningEffort: "high",
+  reasoningEffort: "low",
 } satisfies DeepSeekLanguageModelOptions;

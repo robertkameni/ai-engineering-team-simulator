@@ -2,6 +2,10 @@ import {
   SIMULATION_AGENT_ORDER,
   type SimulationAgentRole,
 } from "@/ai/agents/config";
+import {
+  getTeamTemplate,
+  type TeamTemplateId,
+} from "@/ai/agents/team-templates";
 import { AGENT_PERSONAS } from "@/features/agents/personas";
 
 const FIRST_NAMES = [
@@ -39,7 +43,9 @@ export interface TeamMember {
   initials: string;
 }
 
-export type TeamRoster = Record<SimulationAgentRole, TeamMember>;
+export type TeamRoster = {
+  templateId: TeamTemplateId;
+} & Record<SimulationAgentRole, TeamMember>;
 
 function shuffle<T>(items: readonly T[]): T[] {
   const copy = [...items];
@@ -57,18 +63,21 @@ function pickNames(count: number): string[] {
   return shuffle(FIRST_NAMES).slice(0, count);
 }
 
-/** Random display names per simulation run; titles/initials stay role-based. */
-export function createSimulationRoster(): TeamRoster {
+/** Random display names per simulation run; titles come from the team template. */
+export function createSimulationRoster(
+  templateId: TeamTemplateId = "software",
+): TeamRoster {
+  const teamTemplate = getTeamTemplate(templateId);
   const names = pickNames(SIMULATION_AGENT_ORDER.length);
-  const roster = {} as TeamRoster;
+  const roster = { templateId } as TeamRoster;
 
   SIMULATION_AGENT_ORDER.forEach((role, index) => {
-    const template = AGENT_PERSONAS[role];
+    const persona = AGENT_PERSONAS[role];
     roster[role] = {
       role,
-      name: names[index],
-      title: template.title,
-      initials: template.initials,
+      name: names[index]!,
+      title: teamTemplate.slotTitles[role],
+      initials: persona.initials,
     };
   });
 

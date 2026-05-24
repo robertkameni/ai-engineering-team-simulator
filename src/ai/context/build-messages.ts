@@ -5,6 +5,13 @@ import type { TranscriptEntry } from "@/ai/context/transcript";
 import { getAgentTurnPrompt } from "@/ai/prompts";
 import type { AgentRole } from "@/features/agents/types";
 
+const LANGUAGE_MATCH_DIRECTIVE =
+  "CRITICAL: You MUST detect the language of the Product Idea. Your entire response, including all section headings and technical terms, MUST be written in that same language.";
+
+function formatProductIdeaBlock(productIdea: string): string {
+  return `## Product idea\n\n${productIdea}\n\n${LANGUAGE_MATCH_DIRECTIVE}`;
+}
+
 export function buildAgentMessages(
   role: AgentRole,
   productIdea: string,
@@ -14,7 +21,7 @@ export function buildAgentMessages(
   const messages: ModelMessage[] = [
     {
       role: "user",
-      content: `## Product idea\n\n${productIdea}`,
+      content: formatProductIdeaBlock(productIdea),
     },
   ];
 
@@ -25,17 +32,10 @@ export function buildAgentMessages(
     });
   }
 
-  if (transcript.length > 0) {
-    messages.push({
-      role: "user",
-      content: getAgentTurnPrompt(role, productIdea, roster),
-    });
-  } else {
-    messages[0] = {
-      role: "user",
-      content: getAgentTurnPrompt(role, productIdea, roster),
-    };
-  }
+  messages.push({
+    role: "user",
+    content: getAgentTurnPrompt(role, productIdea, roster, roster.templateId),
+  });
 
   return messages;
 }

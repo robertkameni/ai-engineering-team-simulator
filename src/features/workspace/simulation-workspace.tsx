@@ -12,16 +12,19 @@ import { SimulationErrorBanner } from "@/features/simulation/simulation-error-ba
 import { AgentTypingIndicator } from "@/features/simulation/agent-typing-indicator";
 import { debateProgressFromMessages } from "@/features/artifacts/artifact-panel-phase";
 import { useSimulationStream } from "@/features/simulation/use-simulation-stream";
+import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { useWorkspaceMobile } from "@/features/workspace/workspace-mobile-context";
 
 interface SimulationWorkspaceProps {
   userPrompt: string;
   title: string;
+  initialRecentRuns?: SidebarRunItemData[];
 }
 
 export function SimulationWorkspace({
   userPrompt,
   title,
+  initialRecentRuns,
 }: SimulationWorkspaceProps) {
   const {
     messages,
@@ -58,10 +61,12 @@ export function SimulationWorkspace({
   const showBootstrapping =
     status === "running" && messages.length === 0 && !error;
 
+  const latestMessage = messages.at(-1);
   const showHandoff =
     status === "running" &&
     activeAgent != null &&
-    messages.every((message) => !message.isStreaming);
+    latestMessage?.isStreaming === true &&
+    latestMessage.content === "";
 
   const debateProgress = useMemo(
     () => debateProgressFromMessages(messages, activeAgent),
@@ -94,6 +99,7 @@ export function SimulationWorkspace({
     <AppShell
       artifacts={artifacts}
       artifactsStatus={artifactsStatus}
+      initialRecentRuns={initialRecentRuns}
       debateProgress={debateProgress}
       debateMessages={messages}
       activeAgent={activeAgent}
@@ -119,15 +125,7 @@ export function SimulationWorkspace({
         {showHandoff && activeAgent ? (
           <AgentTypingIndicator
             role={activeAgent}
-            label={
-              activeAgent === "architect"
-                ? "Drafting the architecture…"
-                : activeAgent === "backend"
-                  ? "Drafting the backend plan…"
-                  : activeAgent === "frontend"
-                    ? "Designing the frontend experience…"
-                    : "Joining the discussion…"
-            }
+            label="Preparing contribution…"
           />
         ) : null}
         <MessageThread

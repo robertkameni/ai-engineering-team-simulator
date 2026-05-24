@@ -1,5 +1,6 @@
 import { SimulationWorkspace } from "@/features/workspace/simulation-workspace";
 import { WorkspaceView } from "@/features/workspace/workspace-view";
+import { listRecentRunsForSidebar } from "@/lib/db/runs";
 
 interface WorkspacePageProps {
   searchParams: Promise<{ prompt?: string }>;
@@ -8,7 +9,10 @@ interface WorkspacePageProps {
 export default async function WorkspacePage({
   searchParams,
 }: WorkspacePageProps) {
-  const params = await searchParams;
+  const [params, recentRuns] = await Promise.all([
+    searchParams,
+    listRecentRunsForSidebar(12),
+  ]);
   const prompt = params.prompt?.trim();
 
   if (prompt) {
@@ -16,6 +20,7 @@ export default async function WorkspacePage({
       <SimulationWorkspace
         userPrompt={prompt}
         title={truncateTitle(prompt)}
+        initialRecentRuns={recentRuns}
       />
     );
   }
@@ -23,6 +28,7 @@ export default async function WorkspacePage({
   return (
     <WorkspaceView
       showEmptyThread
+      initialRecentRuns={recentRuns}
       run={{
         id: "new",
         title: "New simulation",

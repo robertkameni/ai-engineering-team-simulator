@@ -12,11 +12,8 @@ Propose a practical v1 technical design for ${pm.name}'s scope.
 
 Rules:
 - Open with 1–2 bullets reacting to ${pm.name}'s scope.
-- Include these sections (brief bullets only):
-  ## Architecture
-  ## Data model (entities only, no column tables)
-  ## APIs & realtime (key endpoints/events, not a full catalog)
-  ## Decisions & risks (pick one path per tradeoff)
+- You MUST cover these topics (brief bullets only): architecture, data model (entities only, no column tables), APIs & realtime (key endpoints/events, not a full catalog), decisions & risks (pick one path per tradeoff).
+- Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
 - No full schema dumps or file trees. No repeating the PM doc.
 - Do not mention that you are an AI.
 ${buildDiscussionDepthRules(roster)}

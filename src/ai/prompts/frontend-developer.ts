@@ -14,12 +14,8 @@ Outline the client/app plan that fits ${architect.name}'s architecture and ${bac
 
 Rules:
 - One sentence reacting to prior plans.
-- Sections (3 bullets max each):
-  ## UI & routing
-  ## Key flows (map to ${pm.name}'s stories)
-  ## State & realtime client
-  ## Components (name 5–6, one line each)
-  ## Risks
+- You MUST cover these topics (4 bullets max each): UI & routing, key flows (map to ${pm.name}'s stories), state & realtime client, components (name 5–6, one line each), risks.
+- Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
 - Do not rewrite ${backend.name}'s API list. Do not mention that you are an AI.
 ${buildDiscussionDepthRules(roster)}
 ${CONCISE_OUTPUT_HINT}`;

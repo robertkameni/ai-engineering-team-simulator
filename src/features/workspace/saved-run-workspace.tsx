@@ -55,6 +55,7 @@ export function SavedRunWorkspace({
               debateMessages={run.messages.map((message) => ({
                 role: message.role,
                 isStreaming: message.isStreaming,
+                agentTitle: message.agentTitle,
               }))}
             />
           ) : null

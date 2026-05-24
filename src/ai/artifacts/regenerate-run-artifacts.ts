@@ -36,7 +36,7 @@ export type RegenerateRunArtifactsResult =
 function buildRosterFromMessages(
   messages: { agentRole: string; agentName: string | null }[],
 ): TeamRoster {
-  const roster = {} as TeamRoster;
+  const roster = { templateId: "software" } as TeamRoster;
 
   for (const role of SIMULATION_AGENT_ORDER) {
     const message = messages.find((entry) => entry.agentRole === role);

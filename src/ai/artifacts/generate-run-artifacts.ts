@@ -1,8 +1,9 @@
 import { generateText, Output } from "ai";
 
-import { sectionTitlesForArtifact } from "@/ai/artifacts/artifact-templates";
+import { sectionGuidelinesForArtifact } from "@/ai/artifacts/artifact-templates";
 import { buildTranscriptForArtifacts } from "@/ai/artifacts/build-transcript";
 import type { TeamRoster } from "@/ai/agents/roster";
+import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { getDeepSeekModel } from "@/ai/providers";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
@@ -14,7 +15,10 @@ import {
   type RunArtifactsOutput,
 } from "@/features/artifacts/schemas";
 
-const ARTIFACT_FOCUS: Record<ArtifactType, string> = {
+const ARTIFACT_LANGUAGE_DIRECTIVE =
+  "Analyze the transcript to determine the primary language used by the agents. You MUST write this entire artifact, including all section titles, in that exact language.";
+
+const SOFTWARE_ARTIFACT_FOCUS: Record<ArtifactType, string> = {
   requirements:
     "Product scope, users, v1 features, user stories, exclusions, measurable success criteria.",
   architecture:
@@ -25,19 +29,42 @@ const ARTIFACT_FOCUS: Record<ArtifactType, string> = {
     "Where the team agreed, key disagreements, top risks, and prioritized recommendations.",
 };
 
+const PHYSICAL_ARTIFACT_FOCUS: Record<ArtifactType, string> = {
+  requirements:
+    "Work scope, stakeholders, site context, key deliverables, exclusions, measurable success criteria.",
+  architecture:
+    "Technical design, materials, site constraints, regulatory compliance, and technical risks.",
+  implementation:
+    "Execution plan, phasing, budget scenarios, resources, contractors, and delivery risks.",
+  review:
+    "Where the team agreed, key disagreements, top risks, and prioritized recommendations.",
+};
+
+function artifactFocusForTemplate(
+  type: ArtifactType,
+  templateId: TeamTemplateId,
+): string {
+  const focus =
+    templateId === "physical" ? PHYSICAL_ARTIFACT_FOCUS : SOFTWARE_ARTIFACT_FOCUS;
+  return focus[type];
+}
+
 async function generateArtifactDocument(
   type: ArtifactType,
   transcriptPrompt: string,
+  templateId: TeamTemplateId,
 ): Promise<ArtifactDocument> {
-  const sectionList = sectionTitlesForArtifact(type);
+  const sectionGuidelines = sectionGuidelinesForArtifact(type, templateId);
+  const focus = artifactFocusForTemplate(type, templateId);
 
-  const system = `You are a technical writer producing the "${type}" deliverable from an engineering team debate.
+  const system = `You are a technical writer producing the "${type}" deliverable from a team debate.
 
-Focus: ${ARTIFACT_FOCUS[type]}
+Focus: ${focus}
 
 Output rules:
-- Use exactly these section titles (one section each, in order):
-${sectionList}
+- The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}
+- Choose appropriate section titles in the transcript's primary language.
+- ${ARTIFACT_LANGUAGE_DIRECTIVE}
 - 3–5 concise bullets per section; each bullet is one complete sentence (max ~20 words).
 - Write as a polished internal document — NOT meeting notes.
 - Do NOT append speaker names to bullets (no "(Name)" suffixes).
@@ -113,6 +140,7 @@ export async function generateRunArtifacts({
   transcript: TranscriptEntry[];
   roster: TeamRoster;
 }): Promise<RunArtifactsOutput> {
+  const templateId = roster.templateId;
   const transcriptPrompt = buildTranscriptForArtifacts(
     productIdea,
     transcript,
@@ -122,7 +150,11 @@ export async function generateRunArtifacts({
   const output = {} as RunArtifactsOutput;
 
   for (const type of ARTIFACT_TYPES) {
-    const document = await generateArtifactDocument(type, transcriptPrompt);
+    const document = await generateArtifactDocument(
+      type,
+      transcriptPrompt,
+      templateId,
+    );
     output[type] = document;
   }
 

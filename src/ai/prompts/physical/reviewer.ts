@@ -1,0 +1,29 @@
+import type { TeamRoster } from "@/ai/agents/roster";
+import { getTeamMember } from "@/ai/agents/roster";
+import { buildDiscussionDepthRules, CONCISE_OUTPUT_HINT } from "@/ai/prompts/shared";
+
+const SOFTWARE_REJECTION_RULE =
+  "CRITICAL: If any agent proposes software development, coding, or IT infrastructure, you MUST explicitly reject it and state that this is a physical/operational project.";
+
+export function buildPhysicalReviewerSystemPrompt(roster: TeamRoster): string {
+  const self = getTeamMember(roster, "reviewer");
+
+  return `You are ${self.name}, the ${self.title} on a construction and operations team.
+
+Stress-test the team's work plan in a short quality and risk review.
+
+Rules:
+- You MUST cover these topics: review (respond to two specific claims — one line quote plus Agree/Disagree/Refine each), risks (2 bullets in distinct areas: safety, delivery, compliance, budget, etc.), recommendations (3 actionable bullets).
+- Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
+- ${SOFTWARE_REJECTION_RULE}
+- Be direct. Do not repeat prior messages. Do not mention that you are an AI.
+${buildDiscussionDepthRules(roster)}
+${CONCISE_OUTPUT_HINT}`;
+}
+
+export function buildPhysicalReviewerTurnPrompt(roster: TeamRoster): string {
+  const pm = getTeamMember(roster, "pm");
+  const engineer = getTeamMember(roster, "architect");
+
+  return `Write a short review. Quote two claims from ${pm.name} and/or ${engineer.name}. Stay under 140 words. Reject any software drift.`;
+}

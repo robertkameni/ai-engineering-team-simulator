@@ -10,9 +10,8 @@ export function buildReviewerSystemPrompt(roster: TeamRoster): string {
 Stress-test the team's plan in a short review.
 
 Rules:
-- ## Review — respond to **two** specific claims (one line quote + Agree/Disagree/Refine each).
-- ## Risks — 2 bullets (distinct areas: security, delivery, ops, etc.).
-- ## Recommendations — 3 actionable bullets.
+- You MUST cover these topics: review (respond to two specific claims — one line quote plus Agree/Disagree/Refine each), risks (2 bullets in distinct areas: security, delivery, ops, etc.), recommendations (3 actionable bullets).
+- Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
 - Be direct. Do not repeat prior messages. Do not mention that you are an AI.
 ${buildDiscussionDepthRules(roster)}
 ${CONCISE_OUTPUT_HINT}`;

@@ -5,20 +5,33 @@ import { cn } from "@/lib/utils";
 
 type StepState = "complete" | "active" | "upcoming";
 
+interface DebateProgressMessage {
+  role: AgentRole;
+  isStreaming?: boolean;
+  agentTitle?: string;
+}
+
 interface DebateProgressStepperProps {
-  messages: { role: AgentRole; isStreaming?: boolean }[];
+  messages: DebateProgressMessage[];
   activeAgent: AgentRole | null;
 }
 
 function stepState(
   role: AgentRole,
-  messages: DebateProgressStepperProps["messages"],
+  messages: DebateProgressMessage[],
   activeAgent: AgentRole | null,
 ): StepState {
   const message = messages.find((entry) => entry.role === role);
   if (activeAgent === role || message?.isStreaming) return "active";
   if (message && !message.isStreaming) return "complete";
   return "upcoming";
+}
+
+function roleTitle(
+  role: AgentRole,
+  messages: DebateProgressMessage[],
+): string {
+  return messages.find((entry) => entry.role === role)?.agentTitle ?? getPersona(role).title;
 }
 
 export function DebateProgressStepper({
@@ -30,6 +43,7 @@ export function DebateProgressStepper({
       {SIMULATION_AGENT_ORDER.map((role) => {
         const persona = getPersona(role);
         const state = stepState(role, messages, activeAgent);
+        const title = roleTitle(role, messages);
 
         return (
           <li
@@ -55,7 +69,7 @@ export function DebateProgressStepper({
             >
               {state === "complete" ? "✓" : persona.initials}
             </span>
-            <span className="truncate">{persona.title}</span>
+            <span className="truncate">{title}</span>
           </li>
         );
       })}

@@ -19,14 +19,16 @@ export function SidebarRecentRuns({
   const [fetchedRuns, setFetchedRuns] = useState<SidebarRunItemData[] | null>(
     null,
   );
+  const [isLoading, setIsLoading] = useState(initialRuns == null);
   const [deletedIds, setDeletedIds] = useState(() => new Set<string>());
 
   useEffect(() => {
-    if (initialRuns != null && initialRuns.length > 0) return;
+    if (initialRuns != null) return;
 
     let cancelled = false;
 
     async function fetchRuns() {
+      setIsLoading(true);
       try {
         const response = await fetch("/api/runs");
         if (!response.ok || cancelled) return;
@@ -34,6 +36,10 @@ export function SidebarRecentRuns({
         setFetchedRuns(data.runs);
       } catch {
         // Keep empty list on failure
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     }
 
@@ -51,6 +57,12 @@ export function SidebarRecentRuns({
 
   function handleDeleted(runId: string) {
     setDeletedIds((current) => new Set(current).add(runId));
+  }
+
+  if (isLoading) {
+    return (
+      <div className="px-3 py-2 text-xs text-muted-foreground">Loading...</div>
+    );
   }
 
   if (runs.length === 0) {

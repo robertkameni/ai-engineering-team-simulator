@@ -8,8 +8,10 @@ import {
 } from "@/ai/agents/config";
 import { createSimulationRoster, getTeamMember } from "@/ai/agents/roster";
 import type { TeamRoster } from "@/ai/agents/roster";
+import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import { buildAgentMessages } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
+import { classifyProjectTeamTemplate } from "@/ai/orchestration/classify-project";
 import { getAgentSystemPrompt } from "@/ai/prompts";
 import { getDeepSeekModel } from "@/ai/providers";
 import { updateArtifactStatus } from "@/lib/db/artifact-status";
@@ -36,7 +38,8 @@ export async function runSimulation(
   let artifactPhaseStarted = false;
 
   try {
-    const roster = createSimulationRoster();
+    const classification = await classifyProjectTeamTemplate(productIdea);
+    const roster = createSimulationRoster(classification.templateId);
     await saveTeamRoster(run.id, roster);
     await touchRunActivity(run.id);
 
@@ -65,6 +68,7 @@ export async function runSimulation(
         productIdea,
         transcript,
         roster,
+        templateId: classification.templateId,
         send: notify,
       });
 
@@ -108,6 +112,7 @@ async function streamAgentTurn({
   productIdea,
   transcript,
   roster,
+  templateId,
   send,
 }: {
   runId: string;
@@ -115,6 +120,7 @@ async function streamAgentTurn({
   productIdea: string;
   transcript: TranscriptEntry[];
   roster: TeamRoster;
+  templateId: TeamTemplateId;
   send: (event: SimulationStreamEvent) => void;
 }): Promise<string> {
   const config = getAgentConfig(role);
@@ -135,6 +141,7 @@ async function streamAgentTurn({
       productIdea,
       transcript,
       roster,
+      templateId,
       config,
       send,
     });
@@ -147,6 +154,7 @@ async function streamAgentTurn({
         productIdea,
         transcript,
         roster,
+        templateId,
         config: {
           ...config,
           maxOutputTokens: Math.max(config.maxOutputTokens * 2, 900),
@@ -176,6 +184,7 @@ async function collectAgentStream({
   productIdea,
   transcript,
   roster,
+  templateId,
   config,
   send,
 }: {
@@ -184,12 +193,13 @@ async function collectAgentStream({
   productIdea: string;
   transcript: TranscriptEntry[];
   roster: TeamRoster;
+  templateId: TeamTemplateId;
   config: ReturnType<typeof getAgentConfig>;
   send: (event: SimulationStreamEvent) => void;
 }): Promise<string> {
   const result = streamText({
     model: getDeepSeekModel(config.model),
-    system: getAgentSystemPrompt(role, roster),
+    system: getAgentSystemPrompt(role, roster, templateId),
     messages: buildAgentMessages(role, productIdea, transcript, roster),
     maxOutputTokens: config.maxOutputTokens,
     temperature: config.temperature,
