@@ -11,7 +11,11 @@ import {
   useSubmitShortcutLabel,
 } from "@/lib/submit-shortcut";
 
-export function LandingPromptForm() {
+interface LandingPromptFormProps {
+  examplePrompts: string[];
+}
+
+export function LandingPromptForm({ examplePrompts }: LandingPromptFormProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const shortcutLabel = useSubmitShortcutLabel();
@@ -52,6 +56,7 @@ export function LandingPromptForm() {
       </form>
 
       <ExamplePromptChips
+        prompts={examplePrompts}
         onSelect={(value) => {
           router.push(`/workspace?prompt=${encodeURIComponent(value)}`);
         }}

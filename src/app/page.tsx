@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
+import { pickRandomExamplePrompts } from "@/features/landing/example-prompts";
 import { LandingPromptForm } from "@/features/landing/landing-prompt-form";
 
 export default function HomePage() {
+  const examplePrompts = pickRandomExamplePrompts(3);
+
   return (
     <div className="@container/landing relative flex min-h-svh flex-col items-center justify-center overflow-hidden ambient-mesh px-4">
       <main className="relative z-10 flex w-full max-w-2xl flex-col items-center text-center">
@@ -23,7 +26,7 @@ export default function HomePage() {
           on your product idea — challenging assumptions, not just agreeing.
         </p>
 
-        <LandingPromptForm />
+        <LandingPromptForm examplePrompts={examplePrompts} />
 
         <Link
           href="/workspace"

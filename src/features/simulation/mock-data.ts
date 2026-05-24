@@ -1,11 +1,5 @@
 import type { MockArtifacts, MockRun } from "@/features/agents/types";
 
-export const EXAMPLE_PROMPTS = [
-  "Build a food delivery app for students",
-  "Build an AI travel planner for Europe",
-  "Create a study group matching platform",
-] as const;
-
 export const MOCK_RECENT_RUNS: Pick<
   MockRun,
   "id" | "title" | "status" | "updatedAt"
