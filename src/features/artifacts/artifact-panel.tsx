@@ -6,7 +6,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArtifactSections } from "@/features/artifacts/artifact-sections";
 import { ArtifactPanelPlaceholder } from "@/features/artifacts/artifact-panel-placeholder";
 import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skeleton";
@@ -66,7 +65,7 @@ export function ArtifactPanel({
   return (
     <aside
       className={cn(
-        "@container/artifact-panel glass-panel flex min-h-0 shrink-0 flex-col overflow-x-hidden",
+        "@container/artifact-panel glass-panel flex min-h-0 shrink-0 flex-col overflow-hidden",
         isSheet
           ? "h-full w-full max-h-none border-0"
           : "hidden h-full max-h-none w-[min(100%,420px)] border-l border-glass-border min-[960px]:flex",
@@ -103,10 +102,10 @@ export function ArtifactPanel({
       {showTabs ? (
         <Tabs
           defaultValue="requirements"
-          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+          className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-hidden"
         >
-          <div className="min-w-0 shrink-0 px-4 pt-3 @max-sm/artifact-panel:pb-3">
-            <TabsList className={ARTIFACT_TAB_LIST_CLASS}>
+          <div className="relative z-10 min-w-0 shrink-0 bg-glass-bg px-4 pt-3 @max-sm/artifact-panel:pb-3">
+            <TabsList className={cn(ARTIFACT_TAB_LIST_CLASS, "h-auto w-full")}>
               {artifactTabs.map((tab) => (
                 <TabsTrigger
                   key={tab.value}
@@ -120,28 +119,21 @@ export function ArtifactPanel({
             </TabsList>
           </div>
 
-          {artifactTabs.map((tab) => (
-            <TabsContent
-              key={tab.value}
-              value={tab.value}
-              className="artifact-tab-content mt-0 min-h-0 flex-1 data-[state=inactive]:hidden"
-            >
-              <ScrollArea
-                className={cn(
-                  "px-4",
-                  isSheet
-                    ? "h-[calc(100%-1px)] max-h-[calc(88svh-7rem)]"
-                    : "h-[calc(100svh-7.5rem)]",
-                )}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {artifactTabs.map((tab) => (
+              <TabsContent
+                key={tab.value}
+                value={tab.value}
+                className="artifact-tab-content m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 data-[state=inactive]:hidden data-[state=active]:flex data-[state=active]:flex-col"
               >
                 {artifacts?.[tab.value] ? (
                   <ArtifactSections sections={artifacts[tab.value]!} />
                 ) : (
                   <ArtifactPanelSkeleton />
                 )}
-              </ScrollArea>
-            </TabsContent>
-          ))}
+              </TabsContent>
+            ))}
+          </div>
         </Tabs>
       ) : (
         <ArtifactPanelPlaceholder
