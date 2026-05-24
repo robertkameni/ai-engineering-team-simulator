@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef } from "react";
 import { ArrowRight } from "lucide-react";
 import { ExamplePromptChips } from "@/features/simulation/example-prompt-chips";
+import { useRotatingPlaceholder } from "@/features/landing/use-rotating-placeholder";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -13,12 +14,17 @@ import {
 
 interface LandingPromptFormProps {
   examplePrompts: string[];
+  staggerExampleChips?: boolean;
 }
 
-export function LandingPromptForm({ examplePrompts }: LandingPromptFormProps) {
+export function LandingPromptForm({
+  examplePrompts,
+  staggerExampleChips = false,
+}: LandingPromptFormProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const shortcutLabel = useSubmitShortcutLabel();
+  const rotatingPlaceholder = useRotatingPlaceholder();
 
   return (
     <>
@@ -26,7 +32,7 @@ export function LandingPromptForm({ examplePrompts }: LandingPromptFormProps) {
         ref={formRef}
         action="/workspace"
         method="get"
-        className="mt-10 w-full rounded-2xl glass-input p-2 shadow-lg transition-all duration-300 focus-within:ring-2 focus-within:ring-ring/30"
+        className="landing-rise landing-delay-3 mt-10 w-full rounded-2xl glass-input p-2 shadow-lg transition-all duration-300 focus-within:ring-2 focus-within:ring-ring/30 focus-within:shadow-[0_0_40px_oklch(0.68_0.17_255/12%)]"
       >
         <label htmlFor="landing-prompt" className="sr-only">
           Product idea
@@ -35,7 +41,7 @@ export function LandingPromptForm({ examplePrompts }: LandingPromptFormProps) {
           id="landing-prompt"
           name="prompt"
           required
-          placeholder="e.g. A food donation app for a church community…"
+          placeholder={rotatingPlaceholder}
           rows={4}
           className="min-h-[120px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
           onKeyDown={(event) => {
@@ -48,7 +54,10 @@ export function LandingPromptForm({ examplePrompts }: LandingPromptFormProps) {
           <p className="text-xs text-muted-foreground">
             {shortcutLabel} to start
           </p>
-          <Button type="submit" className="gap-2">
+          <Button
+            type="submit"
+            className="gap-2 transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
+          >
             Start simulation
             <ArrowRight />
           </Button>
@@ -57,6 +66,7 @@ export function LandingPromptForm({ examplePrompts }: LandingPromptFormProps) {
 
       <ExamplePromptChips
         prompts={examplePrompts}
+        staggerEnter={staggerExampleChips}
         onSelect={(value) => {
           router.push(`/workspace?prompt=${encodeURIComponent(value)}`);
         }}

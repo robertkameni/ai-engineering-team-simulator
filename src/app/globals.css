@@ -245,6 +245,256 @@
   animation: pulse-glow 1.8s ease-in-out infinite;
 }
 
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.96);
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes landing-orb-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(4%, 3%) scale(1.08);
+    opacity: 0.85;
+  }
+}
+
+@keyframes landing-orb-drift-alt {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate(-3%, 5%) scale(1.05);
+    opacity: 0.75;
+  }
+}
+
+.landing-rise {
+  animation: landing-rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.landing-delay-0 {
+  animation-delay: 0ms;
+}
+
+.landing-delay-1 {
+  animation-delay: 110ms;
+}
+
+.landing-delay-2 {
+  animation-delay: 220ms;
+}
+
+.landing-delay-25 {
+  animation-delay: 280ms;
+}
+
+.landing-delay-3 {
+  animation-delay: 340ms;
+}
+
+.landing-delay-4 {
+  animation-delay: 460ms;
+}
+
+.landing-delay-5 {
+  animation-delay: 580ms;
+}
+
+.landing-delay-6 {
+  animation-delay: 700ms;
+}
+
+.landing-delay-7 {
+  animation-delay: 900ms;
+}
+
+.landing-ambient {
+  isolation: isolate;
+}
+
+.landing-ambient::before,
+.landing-ambient::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  border-radius: 9999px;
+  filter: blur(72px);
+}
+
+.landing-ambient::before {
+  width: min(42rem, 70vw);
+  height: min(42rem, 70vw);
+  top: -18%;
+  left: -12%;
+  background: oklch(0.68 0.17 255 / 22%);
+  animation: landing-orb-drift 14s ease-in-out infinite;
+}
+
+.landing-ambient::after {
+  width: min(36rem, 60vw);
+  height: min(36rem, 60vw);
+  bottom: -20%;
+  right: -10%;
+  background: oklch(0.72 0.15 145 / 18%);
+  animation: landing-orb-drift-alt 18s ease-in-out infinite;
+}
+
+@keyframes landing-shimmer {
+  from {
+    background-position: 0% center;
+  }
+  to {
+    background-position: 200% center;
+  }
+}
+
+.landing-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    oklch(0.62 0.02 285) 0%,
+    oklch(0.78 0.14 65) 30%,
+    oklch(0.72 0.17 255) 55%,
+    oklch(0.75 0.16 305) 75%,
+    oklch(0.62 0.02 285) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: landing-shimmer 5s linear infinite;
+}
+
+.landing-live-dot {
+  position: relative;
+  display: inline-flex;
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+}
+
+.landing-live-dot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: oklch(0.72 0.15 145);
+  animation: pulse-glow 1.8s ease-in-out infinite;
+}
+
+.landing-live-dot::after {
+  content: "";
+  position: relative;
+  display: block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: oklch(0.72 0.15 145);
+  box-shadow: 0 0 10px oklch(0.72 0.15 145 / 55%);
+}
+
+@keyframes landing-debate-tick {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  10%,
+  85% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.landing-debate-tick {
+  animation: landing-debate-tick 3.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes landing-agent-float {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  33% {
+    transform: translate(6px, -10px) rotate(2deg);
+  }
+  66% {
+    transform: translate(-4px, 8px) rotate(-2deg);
+  }
+}
+
+.landing-agent-ghost {
+  opacity: 0.35;
+  box-shadow: 0 0 24px oklch(0 0 0 / 12%);
+}
+
+.landing-float-a {
+  animation: landing-agent-float 9s ease-in-out infinite;
+}
+
+.landing-float-b {
+  animation: landing-agent-float 11s ease-in-out infinite;
+  animation-delay: -2s;
+}
+
+.landing-float-c {
+  animation: landing-agent-float 10s ease-in-out infinite;
+  animation-delay: -4s;
+}
+
+.landing-float-d {
+  animation: landing-agent-float 12s ease-in-out infinite;
+  animation-delay: -1s;
+}
+
+.landing-float-e {
+  animation: landing-agent-float 8s ease-in-out infinite;
+  animation-delay: -3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-rise,
+  .landing-ambient::before,
+  .landing-ambient::after,
+  .landing-shimmer-text,
+  .landing-debate-tick,
+  .landing-agent-ghost,
+  .landing-live-dot::before {
+    animation: none !important;
+    filter: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .landing-shimmer-text {
+    color: oklch(0.68 0.015 285);
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+  }
+
+  .landing-agent-ghost {
+    opacity: 0.2;
+  }
+}
+
 /* CSS-only tabs for server-rendered artifact panel */
 .artifact-static-tabs input[name="artifact-tab"] {
   position: absolute;
