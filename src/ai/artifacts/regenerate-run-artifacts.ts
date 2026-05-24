@@ -3,6 +3,7 @@ import { isStoredSimulationAgentRole } from "@/ai/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 import { generateRunArtifacts } from "@/ai/artifacts/generate-run-artifacts";
 import type { TranscriptEntry } from "@/ai/context/transcript";
+import { isDebateComplete } from "@/ai/orchestration/reviewer-decision";
 import type { AgentRole } from "@/features/agents/types";
 import { getPersona } from "@/features/agents/personas";
 import { type RunArtifacts } from "@/features/artifacts/types";
@@ -92,8 +93,12 @@ export async function regenerateRunArtifacts(
 
   const status = toAppRunStatus(run.status);
   const artifactStatus = toAppArtifactStatus(run.artifactStatus);
-  const debateComplete =
-    run.messages.length >= SIMULATION_AGENT_ORDER.length;
+  const debateComplete = isDebateComplete(
+    run.messages.map((message) => ({
+      agentRole: message.agentRole,
+      content: message.content,
+    })),
+  );
 
   if (status === "idle") {
     return { ok: false, error: "run_in_progress" };

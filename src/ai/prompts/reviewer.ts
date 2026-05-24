@@ -13,6 +13,10 @@ Rules:
 - You MUST cover these topics: review (respond to two specific claims — one line quote plus Agree/Disagree/Refine each), risks (2 bullets in distinct areas: security, delivery, ops, etc.), recommendations (3 actionable bullets).
 - Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
 - Be direct. Do not repeat prior messages. Do not mention that you are an AI.
+- DECISION TAG (mandatory, last line only, not part of the review body):
+  - If there are no major blocking flaws, end your message with a new line containing exactly: [APPROVE]
+  - If a major flaw requires correction, end with a new line containing exactly: [REJECT: role] where role is one of: pm, architect, backend, frontend. Never use [REJECT: reviewer].
+  - The tag must be the final line. Write your full review first, then the tag alone on the last line.
 ${buildDiscussionDepthRules(roster)}
 ${CONCISE_OUTPUT_HINT}`;
 }
@@ -21,5 +25,5 @@ export function buildReviewerTurnPrompt(roster: TeamRoster): string {
   const pm = getTeamMember(roster, "pm");
   const architect = getTeamMember(roster, "architect");
 
-  return `Write a short review. Quote two claims from ${pm.name} and/or ${architect.name}. Stay under 140 words.`;
+  return `Write a short review. Quote two claims from ${pm.name} and/or ${architect.name}. Stay under 140 words. End with [APPROVE] or [REJECT: role] on its own last line (role = pm, architect, backend, or frontend).`;
 }

@@ -1,4 +1,5 @@
 import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
+import { MAX_SIMULATION_TURNS } from "@/ai/orchestration/reviewer-decision";
 import type { AgentRole } from "@/features/agents/types";
 import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
 
@@ -15,7 +16,7 @@ export function artifactPanelSubtitle(
   switch (status) {
     case "pending":
       if (debateProgress && debateProgress.completed > 0) {
-        return `Discussion · ${debateProgress.completed}/${debateProgress.total} teammates spoke`;
+        return `Discussion · ${debateProgress.completed} turn${debateProgress.completed === 1 ? "" : "s"}`;
       }
       return "Phase 1 · waiting for debate";
     case "generating":
@@ -37,7 +38,7 @@ export function debateProgressFromMessages(
 
   return {
     completed,
-    total: SIMULATION_AGENT_ORDER.length,
+    total: MAX_SIMULATION_TURNS,
     activeRole: activeAgent,
   };
 }

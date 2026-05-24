@@ -1,9 +1,8 @@
-import { streamText } from "ai";
+import { stepCountIs, streamText } from "ai";
 
 import {
   SIMULATION_AGENT_ORDER,
   getAgentConfig,
-  isSimulationAgent,
   type SimulationAgentRole,
 } from "@/ai/agents/config";
 import { createSimulationRoster, getTeamMember } from "@/ai/agents/roster";
@@ -12,9 +11,16 @@ import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import { buildAgentMessages } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { classifyProjectTeamTemplate } from "@/ai/orchestration/classify-project";
+import {
+  MAX_SIMULATION_TURNS,
+  parseReviewerDecision,
+  reviewerVisibleText,
+  stripReviewerDecisionTag,
+} from "@/ai/orchestration/reviewer-decision";
 import { getAgentSystemPrompt } from "@/ai/prompts";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import { getDeepSeekModel } from "@/ai/providers";
+import { agentTools } from "@/ai/tools/registry";
 import { updateArtifactStatus } from "@/lib/db/artifact-status";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
 import { saveTeamRoster } from "@/lib/db/team-roster";
@@ -26,6 +32,7 @@ import {
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
 const STREAM_HEARTBEAT_MS = 15_000;
+const AGENT_TURN_FALLBACK = "[Tool Error: Agent failed to respond]";
 
 export async function runSimulation(
   productIdea: string,
@@ -70,36 +77,87 @@ export async function runSimulation(
       }),
     });
 
-    for (const role of SIMULATION_AGENT_ORDER) {
-      if (!isSimulationAgent(role)) continue;
+    let turnCount = 0;
+    let roleIndex = 0;
+    let returnToReviewer = false;
+    let nextRole: SimulationAgentRole = SIMULATION_AGENT_ORDER[0];
+
+    while (turnCount < MAX_SIMULATION_TURNS) {
+      const role = nextRole;
 
       await touchRunActivity(run.id);
 
-      const fullText = await streamAgentTurn({
-        runId: run.id,
-        role,
-        productIdea,
-        transcript,
-        roster,
-        templateId: classification.templateId,
-        send: notify,
-      });
-
       const member = getTeamMember(roster, role);
+      let fullText: string;
+
+      try {
+        fullText = await streamAgentTurn({
+          runId: run.id,
+          role,
+          productIdea,
+          transcript,
+          roster,
+          templateId: classification.templateId,
+          send: notify,
+        });
+      } catch (turnError) {
+        console.error(`Agent turn failed (${role}):`, turnError);
+        fullText = AGENT_TURN_FALLBACK;
+        emitFallbackAgentTurn(role, member.name, member.title, fullText, notify);
+      }
+
+      const contentToPersist = stripReviewerDecisionTag(fullText);
+
       transcript.push({
         role,
         agentName: member.name,
-        content: fullText,
+        content: contentToPersist,
       });
 
       await appendMessage(
         run.id,
         role,
-        fullText,
+        contentToPersist,
         messageOrder,
         member.name,
       );
       messageOrder += 1;
+      turnCount += 1;
+
+      if (role === "reviewer") {
+        const parsed = parseReviewerDecision(fullText);
+
+        if (parsed.decision === "approve") {
+          break;
+        }
+
+        if (parsed.decision === "reject" && parsed.rejectRole) {
+          nextRole = parsed.rejectRole;
+          returnToReviewer = true;
+          continue;
+        }
+
+        console.warn("Invalid reviewer decision, defaulting to approve", {
+          runId: run.id,
+          decision: parsed.decision,
+        });
+        break;
+      }
+
+      if (returnToReviewer) {
+        nextRole = "reviewer";
+        returnToReviewer = false;
+      } else {
+        roleIndex += 1;
+        if (roleIndex >= SIMULATION_AGENT_ORDER.length) {
+          break;
+        }
+        nextRole = SIMULATION_AGENT_ORDER[roleIndex];
+      }
+    }
+
+    if (turnCount >= MAX_SIMULATION_TURNS) {
+      console.warn("Simulation reached MAX_SIMULATION_TURNS", { runId: run.id });
     }
 
     debateComplete = true;
@@ -117,6 +175,19 @@ export async function runSimulation(
     });
     throw error;
   }
+}
+
+/** Re-emit a complete turn so the client receives fallback text after a failed stream. */
+function emitFallbackAgentTurn(
+  role: SimulationAgentRole,
+  name: string,
+  title: string,
+  content: string,
+  send: (event: SimulationStreamEvent) => void,
+): void {
+  send({ type: "agent_start", role, name, title });
+  send({ type: "text-delta", role, delta: content });
+  send({ type: "agent_end", role });
 }
 
 async function streamAgentTurn({
@@ -195,6 +266,22 @@ async function streamAgentTurn({
   return fullText.trim();
 }
 
+function emitVisibleDelta(
+  role: SimulationAgentRole,
+  fullText: string,
+  emittedLength: number,
+  send: (event: SimulationStreamEvent) => void,
+): number {
+  const visible =
+    role === "reviewer" ? reviewerVisibleText(fullText) : fullText;
+  const delta = visible.slice(emittedLength);
+  if (delta) {
+    send({ type: "text-delta", role, delta });
+    return emittedLength + delta.length;
+  }
+  return emittedLength;
+}
+
 async function collectAgentStream({
   runId,
   role,
@@ -220,6 +307,8 @@ async function collectAgentStream({
     messages: buildAgentMessages(role, productIdea, transcript, roster),
     maxOutputTokens: config.maxOutputTokens,
     temperature: config.temperature,
+    tools: agentTools,
+    stopWhen: stepCountIs(3),
     providerOptions: {
       deepseek: config.deepseek,
     },
@@ -229,11 +318,12 @@ async function collectAgentStream({
   });
 
   let fullText = "";
+  let emittedLength = 0;
   let lastHeartbeatAt = Date.now();
   try {
     for await (const delta of result.textStream) {
       fullText += delta;
-      send({ type: "text-delta", role, delta });
+      emittedLength = emitVisibleDelta(role, fullText, emittedLength, send);
 
       const now = Date.now();
       if (now - lastHeartbeatAt >= STREAM_HEARTBEAT_MS) {
@@ -246,7 +336,7 @@ async function collectAgentStream({
       const resolved = await result.text;
       if (resolved.trim()) {
         fullText = resolved;
-        send({ type: "text-delta", role, delta: resolved });
+        emitVisibleDelta(role, fullText, emittedLength, send);
       }
     }
   } catch (error) {

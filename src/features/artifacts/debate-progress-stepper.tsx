@@ -19,12 +19,24 @@ interface DebateProgressStepperProps {
   teamRoster?: TeamRosterPreview | null;
 }
 
+function findLastMessageForRole(
+  messages: DebateProgressMessage[],
+  role: AgentRole,
+): DebateProgressMessage | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === role) {
+      return messages[index];
+    }
+  }
+  return undefined;
+}
+
 function stepState(
   role: AgentRole,
   messages: DebateProgressMessage[],
   activeAgent: AgentRole | null,
 ): StepState {
-  const message = messages.find((entry) => entry.role === role);
+  const message = findLastMessageForRole(messages, role);
   if (activeAgent === role || message?.isStreaming) return "active";
   if (message && !message.isStreaming) return "complete";
   return "upcoming";
@@ -36,7 +48,7 @@ function roleTitle(
   teamRoster?: TeamRosterPreview | null,
 ): string {
   return (
-    messages.find((entry) => entry.role === role)?.agentTitle ??
+    findLastMessageForRole(messages, role)?.agentTitle ??
     teamMemberPreview(teamRoster, role)?.title ??
     getPersona(role).title
   );

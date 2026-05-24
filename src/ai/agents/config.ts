@@ -55,7 +55,7 @@ export const ACTIVE_AGENTS: AgentModelConfig[] = [
   {
     role: "reviewer",
     model: "deepseek-v4-flash",
-    maxOutputTokens: 450,
+    maxOutputTokens: 1100,
     temperature: 0.6,
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   },

@@ -1,9 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
-import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
 import type { ArtifactsPanelStatus, RunArtifacts } from "@/features/artifacts/types";
 import type { AgentRole, RunStatus, SimulationMessage } from "@/features/agents/types";
 import { parseSimulationEvent } from "@/lib/simulation-stream";
@@ -14,25 +13,6 @@ import { formatMessageTime } from "@/lib/format-time";
 const POLL_ARTIFACT_INTERVAL_MS = 800;
 /** Match artifacts route synthesis budget (approx). */
 const POLL_ARTIFACT_MAX_MS = 320_000;
-
-function resolvePanelArtifactsStatus(
-  artifactsStatus: ArtifactsPanelStatus,
-  runStatus: RunStatus,
-  messages: SimulationMessage[],
-  activeAgent: AgentRole | null,
-): ArtifactsPanelStatus {
-  const debateComplete =
-    runStatus === "running" &&
-    messages.length >= SIMULATION_AGENT_ORDER.length &&
-    messages.every((message) => !message.isStreaming) &&
-    activeAgent == null;
-
-  if (artifactsStatus === "pending" && debateComplete) {
-    return "generating";
-  }
-
-  return artifactsStatus;
-}
 
 export function useSimulationStream() {
   const router = useRouter();
@@ -48,16 +28,7 @@ export function useSimulationStream() {
   const abortRef = useRef<AbortController | null>(null);
   const activeMessageIdRef = useRef<string | null>(null);
 
-  const panelArtifactsStatus = useMemo(
-    () =>
-      resolvePanelArtifactsStatus(
-        artifactsStatus,
-        status,
-        messages,
-        activeAgent,
-      ),
-    [artifactsStatus, status, messages, activeAgent],
-  );
+  const panelArtifactsStatus = artifactsStatus;
 
   const loadArtifacts = useCallback(async (id: string) => {
     const response = await fetch(`/api/runs/${id}/artifacts`);

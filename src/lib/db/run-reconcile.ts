@@ -1,4 +1,4 @@
-import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
+import { isDebateComplete } from "@/ai/orchestration/reviewer-decision";
 import type {
   ArtifactStatus as PrismaArtifactStatus,
   RunStatus as PrismaRunStatus,
@@ -42,8 +42,13 @@ export async function reconcileStaleRunIfNeeded(run: {
     return false;
   }
 
-  const debateComplete =
-    run.messageCount >= SIMULATION_AGENT_ORDER.length;
+  const messages = await prisma.message.findMany({
+    where: { runId: run.id },
+    orderBy: { order: "asc" },
+    select: { agentRole: true, content: true },
+  });
+
+  const debateComplete = isDebateComplete(messages);
   const artifactStatus = toAppArtifactStatus(run.artifactStatus);
 
   if (debateComplete) {

@@ -17,6 +17,10 @@ Rules:
 - Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
 - ${SOFTWARE_REJECTION_RULE}
 - Be direct. Do not repeat prior messages. Do not mention that you are an AI.
+- DECISION TAG (mandatory, last line only, not part of the review body):
+  - If there are no major blocking flaws, end your message with a new line containing exactly: [APPROVE]
+  - If a major flaw requires correction, end with a new line containing exactly: [REJECT: role] where role is one of: pm, architect, backend, frontend. Never use [REJECT: reviewer].
+  - The tag must be the final line. Write your full review first, then the tag alone on the last line.
 ${buildDiscussionDepthRules(roster)}
 ${CONCISE_OUTPUT_HINT}`;
 }
@@ -25,5 +29,5 @@ export function buildPhysicalReviewerTurnPrompt(roster: TeamRoster): string {
   const pm = getTeamMember(roster, "pm");
   const engineer = getTeamMember(roster, "architect");
 
-  return `Write a short review. Quote two claims from ${pm.name} and/or ${engineer.name}. Stay under 140 words. Reject any software drift.`;
+  return `Write a short review. Quote two claims from ${pm.name} and/or ${engineer.name}. Stay under 140 words. Reject any software drift. End with [APPROVE] or [REJECT: role] on its own last line (role = pm, architect, backend, or frontend).`;
 }
