@@ -61,7 +61,7 @@ export function LandingHero({ examplePrompts }: LandingHeroProps) {
 
       <Link
         href="/workspace"
-        className="landing-rise landing-delay-7 mt-8 text-caption text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+        className="landing-rise landing-delay-7 mt-8 mb-4 text-caption text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
       >
         Open workspace →
       </Link>
