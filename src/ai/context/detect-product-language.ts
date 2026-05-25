@@ -45,11 +45,19 @@ export function productLanguageLabel(language: ProductLanguage): string {
 export function buildLanguageMatchDirective(productIdea: string): string {
   const language = detectProductLanguage(productIdea);
   const label = productLanguageLabel(language);
-  return `CRITICAL: The product idea is written in ${label}. You MUST write your entire response in ${label}, including all section headings. Do not switch languages unless quoting a teammate.`;
+  const base = `CRITICAL: The product idea is written in ${label}. You MUST write your entire response in ${label}, including all section headings. Do not switch languages unless quoting a teammate.`;
+  if (language === "english") {
+    return `${base} Do NOT use Chinese, Japanese, or Korean. Use English headings only (e.g. ## Stack & layout), never CJK characters or kana.`;
+  }
+  return base;
 }
 
 export function buildArtifactLanguageDirective(productIdea: string): string {
   const language = detectProductLanguage(productIdea);
   const label = productLanguageLabel(language);
-  return `The product idea is written in ${label}. You MUST write this entire artifact, including all section titles, in ${label}. Do not switch languages.`;
+  const base = `The product idea is written in ${label}. You MUST write this entire artifact, including all section titles, in ${label}. Do not switch languages.`;
+  if (language === "english") {
+    return `${base} Do NOT use Chinese, Japanese, or Korean characters.`;
+  }
+  return base;
 }
