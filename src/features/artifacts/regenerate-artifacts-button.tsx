@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { regenerateRunArtifactsAction } from "@/features/artifacts/regenerate-artifacts-action";
 import { Button } from "@/components/ui/button";
+import { workspaceHeaderRegenerateButtonClass } from "@/features/workspace/workspace-header-button-styles";
 import { cn } from "@/lib/utils";
 
 interface RegenerateArtifactsButtonProps {
@@ -22,6 +23,7 @@ function RegenerateSubmit({
   const { pending } = useFormStatus();
   const isPlaceholder = variant === "placeholder";
   const loading = pending;
+  const tooltip = loading ? "Regenerating artifacts" : "Regenerate artifacts";
 
   return (
     <Button
@@ -29,11 +31,12 @@ function RegenerateSubmit({
       variant={isPlaceholder ? "default" : "outline"}
       size={isPlaceholder ? "default" : "sm"}
       disabled={disabled || loading}
-      aria-label={loading ? "Regenerating artifacts" : "Regenerate artifacts"}
+      aria-label={tooltip}
+      title={tooltip}
       className={cn(
         isPlaceholder
           ? "mt-4 gap-2"
-          : "glass-card h-8 shrink-0 gap-1.5 border-glass-border px-2.5 text-caption",
+          : workspaceHeaderRegenerateButtonClass,
         className,
       )}
       aria-busy={loading}

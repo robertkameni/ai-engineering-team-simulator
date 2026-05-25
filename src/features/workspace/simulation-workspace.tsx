@@ -21,12 +21,16 @@ interface SimulationWorkspaceProps {
   userPrompt: string;
   title: string;
   initialRecentRuns?: SidebarRunItemData[];
+  isAuthenticated?: boolean;
+  userEmail?: string | null;
 }
 
 export function SimulationWorkspace({
   userPrompt,
   title,
   initialRecentRuns,
+  isAuthenticated = false,
+  userEmail = null,
 }: SimulationWorkspaceProps) {
   const {
     messages,
@@ -120,6 +124,8 @@ export function SimulationWorkspace({
         subtitle={userPrompt}
         artifactsStatus={artifactsStatus}
         debateProgress={debateProgress}
+        isAuthenticated={isAuthenticated}
+        userEmail={userEmail}
         run={messages.length > 0 ? exportRun : undefined}
       />
       <WorkspaceMain>

@@ -8,6 +8,7 @@ import {
   listRecentRunsForSidebar,
 } from "@/lib/db/runs";
 import { getTeamRoster } from "@/lib/db/team-roster";
+import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
 import { getSessionUser } from "@/lib/auth/session";
 import { rosterToPreview } from "@/features/simulation/team-roster-preview";
 
@@ -28,9 +29,10 @@ export async function generateMetadata({
 
 export default async function RunPage({ params }: RunPageProps) {
   const { id } = await params;
+  const ownership = await getRunOwnershipContext();
   const [run, recentRuns, teamRosterRecord, session] = await Promise.all([
     getCachedRun(id),
-    listRecentRunsForSidebar(12),
+    listRecentRunsForSidebar(ownership, 12),
     getTeamRoster(id),
     getSessionUser(),
   ]);
@@ -54,6 +56,7 @@ export default async function RunPage({ params }: RunPageProps) {
         teamRosterRecord != null ? rosterToPreview(teamRosterRecord) : null
       }
       isAuthenticated={session.userId != null}
+      userEmail={session.email}
     />
   );
 }

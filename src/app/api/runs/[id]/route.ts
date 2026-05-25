@@ -1,6 +1,6 @@
-import { deleteRun } from "@/lib/db/runs";
+import { deleteRunIfOwned } from "@/lib/db/runs";
+import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import { getSessionUser } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
@@ -9,17 +9,21 @@ interface RouteParams {
 }
 
 export async function DELETE(request: Request, { params }: RouteParams) {
-  const { userId } = await getSessionUser();
-  const rateLimit = await assertRateLimit(request, "delete", userId);
+  const ownership = await getRunOwnershipContext();
+  const rateLimit = await assertRateLimit(request, "delete", ownership.userId);
   if (!rateLimit.ok) {
     return rateLimitResponse(rateLimit);
   }
 
   const { id } = await params;
-  const deleted = await deleteRun(id);
+  const result = await deleteRunIfOwned(id, ownership);
 
-  if (!deleted) {
+  if (result === "not_found") {
     return Response.json({ error: "Run not found" }, { status: 404 });
+  }
+
+  if (result === "forbidden") {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
   return new Response(null, { status: 204 });

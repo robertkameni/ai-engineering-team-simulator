@@ -3,6 +3,8 @@ import {
   buildRunMarkdownFilename,
 } from "@/lib/export/run-markdown";
 import { getRunForWorkspace } from "@/lib/db/runs";
+import { getSessionUser } from "@/lib/auth/session";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
@@ -11,11 +13,31 @@ interface RouteParams {
 }
 
 export async function GET(_request: Request, { params }: RouteParams) {
-  const { id } = await params;
-  const run = await getRunForWorkspace(id);
+  const { userId } = await getSessionUser();
+  if (!userId) {
+    return Response.json(
+      { error: "Authentication required to export" },
+      { status: 401 },
+    );
+  }
 
+  const { id } = await params;
+  const ownership = await prisma.run.findUnique({
+    where: { id },
+    select: { id: true, userId: true },
+  });
+
+  if (!ownership) {
+    return Response.json({ error: "Run not found" }, { status: 404 });
+  }
+
+  if (ownership.userId !== userId) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const run = await getRunForWorkspace(id);
   if (!run) {
-    return new Response("Run not found", { status: 404 });
+    return Response.json({ error: "Run not found" }, { status: 404 });
   }
 
   const markdown = buildRunMarkdown(run);

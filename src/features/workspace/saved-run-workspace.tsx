@@ -18,9 +18,9 @@ interface SavedRunWorkspaceProps {
   regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;
   isAuthenticated?: boolean;
+  userEmail?: string | null;
 }
 
-/** Server-first workspace for saved runs — minimal client JS. */
 export function SavedRunWorkspace({
   run,
   pathname,
@@ -29,6 +29,7 @@ export function SavedRunWorkspace({
   regenerateRunId,
   canRegenerateArtifacts = false,
   isAuthenticated = false,
+  userEmail = null,
 }: SavedRunWorkspaceProps) {
   const artifactsStatus = run.artifactsStatus ?? "idle";
   const showArtifactPanel =
@@ -74,6 +75,7 @@ export function SavedRunWorkspace({
           run={run}
           showArtifactsAction={showArtifactPanel}
           isAuthenticated={isAuthenticated}
+          userEmail={userEmail}
         />
         <WorkspaceMain>
           <MessageThreadStatic messages={run.messages} />

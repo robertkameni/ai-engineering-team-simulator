@@ -1,5 +1,7 @@
 import { SimulationWorkspace } from "@/features/workspace/simulation-workspace";
 import { WorkspaceView } from "@/features/workspace/workspace-view";
+import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
+import { getSessionUser } from "@/lib/auth/session";
 import { listRecentRunsForSidebar } from "@/lib/db/runs";
 
 interface WorkspacePageProps {
@@ -9,10 +11,13 @@ interface WorkspacePageProps {
 export default async function WorkspacePage({
   searchParams,
 }: WorkspacePageProps) {
-  const [params, recentRuns] = await Promise.all([
+  const [params, ownership, session] = await Promise.all([
     searchParams,
-    listRecentRunsForSidebar(12),
+    getRunOwnershipContext(),
+    getSessionUser(),
   ]);
+  const recentRuns = await listRecentRunsForSidebar(ownership, 12);
+  const isAuthenticated = session.userId != null;
   const prompt = params.prompt?.trim();
 
   if (prompt) {
@@ -21,6 +26,8 @@ export default async function WorkspacePage({
         userPrompt={prompt}
         title={truncateTitle(prompt)}
         initialRecentRuns={recentRuns}
+        isAuthenticated={isAuthenticated}
+        userEmail={session.email}
       />
     );
   }
@@ -29,6 +36,8 @@ export default async function WorkspacePage({
     <WorkspaceView
       showEmptyThread
       initialRecentRuns={recentRuns}
+      isAuthenticated={isAuthenticated}
+      userEmail={session.email}
       run={{
         id: "new",
         title: "New simulation",

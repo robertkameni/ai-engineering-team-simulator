@@ -159,10 +159,15 @@ export function useSimulationStream() {
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as {
             error?: string;
+            retryAfter?: number;
           } | null;
-          throw new Error(
-            payload?.error ?? `Request failed (${response.status})`,
-          );
+          const base =
+            payload?.error ?? `Request failed (${response.status})`;
+          if (response.status === 429 && payload?.retryAfter) {
+            const minutes = Math.max(1, Math.ceil(payload.retryAfter / 60));
+            throw new Error(`${base}. Try again in about ${minutes} min.`);
+          }
+          throw new Error(base);
         }
 
         if (!response.body) {

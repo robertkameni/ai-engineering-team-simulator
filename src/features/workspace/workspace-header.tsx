@@ -9,7 +9,9 @@ import { RunUsagePill } from "@/features/simulation/run-usage-pill";
 import { ArtifactStatusPill } from "@/features/artifacts/artifact-status-pill";
 import { AuthStatusBadge } from "@/features/workspace/auth-status-badge";
 import { ExportRunButton } from "@/features/workspace/export-run-button";
+import { SignOutButton } from "@/features/workspace/sign-out-button";
 import { WorkspaceHeaderActions } from "@/features/workspace/workspace-header-actions";
+import { workspaceHeaderHomeButtonClass } from "@/features/workspace/workspace-header-button-styles";
 import { useWorkspaceMobile } from "@/features/workspace/workspace-mobile-context";
 import type { MockRun } from "@/features/agents/types";
 import type { RunStatus } from "@/features/agents/types";
@@ -25,6 +27,7 @@ interface WorkspaceHeaderProps {
   artifactsStatus?: ArtifactsPanelStatus;
   debateProgress?: DebateProgress;
   isAuthenticated?: boolean;
+  userEmail?: string | null;
   className?: string;
 }
 
@@ -36,6 +39,7 @@ export function WorkspaceHeader({
   artifactsStatus = "idle",
   debateProgress,
   isAuthenticated = false,
+  userEmail = null,
   className,
 }: WorkspaceHeaderProps) {
   const mobile = useWorkspaceMobile();
@@ -61,9 +65,9 @@ export function WorkspaceHeader({
           </Button>
         ) : null}
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
-          className="size-8 shrink-0"
+          className={workspaceHeaderHomeButtonClass}
           asChild
         >
           <Link href="/" aria-label="Back to home" title="Back to home">
@@ -95,8 +99,14 @@ export function WorkspaceHeader({
             <Layers className="size-4" />
           </Button>
         ) : null}
-        <AuthStatusBadge isAuthenticated={isAuthenticated} />
-        {run ? <ExportRunButton run={run} /> : null}
+        {isAuthenticated ? (
+          <SignOutButton email={userEmail} />
+        ) : (
+          <AuthStatusBadge isAuthenticated={false} />
+        )}
+        {run ? (
+          <ExportRunButton run={run} isAuthenticated={isAuthenticated} />
+        ) : null}
         {run?.usage ? (
           <RunUsagePill usage={run.usage} compactOnMobile />
         ) : null}

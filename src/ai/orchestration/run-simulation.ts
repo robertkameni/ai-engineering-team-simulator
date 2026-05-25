@@ -42,6 +42,7 @@ const AGENT_TURN_FALLBACK = "[Tool Error: Agent failed to respond]";
 
 export interface RunSimulationOptions {
   userId?: string | null;
+  guestSessionId?: string | null;
   usageAccumulator?: RunUsageAccumulator;
 }
 
@@ -84,7 +85,10 @@ export async function runSimulation(
 ): Promise<RunSimulationResult> {
   const usageAccumulator =
     options.usageAccumulator ?? new RunUsageAccumulator();
-  const run = await createRun(productIdea, { userId: options.userId });
+  const run = await createRun(productIdea, {
+    userId: options.userId,
+    guestSessionId: options.guestSessionId,
+  });
 
   const transcript: TranscriptEntry[] = [];
   let messageOrder = 0;

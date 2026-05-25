@@ -23,10 +23,14 @@ import {
   getTeamRoster,
   parseTeamRoster,
 } from "@/lib/db/team-roster";
+import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
+
+export type { RunOwnershipScope };
 
 export interface CreateRunOptions {
   projectId?: string;
   userId?: string | null;
+  guestSessionId?: string | null;
 }
 
 function mapUsageFromRun(run: {
@@ -60,6 +64,8 @@ export async function createRun(
       projectId: project.id,
       userPrompt,
       userId: options.userId ?? null,
+      guestSessionId:
+        options.userId != null ? null : (options.guestSessionId ?? null),
       status: "RUNNING",
     },
   });
@@ -137,8 +143,63 @@ export async function getRunWithMessages(runId: string) {
   });
 }
 
-export async function listRecentRuns(limit = 10) {
+export function buildRunOwnershipWhere(
+  scope: RunOwnershipScope,
+): Prisma.RunWhereInput | null {
+  const conditions: Prisma.RunWhereInput[] = [];
+
+  if (scope.userId != null) {
+    conditions.push({ userId: scope.userId });
+  }
+
+  if (scope.guestSessionId != null) {
+    conditions.push({
+      guestSessionId: scope.guestSessionId,
+      userId: null,
+    });
+  }
+
+  if (conditions.length === 0) {
+    return null;
+  }
+
+  if (conditions.length === 1) {
+    return conditions[0];
+  }
+
+  return { OR: conditions };
+}
+
+export function canAccessRun(
+  run: { userId: string | null; guestSessionId: string | null },
+  scope: RunOwnershipScope,
+): boolean {
+  if (scope.userId != null && run.userId === scope.userId) {
+    return true;
+  }
+
+  if (
+    scope.guestSessionId != null &&
+    run.userId === null &&
+    run.guestSessionId === scope.guestSessionId
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export async function listRecentRuns(
+  scope: RunOwnershipScope,
+  limit = 10,
+) {
+  const where = buildRunOwnershipWhere(scope);
+  if (where == null) {
+    return [];
+  }
+
   const query = {
+    where,
     orderBy: { updatedAt: "desc" as const },
     take: limit,
     include: {
@@ -172,9 +233,10 @@ export async function listRecentRuns(limit = 10) {
 }
 
 export async function listRecentRunsForSidebar(
+  scope: RunOwnershipScope,
   limit = 12,
 ): Promise<SidebarRunItemData[]> {
-  const runs = await listRecentRuns(limit);
+  const runs = await listRecentRuns(scope, limit);
   return runs.map((run) => ({
     id: run.id,
     title: formatRunTitle(run.userPrompt),
@@ -183,15 +245,27 @@ export async function listRecentRunsForSidebar(
   }));
 }
 
-export async function deleteRun(runId: string): Promise<boolean> {
+export type DeleteRunIfOwnedResult = "deleted" | "not_found" | "forbidden";
+
+export async function deleteRunIfOwned(
+  runId: string,
+  scope: RunOwnershipScope,
+): Promise<DeleteRunIfOwnedResult> {
   const existing = await prisma.run.findUnique({
     where: { id: runId },
-    select: { id: true },
+    select: { id: true, userId: true, guestSessionId: true },
   });
-  if (!existing) return false;
+
+  if (!existing) {
+    return "not_found";
+  }
+
+  if (!canAccessRun(existing, scope)) {
+    return "forbidden";
+  }
 
   await prisma.run.delete({ where: { id: runId } });
-  return true;
+  return "deleted";
 }
 
 export function formatRunTitle(userPrompt: string): string {

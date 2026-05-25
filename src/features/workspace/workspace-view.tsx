@@ -30,6 +30,8 @@ interface WorkspaceViewProps {
   regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;
   initialRecentRuns?: SidebarRunItemData[];
+  isAuthenticated?: boolean;
+  userEmail?: string | null;
 }
 
 export function WorkspaceView({
@@ -41,6 +43,8 @@ export function WorkspaceView({
   regenerateRunId,
   canRegenerateArtifacts = false,
   initialRecentRuns,
+  isAuthenticated = false,
+  userEmail = null,
 }: WorkspaceViewProps) {
   const messages = showEmptyThread ? [] : run.messages;
   const debateProgress = debateProgressFromMessages(messages, null);
@@ -70,6 +74,8 @@ export function WorkspaceView({
         subtitle={run.userPrompt}
         artifactsStatus={run.artifactsStatus ?? "idle"}
         debateProgress={debateProgress}
+        isAuthenticated={isAuthenticated}
+        userEmail={userEmail}
         run={run}
       />
       <WorkspaceMain>{thread}</WorkspaceMain>

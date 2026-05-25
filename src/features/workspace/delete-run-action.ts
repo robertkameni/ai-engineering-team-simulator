@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { deleteRun } from "@/lib/db/runs";
+import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
+import { deleteRunIfOwned } from "@/lib/db/runs";
 
 export async function deleteRunAction(formData: FormData) {
   const runId = formData.get("runId");
@@ -13,8 +14,10 @@ export async function deleteRunAction(formData: FormData) {
     return;
   }
 
-  const deleted = await deleteRun(runId);
-  if (!deleted) {
+  const ownership = await getRunOwnershipContext();
+  const result = await deleteRunIfOwned(runId, ownership);
+
+  if (result !== "deleted") {
     return;
   }
 

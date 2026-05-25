@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { runSimulation } from "@/ai/orchestration/run-simulation";
 import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
-import { getSessionUser } from "@/lib/auth/session";
+import { getRunOwnershipContextWithGuestSession } from "@/lib/auth/run-ownership";
 import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { setRunUsageTotals } from "@/lib/db/runs";
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { userId } = await getSessionUser();
+  const { userId, guestSessionId } = await getRunOwnershipContextWithGuestSession();
   const rateLimit = await assertRateLimit(request, "simulate", userId);
   if (!rateLimit.ok) {
     return rateLimitResponse(rateLimit);
@@ -55,6 +55,7 @@ export async function POST(request: Request) {
       try {
         const simulation = await runSimulation(prompt, send, {
           userId,
+          guestSessionId,
           usageAccumulator,
         });
         runId = simulation.runId;

@@ -22,6 +22,14 @@ enum ArtifactStatus {
   FAILED
 }
 
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  runs         Run[]
+}
+
 model Project {
   id        String   @id @default(cuid())
   title     String
@@ -36,6 +44,7 @@ model Run {
   id               String     @id @default(cuid())
   projectId        String
   userId           String?
+  guestSessionId   String?
   userPrompt       String     @db.Text
   summary          String?    @db.Text
   status           RunStatus      @default(RUNNING)
@@ -47,6 +56,7 @@ model Run {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   project          Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user             User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   messages         Message[]
   artifacts        Artifact[]
 
@@ -54,6 +64,8 @@ model Run {
   @@index([createdAt])
   @@index([status])
   @@index([userId])
+  @@index([guestSessionId])
+  @@index([guestSessionId, updatedAt])
 }
 
 model Message {
