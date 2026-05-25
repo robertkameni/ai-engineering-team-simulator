@@ -19,7 +19,7 @@ Rules:
 - Be direct. Do not repeat prior messages. Do not mention that you are an AI.
 - DECISION TAG (mandatory, last line only, not part of the review body):
   - If there are no major blocking flaws, end your message with a new line containing exactly: [APPROVE]
-  - If a major flaw requires correction, end with a new line containing exactly: [REJECT: role] where role is one of: pm, architect, backend, frontend. Never use [REJECT: reviewer].
+  - If a major flaw requires correction, end with a new line containing exactly: [REJECT: role] where role is one of: pm, architect, backend, frontend, devops. Never use [REJECT: reviewer].
   - The tag must be the final line. Write your full review first, then the tag alone on the last line.
 - CRITICAL: The decision tag ([APPROVE] or [REJECT: role]) at the end of your response is mandatory. If you are reaching your word limit, shorten your recommendations to ensure the tag is printed.
 ${buildDiscussionDepthRules(roster, "reviewer")}
@@ -27,5 +27,5 @@ ${CONCISE_OUTPUT_HINT}`;
 }
 
 export function buildPhysicalReviewerTurnPrompt(roster: TeamRoster): string {
-  return `Write a short review. Quote at least two claims from the previous agents. ${buildImplementationQuoteHint(roster)} Stay under 220 words. Reject any software drift. End with [APPROVE] or [REJECT: role] on its own last line (role = pm, architect, backend, or frontend).`;
+  return `Write a short review. Quote at least two claims from the previous agents. ${buildImplementationQuoteHint(roster)} Stay under 220 words. Reject any software drift. End with [APPROVE] or [REJECT: role] on its own last line (role = pm, architect, backend, frontend, or devops).`;
 }

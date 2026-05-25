@@ -3,6 +3,8 @@ import { Home } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { RunStatusPill } from "@/features/simulation/run-status-pill";
+import { RunUsagePill } from "@/features/simulation/run-usage-pill";
+import { AuthStatusBadge } from "@/features/workspace/auth-status-badge";
 import { ExportRunButton } from "@/features/workspace/export-run-button";
 import type { MockRun } from "@/features/agents/types";
 import type { RunStatus } from "@/features/agents/types";
@@ -15,6 +17,7 @@ interface WorkspaceHeaderSavedProps {
   subtitle?: string;
   run: MockRun;
   showArtifactsAction: boolean;
+  isAuthenticated?: boolean;
   className?: string;
 }
 
@@ -24,6 +27,7 @@ export function WorkspaceHeaderSaved({
   subtitle,
   run,
   showArtifactsAction,
+  isAuthenticated = false,
   className,
 }: WorkspaceHeaderSavedProps) {
   return (
@@ -57,7 +61,11 @@ export function WorkspaceHeaderSaved({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1.5 @[720px]/app-shell:gap-2">
+        <AuthStatusBadge isAuthenticated={isAuthenticated} />
         <ExportRunButton run={run} />
+        {run.usage ? (
+          <RunUsagePill usage={run.usage} compactOnMobile />
+        ) : null}
         <RunStatusPill
           status={status}
           artifactsStatus={run.artifactsStatus}

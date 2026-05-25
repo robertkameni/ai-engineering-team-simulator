@@ -14,6 +14,9 @@ import {
   artifactDocumentSchema,
   type RunArtifactsOutput,
 } from "@/features/artifacts/schemas";
+import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
+
+const ARTIFACT_MODEL = "deepseek-v4-flash" as const;
 
 const ARTIFACT_LANGUAGE_DIRECTIVE =
   "Analyze the transcript to determine the primary language used by the agents. You MUST write this entire artifact, including all section titles, in that exact language.";
@@ -24,7 +27,7 @@ const SOFTWARE_ARTIFACT_FOCUS: Record<ArtifactType, string> = {
   architecture:
     "Components, data entities, APIs/events, auth, background jobs, and technical risks.",
   implementation:
-    "Backend and frontend stacks, key modules, testing approach, and rollout plan.",
+    "Backend and frontend stacks, CI/CD, environments, observability, key modules, testing approach, and rollout plan.",
   review:
     "Where the team agreed, key disagreements, top risks, and prioritized recommendations.",
 };
@@ -53,6 +56,7 @@ async function generateArtifactDocument(
   type: ArtifactType,
   transcriptPrompt: string,
   templateId: TeamTemplateId,
+  usageAccumulator?: RunUsageAccumulator,
 ): Promise<ArtifactDocument> {
   const sectionGuidelines = sectionGuidelinesForArtifact(type, templateId);
   const focus = artifactFocusForTemplate(type, templateId);
@@ -73,7 +77,7 @@ Output rules:
 
   try {
     const structured = await generateText({
-      model: getDeepSeekModel("deepseek-v4-flash"),
+      model: getDeepSeekModel(ARTIFACT_MODEL),
       system,
       prompt: transcriptPrompt,
       maxOutputTokens: 1200,
@@ -84,6 +88,11 @@ Output rules:
       },
     });
 
+    await usageAccumulator?.addFromGenerateTextResult(
+      structured,
+      ARTIFACT_MODEL,
+    );
+
     if (structured.output) {
       return structured.output;
     }
@@ -92,7 +101,7 @@ Output rules:
   }
 
   const fallback = await generateText({
-    model: getDeepSeekModel("deepseek-v4-flash"),
+    model: getDeepSeekModel(ARTIFACT_MODEL),
     system: `${system}
 
 Respond with ONLY a JSON object: { "sections": [{ "title": string, "items": string[] }] }`,
@@ -103,6 +112,8 @@ Respond with ONLY a JSON object: { "sections": [{ "title": string, "items": stri
       deepseek: DEEPSEEK_CHAT_OPTIONS,
     },
   });
+
+  await usageAccumulator?.addFromGenerateTextResult(fallback, ARTIFACT_MODEL);
 
   const json = extractJsonObject(fallback.text);
   const parsed = artifactDocumentSchema.safeParse(json);
@@ -136,6 +147,7 @@ export async function generateRunArtifacts({
   transcript,
   roster,
   onArtifactComplete,
+  usageAccumulator,
 }: {
   productIdea: string;
   transcript: TranscriptEntry[];
@@ -144,6 +156,7 @@ export async function generateRunArtifacts({
     type: ArtifactType,
     document: ArtifactDocument,
   ) => Promise<void> | void;
+  usageAccumulator?: RunUsageAccumulator;
 }): Promise<RunArtifactsOutput> {
   const templateId = roster.templateId;
   const transcriptPrompt = buildTranscriptForArtifacts(
@@ -158,6 +171,7 @@ export async function generateRunArtifacts({
         type,
         transcriptPrompt,
         templateId,
+        usageAccumulator,
       );
       await onArtifactComplete?.(type, document);
       return [type, document] as const;

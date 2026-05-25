@@ -7,6 +7,7 @@ import {
 } from "@/ai/agents/team-templates";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import { getDeepSeekModel } from "@/ai/providers";
+import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 
 const classificationSchema = z.object({
   templateId: z.enum(["software", "physical", "hybrid"]),
@@ -43,6 +44,7 @@ export function isKeywordHybridProject(productIdea: string): boolean {
 
 export async function classifyProjectTeamTemplate(
   productIdea: string,
+  usageAccumulator?: RunUsageAccumulator,
 ): Promise<ProjectClassification> {
   if (isKeywordHybridProject(productIdea)) {
     return {
@@ -75,6 +77,11 @@ Rules:
         deepseek: DEEPSEEK_CHAT_OPTIONS,
       },
     });
+
+    await usageAccumulator?.addFromGenerateTextResult(
+      result,
+      "deepseek-v4-flash",
+    );
 
     if (result.output && isTeamTemplateId(result.output.templateId)) {
       const templateId = isKeywordHybridProject(productIdea)

@@ -23,6 +23,7 @@ import {
   parseTeamRoster,
   TEAM_ROSTER_ARTIFACT_TYPE,
 } from "@/lib/db/team-roster";
+import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 
 export type RegenerateRunArtifactsError =
   | "not_found"
@@ -68,6 +69,7 @@ function mapMessagesToTranscript(
 
 export async function regenerateRunArtifacts(
   runId: string,
+  options: { usageAccumulator?: RunUsageAccumulator } = {},
 ): Promise<RegenerateRunArtifactsResult> {
   let run = await getRunWithMessages(runId);
   if (!run) {
@@ -142,6 +144,7 @@ export async function regenerateRunArtifacts(
       productIdea: run.userPrompt,
       transcript: mapMessagesToTranscript(simulationMessages),
       roster,
+      usageAccumulator: options.usageAccumulator,
       onArtifactComplete: async (type, document) => {
         await saveSingleArtifact(runId, type, document);
       },

@@ -14,6 +14,7 @@ export const softwareTemplate: TeamTemplate = {
     architect: "Architect",
     backend: "Backend Developer",
     frontend: "Frontend Developer",
+    devops: "DevOps Engineer",
     reviewer: "Reviewer",
   },
 };
@@ -25,6 +26,7 @@ export const physicalTemplate: TeamTemplate = {
     architect: "Ingénieur technique",
     backend: "Expert conformité & réglementation",
     frontend: "Planning, budget & risques",
+    devops: "Exploitation & déploiement chantier",
     reviewer: "Reviewer",
   },
 };
@@ -36,6 +38,7 @@ export const hybridTemplate: TeamTemplate = {
     architect: "Software Architect",
     backend: "Expert métier / conformité",
     frontend: "Planning d'intégration",
+    devops: "DevOps / Platform Engineer",
     reviewer: "Reviewer",
   },
 };

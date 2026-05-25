@@ -2,6 +2,10 @@ import { z } from "zod";
 
 import { runSimulation } from "@/ai/orchestration/run-simulation";
 import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
+import { getSessionUser } from "@/lib/auth/session";
+import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
+import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { setRunUsageTotals } from "@/lib/db/runs";
 import {
   encodeSimulationEvent,
   type SimulationStreamEvent,
@@ -30,7 +34,15 @@ export async function POST(request: Request) {
     );
   }
 
+  const { userId } = await getSessionUser();
+  const rateLimit = await assertRateLimit(request, "simulate", userId);
+  if (!rateLimit.ok) {
+    return rateLimitResponse(rateLimit);
+  }
+
   const { prompt } = parsed.data;
+  const usageAccumulator = new RunUsageAccumulator();
+  let runId: string | undefined;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -41,13 +53,25 @@ export async function POST(request: Request) {
       };
 
       try {
-        const runId = await runSimulation(prompt, send);
-        const synthesis = await regenerateRunArtifacts(runId);
+        const simulation = await runSimulation(prompt, send, {
+          userId,
+          usageAccumulator,
+        });
+        runId = simulation.runId;
+
+        const synthesis = await regenerateRunArtifacts(runId, {
+          usageAccumulator,
+        });
         if (!synthesis.ok) {
           console.error("Artifact synthesis failed:", synthesis);
         }
+
+        await setRunUsageTotals(runId, usageAccumulator.getTotals());
         send({ type: "done", runId });
       } catch (error) {
+        if (runId) {
+          await setRunUsageTotals(runId, usageAccumulator.getTotals());
+        }
         const message =
           error instanceof Error ? error.message : "Simulation failed";
         send({ type: "error", message });

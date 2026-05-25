@@ -1,3 +1,4 @@
+import type { Prisma } from "@/generated/prisma/client";
 import type { Message } from "@/generated/prisma/client";
 
 import type { TeamRoster } from "@/ai/agents/roster";
@@ -6,6 +7,7 @@ import type { AgentRole, SimulationMessage } from "@/features/agents/types";
 import { getPersona } from "@/features/agents/personas";
 import { formatMessageTime, formatRelativeTime } from "@/lib/format-time";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
+import type { RunUsageTotals } from "@/lib/ai/run-usage";
 import { prisma } from "@/lib/prisma";
 import {
   deriveArtifactsPanelStatus,
@@ -22,17 +24,58 @@ import {
   parseTeamRoster,
 } from "@/lib/db/team-roster";
 
-export async function createRun(userPrompt: string, projectId?: string) {
+export interface CreateRunOptions {
+  projectId?: string;
+  userId?: string | null;
+}
+
+function mapUsageFromRun(run: {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  estimatedCostUsd: Prisma.Decimal | null;
+}): RunUsageTotals {
+  return {
+    promptTokens: run.promptTokens,
+    completionTokens: run.completionTokens,
+    totalTokens: run.totalTokens,
+    estimatedCostUsd:
+      run.estimatedCostUsd != null ? Number(run.estimatedCostUsd) : 0,
+  };
+}
+
+export async function createRun(
+  userPrompt: string,
+  options: CreateRunOptions = {},
+) {
   const project =
-    projectId != null
-      ? await prisma.project.findUniqueOrThrow({ where: { id: projectId } })
+    options.projectId != null
+      ? await prisma.project.findUniqueOrThrow({
+          where: { id: options.projectId },
+        })
       : await getOrCreateDefaultProject();
 
   return prisma.run.create({
     data: {
       projectId: project.id,
       userPrompt,
+      userId: options.userId ?? null,
       status: "RUNNING",
+    },
+  });
+}
+
+export async function setRunUsageTotals(
+  runId: string,
+  totals: RunUsageTotals,
+): Promise<void> {
+  await prisma.run.update({
+    where: { id: runId },
+    data: {
+      promptTokens: totals.promptTokens,
+      completionTokens: totals.completionTokens,
+      totalTokens: totals.totalTokens,
+      estimatedCostUsd: totals.estimatedCostUsd,
     },
   });
 }
@@ -216,6 +259,8 @@ export async function getRunForWorkspace(runId: string) {
     userPrompt: run.userPrompt,
     status: runStatus,
     updatedAt: run.updatedAt.toISOString(),
+    userId: run.userId,
+    usage: mapUsageFromRun(run),
     messages: mapDbMessagesToSimulation(run.messages, roster),
     artifacts,
     artifactsStatus,

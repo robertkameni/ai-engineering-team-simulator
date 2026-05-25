@@ -1,7 +1,9 @@
 import "server-only";
 
-import { tool } from "ai";
+import { tool, type ToolSet } from "ai";
 import { z } from "zod";
+
+import type { SimulationAgentRole } from "@/ai/agents/config";
 
 const NPM_REGISTRY_TIMEOUT_MS = 8_000;
 
@@ -74,79 +76,97 @@ function lookupTechnicalNorm(query: string): TechnicalNormLookupResult {
   };
 }
 
-export const agentTools = {
-  check_npm_package: tool({
-    description:
-      "Look up an npm package on the public registry. Returns the latest version and description.",
-    inputSchema: z.object({
-      packageName: z
-        .string()
-        .min(1)
-        .describe("npm package name, e.g. next, prisma, react"),
-    }),
-    execute: async ({ packageName }) => {
-      const name = packageName.trim();
-      if (!name) {
+export const checkNpmPackageTool = tool({
+  description:
+    "Look up an npm package on the public registry. Returns the latest version and description.",
+  inputSchema: z.object({
+    packageName: z
+      .string()
+      .min(1)
+      .describe("npm package name, e.g. next, prisma, react"),
+  }),
+  execute: async ({ packageName }) => {
+    const name = packageName.trim();
+    if (!name) {
+      return { found: false as const, packageName: name };
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(
+        () => controller.abort(),
+        NPM_REGISTRY_TIMEOUT_MS,
+      );
+
+      const response = await fetch(
+        `https://registry.npmjs.org/${encodeURIComponent(name)}/latest`,
+        {
+          signal: controller.signal,
+          headers: { Accept: "application/json" },
+        },
+      ).finally(() => clearTimeout(timeout));
+
+      if (response.status === 404) {
         return { found: false as const, packageName: name };
       }
 
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(
-          () => controller.abort(),
-          NPM_REGISTRY_TIMEOUT_MS,
-        );
-
-        const response = await fetch(
-          `https://registry.npmjs.org/${encodeURIComponent(name)}/latest`,
-          {
-            signal: controller.signal,
-            headers: { Accept: "application/json" },
-          },
-        ).finally(() => clearTimeout(timeout));
-
-        if (response.status === 404) {
-          return { found: false as const, packageName: name };
-        }
-
-        if (!response.ok) {
-          return {
-            error: `npm registry returned ${response.status}`,
-            packageName: name,
-          };
-        }
-
-        const data = (await response.json()) as {
-          name?: string;
-          version?: string;
-          description?: string;
-        };
-
+      if (!response.ok) {
         return {
-          found: true as const,
-          name: data.name ?? name,
-          version: data.version ?? "unknown",
-          description: data.description ?? "",
+          error: `npm registry returned ${response.status}`,
+          packageName: name,
         };
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "fetch failed";
-        return { error: message, packageName: name };
       }
-    },
-  }),
 
-  search_technical_norm: tool({
-    description:
-      "Search regulatory and technical norms (DTU, ERP, fire safety, RGPD, etc.). Returns status, normReference, requiredAction, and source on success.",
-    inputSchema: z.object({
-      query: z
-        .string()
-        .min(1)
-        .describe('Norm reference or topic, e.g. "DTU 60.1", "RGPD", "incendie ERP"'),
-    }),
-    execute: async ({ query }) => {
-      return lookupTechnicalNorm(query);
-    },
+      const data = (await response.json()) as {
+        name?: string;
+        version?: string;
+        description?: string;
+      };
+
+      return {
+        found: true as const,
+        name: data.name ?? name,
+        version: data.version ?? "unknown",
+        description: data.description ?? "",
+      };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "fetch failed";
+      return { error: message, packageName: name };
+    }
+  },
+});
+
+export const searchTechnicalNormTool = tool({
+  description:
+    "Search regulatory and technical norms (DTU, ERP, fire safety, RGPD, etc.). Returns status, normReference, requiredAction, and source on success.",
+  inputSchema: z.object({
+    query: z
+      .string()
+      .min(1)
+      .describe('Norm reference or topic, e.g. "DTU 60.1", "RGPD", "incendie ERP"'),
   }),
+  execute: async ({ query }) => {
+    return lookupTechnicalNorm(query);
+  },
+});
+
+/** @deprecated Use getAgentTools(role) for per-role tool access. */
+export const agentTools = {
+  check_npm_package: checkNpmPackageTool,
+  search_technical_norm: searchTechnicalNormTool,
 };
+
+export function getAgentTools(role: SimulationAgentRole): ToolSet {
+  switch (role) {
+    case "architect":
+    case "devops":
+      return { check_npm_package: checkNpmPackageTool };
+    default:
+      return {};
+  }
+}
+
+export function getComplianceTools(): ToolSet {
+  return { search_technical_norm: searchTechnicalNormTool };
+}

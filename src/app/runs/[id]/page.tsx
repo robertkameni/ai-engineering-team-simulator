@@ -8,6 +8,7 @@ import {
   listRecentRunsForSidebar,
 } from "@/lib/db/runs";
 import { getTeamRoster } from "@/lib/db/team-roster";
+import { getSessionUser } from "@/lib/auth/session";
 import { rosterToPreview } from "@/features/simulation/team-roster-preview";
 
 interface RunPageProps {
@@ -27,10 +28,11 @@ export async function generateMetadata({
 
 export default async function RunPage({ params }: RunPageProps) {
   const { id } = await params;
-  const [run, recentRuns, teamRosterRecord] = await Promise.all([
+  const [run, recentRuns, teamRosterRecord, session] = await Promise.all([
     getCachedRun(id),
     listRecentRunsForSidebar(12),
     getTeamRoster(id),
+    getSessionUser(),
   ]);
 
   if (!run) {
@@ -51,6 +53,7 @@ export default async function RunPage({ params }: RunPageProps) {
       teamRoster={
         teamRosterRecord != null ? rosterToPreview(teamRosterRecord) : null
       }
+      isAuthenticated={session.userId != null}
     />
   );
 }

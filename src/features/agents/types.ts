@@ -2,6 +2,7 @@ import type {
   ArtifactsPanelStatus,
   PartialRunArtifacts,
 } from "@/features/artifacts/types";
+import type { RunUsageTotals } from "@/lib/ai/run-usage";
 
 export type AgentRole =
   | "pm"
@@ -44,6 +45,8 @@ export interface MockRun {
   userPrompt: string;
   status: RunStatus;
   updatedAt: string;
+  userId?: string | null;
+  usage?: RunUsageTotals;
   messages: SimulationMessage[];
   artifacts?: PartialRunArtifacts | null;
   artifactsStatus?: ArtifactsPanelStatus;

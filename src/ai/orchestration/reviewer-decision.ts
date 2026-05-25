@@ -3,9 +3,15 @@ import {
   type SimulationAgentRole,
 } from "@/ai/agents/config";
 
-export const MAX_SIMULATION_TURNS = 8;
+export const MAX_SIMULATION_TURNS = 12;
 
-const REJECTABLE_ROLES = ["pm", "architect", "backend", "frontend"] as const;
+const REJECTABLE_ROLES = [
+  "pm",
+  "architect",
+  "backend",
+  "frontend",
+  "devops",
+] as const;
 
 type RejectableRole = (typeof REJECTABLE_ROLES)[number];
 
@@ -19,7 +25,7 @@ export interface ParsedReviewerDecision {
 
 const APPROVE_TAG_PATTERN = /\s*\[APPROVE\]\s*$/i;
 const REJECT_TAG_PATTERN =
-  /\s*\[REJECT:\s*(pm|architect|backend|frontend|reviewer)\s*\]\s*$/i;
+  /\s*\[REJECT:\s*(pm|architect|backend|frontend|devops|reviewer)\s*\]\s*$/i;
 
 function isRejectableRole(role: string): role is RejectableRole {
   return (REJECTABLE_ROLES as readonly string[]).includes(role);
@@ -69,7 +75,7 @@ export interface DebateMessage {
   content: string;
 }
 
-/** Retrocompatible: 5-message runs without tags count as complete when reviewer spoke last. */
+/** Retrocompatible: 5- or 6-message runs without tags count as complete when reviewer spoke last. */
 export function isDebateComplete(messages: DebateMessage[]): boolean {
   if (messages.length === 0) {
     return false;

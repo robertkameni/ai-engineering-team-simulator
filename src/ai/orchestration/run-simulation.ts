@@ -1,3 +1,4 @@
+import type { LanguageModelUsage } from "ai";
 import { stepCountIs, streamText } from "ai";
 
 import {
@@ -10,7 +11,7 @@ import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import { buildAgentMessages } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
-import { classifyProjectTeamTemplate } from "@/ai/orchestration/classify-project";
+import { classifyProjectTeamTemplate, hasPhysicalKeywords } from "@/ai/orchestration/classify-project";
 import {
   getAgentStreamDisplayText,
   normalizeAgentPersistedText,
@@ -23,19 +24,31 @@ import {
 import { getAgentSystemPrompt } from "@/ai/prompts";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import { getDeepSeekModel } from "@/ai/providers";
-import { agentTools } from "@/ai/tools/registry";
+import { getAgentTools, getComplianceTools } from "@/ai/tools/registry";
+import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import { updateArtifactStatus } from "@/lib/db/artifact-status";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
 import { saveTeamRoster } from "@/lib/db/team-roster";
 import {
   appendMessage,
   createRun,
+  setRunUsageTotals,
   touchRunActivity,
 } from "@/lib/db/runs";
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
 const STREAM_HEARTBEAT_MS = 15_000;
 const AGENT_TURN_FALLBACK = "[Tool Error: Agent failed to respond]";
+
+export interface RunSimulationOptions {
+  userId?: string | null;
+  usageAccumulator?: RunUsageAccumulator;
+}
+
+export interface RunSimulationResult {
+  runId: string;
+  usageAccumulator: RunUsageAccumulator;
+}
 
 function getTurnMaxOutputTokens(role: SimulationAgentRole): number {
   switch (role) {
@@ -48,6 +61,8 @@ function getTurnMaxOutputTokens(role: SimulationAgentRole): number {
       return 500;
     case "backend":
       return 600;
+    case "devops":
+      return 550;
     default:
       return 400;
   }
@@ -65,8 +80,11 @@ function withTurnTokenLimit(
 export async function runSimulation(
   productIdea: string,
   send: (event: SimulationStreamEvent) => void,
-): Promise<string> {
-  const run = await createRun(productIdea);
+  options: RunSimulationOptions = {},
+): Promise<RunSimulationResult> {
+  const usageAccumulator =
+    options.usageAccumulator ?? new RunUsageAccumulator();
+  const run = await createRun(productIdea, { userId: options.userId });
 
   const transcript: TranscriptEntry[] = [];
   let messageOrder = 0;
@@ -74,7 +92,10 @@ export async function runSimulation(
   let artifactPhaseStarted = false;
 
   try {
-    const classification = await classifyProjectTeamTemplate(productIdea);
+    const classification = await classifyProjectTeamTemplate(
+      productIdea,
+      usageAccumulator,
+    );
     const roster = createSimulationRoster(classification.templateId);
     await saveTeamRoster(run.id, roster);
     await touchRunActivity(run.id);
@@ -126,6 +147,7 @@ export async function runSimulation(
           transcript,
           roster,
           templateId: classification.templateId,
+          usageAccumulator,
           send: notify,
         });
       } catch (turnError) {
@@ -199,8 +221,9 @@ export async function runSimulation(
     artifactPhaseStarted = true;
 
     notify({ type: "artifacts_start" });
-    return run.id;
+    return { runId: run.id, usageAccumulator };
   } catch (error) {
+    await setRunUsageTotals(run.id, usageAccumulator.getTotals());
     await reconcileRunFailure(run.id, {
       debateComplete,
       artifactPhaseStarted,
@@ -229,6 +252,7 @@ async function streamAgentTurn({
   transcript,
   roster,
   templateId,
+  usageAccumulator,
   send,
 }: {
   runId: string;
@@ -237,6 +261,7 @@ async function streamAgentTurn({
   transcript: TranscriptEntry[];
   roster: TeamRoster;
   templateId: TeamTemplateId;
+  usageAccumulator: RunUsageAccumulator;
   send: (event: SimulationStreamEvent) => void;
 }): Promise<string> {
   const config = withTurnTokenLimit(role);
@@ -259,6 +284,7 @@ async function streamAgentTurn({
       roster,
       templateId,
       config,
+      usageAccumulator,
       send,
     });
 
@@ -266,6 +292,12 @@ async function streamAgentTurn({
       console.warn(
         `${role}: empty stream, retrying with chat model (no reasoning)`,
       );
+      const retryConfig = {
+        ...config,
+        model: "deepseek-v4-flash" as const,
+        maxOutputTokens: Math.max(config.maxOutputTokens * 2, 900),
+        deepseek: DEEPSEEK_CHAT_OPTIONS,
+      };
       fullText = await collectAgentStream({
         runId,
         role,
@@ -273,12 +305,8 @@ async function streamAgentTurn({
         transcript,
         roster,
         templateId,
-        config: {
-          ...config,
-          model: "deepseek-v4-flash",
-          maxOutputTokens: Math.max(config.maxOutputTokens * 2, 900),
-          deepseek: DEEPSEEK_CHAT_OPTIONS,
-        },
+        config: retryConfig,
+        usageAccumulator,
         send,
       });
     }
@@ -321,6 +349,29 @@ function emitVisibleDelta(
   return emittedLength;
 }
 
+async function recordStreamUsage(
+  result: { usage: PromiseLike<LanguageModelUsage> },
+  modelId: ReturnType<typeof getAgentConfig>["model"],
+  usageAccumulator: RunUsageAccumulator,
+): Promise<void> {
+  await usageAccumulator.addFromStreamResult(result, modelId);
+}
+
+function resolveToolsForTurn(
+  role: SimulationAgentRole,
+  templateId: TeamTemplateId,
+  productIdea: string,
+) {
+  if (
+    role === "backend" &&
+    templateId === "hybrid" &&
+    hasPhysicalKeywords(productIdea)
+  ) {
+    return getComplianceTools();
+  }
+  return getAgentTools(role);
+}
+
 async function collectAgentStream({
   runId,
   role,
@@ -329,6 +380,7 @@ async function collectAgentStream({
   roster,
   templateId,
   config,
+  usageAccumulator,
   send,
 }: {
   runId: string;
@@ -338,6 +390,7 @@ async function collectAgentStream({
   roster: TeamRoster;
   templateId: TeamTemplateId;
   config: ReturnType<typeof getAgentConfig>;
+  usageAccumulator: RunUsageAccumulator;
   send: (event: SimulationStreamEvent) => void;
 }): Promise<string> {
   const result = streamText({
@@ -346,7 +399,7 @@ async function collectAgentStream({
     messages: buildAgentMessages(role, productIdea, transcript, roster),
     maxOutputTokens: config.maxOutputTokens,
     temperature: config.temperature,
-    tools: agentTools,
+    tools: resolveToolsForTurn(role, templateId, productIdea),
     stopWhen: stepCountIs(3),
     providerOptions: {
       deepseek: config.deepseek,
@@ -398,7 +451,10 @@ async function collectAgentStream({
         emitVisibleDelta(role, fullText, emittedLength, send);
       }
     }
+
+    await recordStreamUsage(result, config.model, usageAccumulator);
   } catch (error) {
+    await recordStreamUsage(result, config.model, usageAccumulator);
     if (fullText.trim()) {
       return fullText.trim();
     }

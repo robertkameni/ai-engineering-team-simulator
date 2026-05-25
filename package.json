@@ -24,6 +24,8 @@
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tabs": "^1.1.13",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
     "ai": "^6.0.185",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

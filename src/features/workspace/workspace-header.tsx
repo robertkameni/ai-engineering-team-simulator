@@ -5,7 +5,9 @@ import { Home, Menu, Layers } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { RunStatusPill } from "@/features/simulation/run-status-pill";
+import { RunUsagePill } from "@/features/simulation/run-usage-pill";
 import { ArtifactStatusPill } from "@/features/artifacts/artifact-status-pill";
+import { AuthStatusBadge } from "@/features/workspace/auth-status-badge";
 import { ExportRunButton } from "@/features/workspace/export-run-button";
 import { useWorkspaceMobile } from "@/features/workspace/workspace-mobile-context";
 import type { MockRun } from "@/features/agents/types";
@@ -21,6 +23,7 @@ interface WorkspaceHeaderProps {
   run?: MockRun;
   artifactsStatus?: ArtifactsPanelStatus;
   debateProgress?: DebateProgress;
+  isAuthenticated?: boolean;
   className?: string;
 }
 
@@ -31,6 +34,7 @@ export function WorkspaceHeader({
   run,
   artifactsStatus = "idle",
   debateProgress,
+  isAuthenticated = false,
   className,
 }: WorkspaceHeaderProps) {
   const mobile = useWorkspaceMobile();
@@ -90,7 +94,11 @@ export function WorkspaceHeader({
             <Layers className="size-4" />
           </Button>
         ) : null}
+        <AuthStatusBadge isAuthenticated={isAuthenticated} />
         {run ? <ExportRunButton run={run} /> : null}
+        {run?.usage ? (
+          <RunUsagePill usage={run.usage} compactOnMobile />
+        ) : null}
         {artifactsStatus === "pending" || artifactsStatus === "unavailable" ? (
           <ArtifactStatusPill
             status={artifactsStatus}

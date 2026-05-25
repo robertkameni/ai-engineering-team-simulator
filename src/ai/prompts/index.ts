@@ -12,10 +12,18 @@ import {
   buildDeveloperTurnPrompt,
 } from "@/ai/prompts/developer";
 import {
+  buildDevOpsSystemPrompt,
+  buildDevOpsTurnPrompt,
+} from "@/ai/prompts/devops";
+import {
   buildFrontendDeveloperSystemPrompt,
   buildFrontendDeveloperTurnPrompt,
 } from "@/ai/prompts/frontend-developer";
 import { buildPhysicalComplianceExpertSystemPrompt, buildPhysicalComplianceExpertTurnPrompt } from "@/ai/prompts/physical/compliance-expert";
+import {
+  buildPhysicalDevOpsSystemPrompt,
+  buildPhysicalDevOpsTurnPrompt,
+} from "@/ai/prompts/physical/devops-site";
 import { buildPhysicalPlanningBudgetSystemPrompt, buildPhysicalPlanningBudgetTurnPrompt } from "@/ai/prompts/physical/planning-budget";
 import { buildPhysicalPmSystemPrompt, buildPhysicalPmUserPrompt } from "@/ai/prompts/physical/pm";
 import {
@@ -73,6 +81,8 @@ export function getAgentSystemPrompt(
         return buildPhysicalComplianceExpertSystemPrompt(roster);
       case "frontend":
         return buildPhysicalPlanningBudgetSystemPrompt(roster);
+      case "devops":
+        return buildPhysicalDevOpsSystemPrompt(roster);
       case "reviewer":
         return buildPhysicalReviewerSystemPrompt(roster);
       default:
@@ -89,6 +99,8 @@ export function getAgentSystemPrompt(
       return buildDeveloperSystemPrompt(roster);
     case "frontend":
       return buildFrontendDeveloperSystemPrompt(roster);
+    case "devops":
+      return buildDevOpsSystemPrompt(roster);
     case "reviewer":
       return buildReviewerSystemPrompt(roster);
     default:
@@ -124,6 +136,9 @@ export function getAgentTurnPrompt(
       case "frontend":
         turnPrompt = buildPhysicalPlanningBudgetTurnPrompt();
         break;
+      case "devops":
+        turnPrompt = buildPhysicalDevOpsTurnPrompt();
+        break;
       case "reviewer":
         turnPrompt = buildPhysicalReviewerTurnPrompt(roster);
         break;
@@ -143,6 +158,9 @@ export function getAgentTurnPrompt(
         break;
       case "frontend":
         turnPrompt = buildFrontendDeveloperTurnPrompt();
+        break;
+      case "devops":
+        turnPrompt = buildDevOpsTurnPrompt();
         break;
       case "reviewer":
         turnPrompt = buildReviewerTurnPrompt(roster);

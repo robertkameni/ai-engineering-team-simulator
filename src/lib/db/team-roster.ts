@@ -5,7 +5,8 @@ import {
   type SimulationAgentRole,
 } from "@/ai/agents/config";
 import type { TeamMember, TeamRoster } from "@/ai/agents/roster";
-import { isTeamTemplateId } from "@/ai/agents/team-templates";
+import { getTeamTemplate, isTeamTemplateId } from "@/ai/agents/team-templates";
+import { AGENT_PERSONAS } from "@/features/agents/personas";
 import { prisma } from "@/lib/prisma";
 
 export const TEAM_ROSTER_ARTIFACT_TYPE = "team-roster";
@@ -40,18 +41,34 @@ export function parseTeamRoster(data: unknown): TeamRoster | null {
     : "software";
 
   const roster = { templateId } as TeamRoster;
+  let parsedCount = 0;
 
   for (const role of SIMULATION_AGENT_ORDER) {
     const member = record[role];
     if (
-      member == null ||
-      typeof member !== "object" ||
-      typeof (member as TeamMember).name !== "string" ||
-      typeof (member as TeamMember).title !== "string"
+      member != null &&
+      typeof member === "object" &&
+      typeof (member as TeamMember).name === "string" &&
+      typeof (member as TeamMember).title === "string"
     ) {
-      return null;
+      roster[role] = member as TeamMember;
+      parsedCount += 1;
+      continue;
     }
-    roster[role] = member as TeamMember;
+
+    if (role === "devops" && parsedCount >= 5 && record.pm != null) {
+      const template = getTeamTemplate(templateId);
+      const persona = AGENT_PERSONAS.devops;
+      roster.devops = {
+        role: "devops",
+        name: persona.name,
+        title: template.slotTitles.devops,
+        initials: persona.initials,
+      };
+      continue;
+    }
+
+    return null;
   }
 
   return roster;

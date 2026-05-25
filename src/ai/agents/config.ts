@@ -12,12 +12,13 @@ export interface AgentModelConfig {
   deepseek: DeepSeekLanguageModelOptions;
 }
 
-/** PM → Architect → Backend → Frontend → Reviewer */
+/** PM → Architect → Backend → Frontend → DevOps → Reviewer */
 export const SIMULATION_AGENT_ORDER = [
   "pm",
   "architect",
   "backend",
   "frontend",
+  "devops",
   "reviewer",
 ] as const;
 
@@ -50,6 +51,13 @@ export const ACTIVE_AGENTS: AgentModelConfig[] = [
     model: "deepseek-v4-flash",
     maxOutputTokens: 500,
     temperature: 0.6,
+    deepseek: DEEPSEEK_CHAT_OPTIONS,
+  },
+  {
+    role: "devops",
+    model: "deepseek-v4-flash",
+    maxOutputTokens: 550,
+    temperature: 0.55,
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   },
   {
