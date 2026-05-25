@@ -18,17 +18,15 @@ export function AuthStatusBadge({
     <Badge
       variant="outline"
       className={cn(
-        "border-amber-500/40 bg-amber-500/10 font-normal text-amber-600 dark:text-amber-400",
+        "shrink-0 border-amber-500/40 bg-amber-500/10 font-normal text-amber-600 dark:text-amber-400",
         className,
       )}
       title="Public session — runs are not private"
     >
-      <span className="sr-only @[480px]/workspace-header:not-sr-only">
+      <span className="hidden @[720px]/workspace-header:inline">
         Public session — runs are not private
       </span>
-      <span className="@[480px]/workspace-header:hidden" aria-hidden>
-        Public
-      </span>
+      <span className="@[720px]/workspace-header:hidden">Public</span>
     </Badge>
   );
 }

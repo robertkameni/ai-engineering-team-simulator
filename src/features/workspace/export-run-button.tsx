@@ -7,7 +7,7 @@ import type { MockRun } from "@/features/agents/types";
 import { exportRunMarkdown } from "@/lib/export/run-markdown";
 
 const EXPORT_BUTTON_CLASS =
-  "glass-card h-8 gap-1.5 border-glass-border px-2.5 text-caption transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] @[720px]/workspace-header:h-8";
+  "glass-card h-8 shrink-0 gap-1.5 border-glass-border px-2.5 text-caption transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] @[720px]/workspace-header:h-8";
 
 interface ExportRunButtonProps {
   run: MockRun;

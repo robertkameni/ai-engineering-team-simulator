@@ -44,7 +44,7 @@ export function RunStatusPill({
   return (
     <Badge
       variant="outline"
-      className={cn("gap-1.5 font-normal", STATUS_STYLES[status], className)}
+      className={cn("shrink-0 gap-1.5 font-normal", STATUS_STYLES[status], className)}
       title={label}
     >
       {compactOnMobile ? (
@@ -61,7 +61,7 @@ export function RunStatusPill({
       ) : null}
       <span
         className={cn(
-          compactOnMobile && "sr-only @[420px]/workspace-header:not-sr-only",
+          compactOnMobile && "sr-only @[480px]/workspace-header:not-sr-only",
         )}
       >
         {label}

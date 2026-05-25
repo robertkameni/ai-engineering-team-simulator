@@ -9,6 +9,7 @@ import { RunUsagePill } from "@/features/simulation/run-usage-pill";
 import { ArtifactStatusPill } from "@/features/artifacts/artifact-status-pill";
 import { AuthStatusBadge } from "@/features/workspace/auth-status-badge";
 import { ExportRunButton } from "@/features/workspace/export-run-button";
+import { WorkspaceHeaderActions } from "@/features/workspace/workspace-header-actions";
 import { useWorkspaceMobile } from "@/features/workspace/workspace-mobile-context";
 import type { MockRun } from "@/features/agents/types";
 import type { RunStatus } from "@/features/agents/types";
@@ -42,11 +43,11 @@ export function WorkspaceHeader({
   return (
     <header
       className={cn(
-        "@container/workspace-header glass-panel flex shrink-0 items-center justify-between gap-2 border-b-0 border-glass-border px-3 py-2.5 @[720px]/app-shell:gap-3 @[720px]/app-shell:px-4 @[720px]/app-shell:py-3",
+        "@container/workspace-header glass-panel grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 border-b-0 border-glass-border px-3 py-2.5 @[720px]/app-shell:gap-x-3 @[720px]/app-shell:px-4 @[720px]/app-shell:py-3",
         className,
       )}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2 overflow-hidden">
         {mobile ? (
           <Button
             type="button"
@@ -80,7 +81,7 @@ export function WorkspaceHeader({
           ) : null}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1.5 @[720px]/app-shell:gap-2">
+      <WorkspaceHeaderActions>
         {mobile?.showArtifactsAction ? (
           <Button
             type="button"
@@ -110,7 +111,7 @@ export function WorkspaceHeader({
           artifactsStatus={artifactsStatus}
           compactOnMobile
         />
-      </div>
+      </WorkspaceHeaderActions>
     </header>
   );
 }

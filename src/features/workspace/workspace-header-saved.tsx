@@ -10,6 +10,7 @@ import type { MockRun } from "@/features/agents/types";
 import type { RunStatus } from "@/features/agents/types";
 import { cn } from "@/lib/utils";
 import { SavedRunMobileActions } from "./saved-run-mobile-actions";
+import { WorkspaceHeaderActions } from "./workspace-header-actions";
 
 interface WorkspaceHeaderSavedProps {
   title: string;
@@ -33,11 +34,11 @@ export function WorkspaceHeaderSaved({
   return (
     <header
       className={cn(
-        "@container/workspace-header glass-panel flex shrink-0 items-center justify-between gap-2 border-b-0 border-glass-border px-3 py-2.5 @[720px]/app-shell:gap-3 @[720px]/app-shell:px-4 @[720px]/app-shell:py-3",
+        "@container/workspace-header glass-panel grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 border-b-0 border-glass-border px-3 py-2.5 @[720px]/app-shell:gap-x-3 @[720px]/app-shell:px-4 @[720px]/app-shell:py-3",
         className,
       )}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2 overflow-hidden">
         <SavedRunMobileActions showArtifactsAction={showArtifactsAction} />
         <Button
           variant="ghost"
@@ -60,7 +61,7 @@ export function WorkspaceHeaderSaved({
           ) : null}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1.5 @[720px]/app-shell:gap-2">
+      <WorkspaceHeaderActions>
         <AuthStatusBadge isAuthenticated={isAuthenticated} />
         <ExportRunButton run={run} />
         {run.usage ? (
@@ -71,7 +72,7 @@ export function WorkspaceHeaderSaved({
           artifactsStatus={run.artifactsStatus}
           compactOnMobile
         />
-      </div>
+      </WorkspaceHeaderActions>
     </header>
   );
 }

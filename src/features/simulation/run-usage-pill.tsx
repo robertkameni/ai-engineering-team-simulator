@@ -25,7 +25,7 @@ export function RunUsagePill({
     <Badge
       variant="outline"
       className={cn(
-        "gap-1.5 border-muted-foreground/30 bg-muted/20 font-normal text-muted-foreground",
+        "shrink-0 gap-1.5 border-muted-foreground/30 bg-muted/20 font-normal text-muted-foreground",
         className,
       )}
       title={tooltip}
@@ -33,13 +33,13 @@ export function RunUsagePill({
       <span
         className={cn(
           compactOnMobile &&
-            "sr-only @[420px]/workspace-header:not-sr-only",
+            "sr-only @[480px]/workspace-header:not-sr-only",
         )}
       >
         {label}
       </span>
       {compactOnMobile ? (
-        <span className="@[420px]/workspace-header:hidden" aria-hidden>
+        <span className="@[480px]/workspace-header:hidden" aria-hidden>
           {formatTokenCount(usage.totalTokens)}
         </span>
       ) : null}

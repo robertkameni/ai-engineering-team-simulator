@@ -5,6 +5,7 @@ import { buildTranscriptForArtifacts } from "@/ai/artifacts/build-transcript";
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { TranscriptEntry } from "@/ai/context/transcript";
+import { buildArtifactLanguageDirective } from "@/ai/context/detect-product-language";
 import { getDeepSeekModel } from "@/ai/providers";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import {
@@ -17,9 +18,6 @@ import {
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 
 const ARTIFACT_MODEL = "deepseek-v4-flash" as const;
-
-const ARTIFACT_LANGUAGE_DIRECTIVE =
-  "Analyze the transcript to determine the primary language used by the agents. You MUST write this entire artifact, including all section titles, in that exact language.";
 
 const SOFTWARE_ARTIFACT_FOCUS: Record<ArtifactType, string> = {
   requirements:
@@ -56,10 +54,12 @@ async function generateArtifactDocument(
   type: ArtifactType,
   transcriptPrompt: string,
   templateId: TeamTemplateId,
+  productIdea: string,
   usageAccumulator?: RunUsageAccumulator,
 ): Promise<ArtifactDocument> {
   const sectionGuidelines = sectionGuidelinesForArtifact(type, templateId);
   const focus = artifactFocusForTemplate(type, templateId);
+  const languageDirective = buildArtifactLanguageDirective(productIdea);
 
   const system = `You are a technical writer producing the "${type}" deliverable from a team debate.
 
@@ -67,8 +67,7 @@ Focus: ${focus}
 
 Output rules:
 - The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}
-- Choose appropriate section titles in the transcript's primary language.
-- ${ARTIFACT_LANGUAGE_DIRECTIVE}
+- ${languageDirective}
 - 3–5 concise bullets per section; each bullet is one complete sentence (max ~20 words).
 - Write as a polished internal document — NOT meeting notes.
 - Do NOT append speaker names to bullets (no "(Name)" suffixes).
@@ -171,6 +170,7 @@ export async function generateRunArtifacts({
         type,
         transcriptPrompt,
         templateId,
+        productIdea,
         usageAccumulator,
       );
       await onArtifactComplete?.(type, document);
