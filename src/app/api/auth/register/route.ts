@@ -54,6 +54,19 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
-    throw error;
+
+    console.error("Register failed:", error);
+
+    if (error instanceof Error && error.message.includes("AUTH_SECRET")) {
+      return Response.json(
+        { error: "Server authentication is not configured (AUTH_SECRET)." },
+        { status: 503 },
+      );
+    }
+
+    return Response.json(
+      { error: "Registration failed. Please try again." },
+      { status: 500 },
+    );
   }
 }

@@ -30,7 +30,19 @@ async function postAuth(
     body: JSON.stringify({ email, password }),
   });
 
-  const data = (await response.json()) as { error?: string };
+  let data: { error?: string } = {};
+  try {
+    data = (await response.json()) as { error?: string };
+  } catch {
+    return {
+      ok: false,
+      error:
+        response.status >= 500
+          ? "Server error during sign-in. If this persists, contact support."
+          : "Authentication failed",
+    };
+  }
+
   if (!response.ok) {
     return { ok: false, error: data.error ?? "Authentication failed" };
   }
@@ -64,8 +76,10 @@ export function ExportAuthModal({
       await onAuthSuccess();
       onOpenChange(false);
       setPassword("");
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong. Please try again.";
+      setError(message);
     } finally {
       setIsSubmitting(false);
     }
