@@ -9,6 +9,7 @@ import type {
   ArtifactsPanelStatus,
   PartialRunArtifacts,
 } from "@/features/artifacts/types";
+import type { DebateExitOutcome } from "@/features/agents/types";
 
 const SidebarMobileSheet = dynamic(
   () =>
@@ -34,6 +35,7 @@ interface SavedRunMobileSheetsProps {
   artifactsStatus: ArtifactsPanelStatus;
   regenerateRunId?: string;
   canRegenerateArtifacts: boolean;
+  debateOutcome?: DebateExitOutcome | null;
   children: React.ReactNode;
 }
 
@@ -45,6 +47,7 @@ export function SavedRunMobileSheets({
   artifactsStatus,
   regenerateRunId,
   canRegenerateArtifacts,
+  debateOutcome = null,
   children,
 }: SavedRunMobileSheetsProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -71,6 +74,7 @@ export function SavedRunMobileSheets({
     status: artifactsStatus,
     regenerateRunId,
     canRegenerateArtifacts,
+    debateOutcome,
   };
 
   return (

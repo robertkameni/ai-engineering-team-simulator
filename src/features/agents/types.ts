@@ -14,6 +14,11 @@ export type AgentRole =
 
 export type RunStatus = "idle" | "running" | "complete" | "failed";
 
+export type DebateExitOutcome =
+  | "approved"
+  | "cap_reached"
+  | "unknown_reject_fallback";
+
 export interface AgentPersona {
   role: AgentRole;
   name: string;
@@ -50,6 +55,7 @@ export interface MockRun {
   messages: SimulationMessage[];
   artifacts?: PartialRunArtifacts | null;
   artifactsStatus?: ArtifactsPanelStatus;
+  debateOutcome?: DebateExitOutcome | null;
 }
 
 export interface MockArtifactSection {

@@ -41,6 +41,7 @@ export function SimulationWorkspace({
     artifacts,
     artifactsStatus,
     teamRoster,
+    debateOutcome,
     start,
   } = useSimulationStream();
 
@@ -90,6 +91,7 @@ export function SimulationWorkspace({
       messages,
       artifacts,
       artifactsStatus,
+      debateOutcome,
     }),
     [
       runId,
@@ -99,6 +101,7 @@ export function SimulationWorkspace({
       messages,
       artifacts,
       artifactsStatus,
+      debateOutcome,
     ],
   );
 
@@ -117,6 +120,7 @@ export function SimulationWorkspace({
       debateMessages={messages}
       activeAgent={activeAgent}
       teamRoster={teamRoster}
+      debateOutcome={debateOutcome}
     >
       <WorkspaceHeader
         title={title}

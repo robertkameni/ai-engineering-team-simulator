@@ -6,6 +6,10 @@ import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { buildArtifactLanguageDirective } from "@/ai/context/detect-product-language";
+import {
+  type DebateExitOutcome,
+  parseDebateOutcomeFromRunSummary,
+} from "@/ai/orchestration/reviewer-decision";
 import { getDeepSeekModel } from "@/ai/providers";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import {
@@ -18,6 +22,13 @@ import {
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 
 const ARTIFACT_MODEL = "deepseek-v4-flash" as const;
+
+const UNAPPROVED_DEBATE_NOTICE =
+  "DEBATE_STATUS: unapproved_cap — The simulation ended without an explicit [APPROVE]. Summarize open risks and label recommendations as provisional.";
+
+function needsUnapprovedDebateNotice(outcome: DebateExitOutcome | null): boolean {
+  return outcome === "cap_reached" || outcome === "unknown_reject_fallback";
+}
 
 const SOFTWARE_ARTIFACT_FOCUS: Record<ArtifactType, string> = {
   requirements:
@@ -56,12 +67,18 @@ async function generateArtifactDocument(
   templateId: TeamTemplateId,
   productIdea: string,
   usageAccumulator?: RunUsageAccumulator,
+  debateOutcome?: DebateExitOutcome | null,
 ): Promise<ArtifactDocument> {
   const sectionGuidelines = sectionGuidelinesForArtifact(type, templateId);
   const focus = artifactFocusForTemplate(type, templateId);
   const languageDirective = buildArtifactLanguageDirective(productIdea);
 
-  const system = `You are a technical writer producing the "${type}" deliverable from a team debate.
+  const unapprovedNotice =
+    type === "review" && needsUnapprovedDebateNotice(debateOutcome ?? null)
+      ? `${UNAPPROVED_DEBATE_NOTICE}\n\n`
+      : "";
+
+  const system = `${unapprovedNotice}You are a technical writer producing the "${type}" deliverable from a team debate.
 
 Focus: ${focus}
 
@@ -147,6 +164,7 @@ export async function generateRunArtifacts({
   roster,
   onArtifactComplete,
   usageAccumulator,
+  runSummary,
 }: {
   productIdea: string;
   transcript: TranscriptEntry[];
@@ -156,8 +174,10 @@ export async function generateRunArtifacts({
     document: ArtifactDocument,
   ) => Promise<void> | void;
   usageAccumulator?: RunUsageAccumulator;
+  runSummary?: string | null;
 }): Promise<RunArtifactsOutput> {
   const templateId = roster.templateId;
+  const debateOutcome = parseDebateOutcomeFromRunSummary(runSummary ?? null);
   const transcriptPrompt = buildTranscriptForArtifacts(
     productIdea,
     transcript,
@@ -172,6 +192,7 @@ export async function generateRunArtifacts({
         templateId,
         productIdea,
         usageAccumulator,
+        debateOutcome,
       );
       await onArtifactComplete?.(type, document);
       return [type, document] as const;

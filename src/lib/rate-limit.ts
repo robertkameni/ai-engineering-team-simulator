@@ -142,6 +142,14 @@ export async function assertRateLimit(
     return { ok: true };
   } catch (error) {
     console.error("Rate limit check failed:", error);
+    if (isProduction()) {
+      return {
+        ok: false,
+        status: 503,
+        retryAfterSec: 60,
+        error: "Rate limiting unavailable",
+      };
+    }
     return { ok: true };
   }
 }

@@ -2,12 +2,12 @@
 
 Multi-agent product debate simulator: describe an idea, watch a team debate it with streaming replies, persisted runs, and structured artifacts.
 
-The simulator **auto-detects** whether your idea is a **software product**, a **physical / operational project** (construction, renovation, compliance), or **hybrid**, and adapts role titles, prompts, and artifact labels accordingly. Agents respond in the **same language** as your prompt (French, German, English, etc.).
+The simulator **auto-detects** whether your idea is a **software product**, a **physical / operational project** (construction, renovation, compliance), or **hybrid**, and adapts role titles, prompts, and artifact labels accordingly. Agents respond in the **detected language** of your prompt (English, French, or Chinese — Latin-script prompts default to English to avoid model drift).
 
-**Default software pipeline:** PM → Architect → Backend → Frontend → Reviewer  
-**Physical pipeline (same 5 slots, different roles):** Chef de projet travaux → Ingénieur technique → Expert conformité → Planning & budget → Reviewer
+**Default software pipeline (6 agents):** PM → Architect → Backend → Frontend → **DevOps** → Reviewer  
+**Physical pipeline (same 6 slots, different roles):** Chef de projet travaux → Ingénieur technique → Expert conformité → Planning & budget → **Exploitation & déploiement chantier** → Reviewer
 
-**Stack:** Next.js 16 (App Router), React 19, Tailwind 4, Prisma 7 + Neon, Vercel AI SDK + DeepSeek. Conventions live in [AGENTS.md](./AGENTS.md).
+**Stack:** Next.js 16 (App Router), React 19, Tailwind 4, Prisma 7 + Neon, Vercel AI SDK + DeepSeek, Upstash Redis (rate limits). Conventions live in [AGENTS.md](./AGENTS.md).
 
 ## Production
 
@@ -24,17 +24,25 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+**Optional env** (see [.env.example](./.env.example)): `AUTH_SECRET` (JWT sessions in production), `DIRECT_URL` (Neon migrations), Upstash Redis for rate limits in production.
+
 - **Recommended:** Lighthouse and perf checks on **`npm run build && npm run start`**, not `next dev`.
 
 ## How it works
 
-1. Enter a product or project idea on `/` → `/workspace?prompt=...`
+1. Enter a product or project idea on `/` (animated landing with rotating examples) → `/workspace?prompt=...`
 2. The server classifies the idea (`software` | `physical` | `hybrid`) and assembles the matching team
-3. Five agents debate sequentially (short Slack-style turns, ~80–140 words)
+3. **Six agents** debate sequentially (short Slack-style turns, ~80–140 words)
 4. During debate, agents may call tools (npm package lookup, technical norm search) — live activity pills appear on streaming messages
 5. Artifacts synthesize after the debate (requirements/scope, architecture/technical, implementation/execution, review)
-6. Run persists to Neon; sidebar lists recent history; `/runs/[id]` replays the saved debate
-7. **Export** any run as Markdown from the header (Chrome/Edge: native Save As dialog; other browsers: direct download)
+6. Run persists to Neon with **token usage and estimated cost**; sidebar lists your recent history; `/runs/[id]` replays the saved debate
+7. **Export** as Markdown from the header — **sign in required** (modal for guests; Chrome/Edge: native Save As; other browsers: blob download)
+
+## Sessions & auth
+
+- **Guest mode (default):** a cookie-scoped session owns your runs; sidebar and delete are scoped to that browser session. A **Public session** badge appears in the header.
+- **Sign in / register:** email + password (JWT session cookie). Guest runs are **claimed** to your account on login/register (`POST /api/auth/claim-guest-runs`).
+- **Rate limits** (production, Upstash Redis): simulate and delete are throttled per IP (guests) or per user (signed in). Disabled in local dev unless `RATE_LIMIT_ENABLED_IN_DEV=true`.
 
 **Examples**
 
@@ -69,4 +77,4 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Vercel + Neon env vars, build/migra
 
 ---
 
-*README last updated: 2026-05-24 — tool calling, hybrid routing, export (Save As), orchestration stability.*
+*README last updated: 2026-05-25 — 6-agent pipeline (DevOps), auth + guest sessions, usage/cost pill, rate limiting, landing refresh, language detection.*

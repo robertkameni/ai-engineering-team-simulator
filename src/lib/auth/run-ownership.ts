@@ -2,6 +2,8 @@ import "server-only";
 
 import { getGuestSessionId } from "@/lib/auth/guest-session";
 import { getSessionUser } from "@/lib/auth/session";
+import { canAccessRun } from "@/lib/db/runs";
+import { prisma } from "@/lib/prisma";
 
 export interface RunOwnershipScope {
   userId: string | null;
@@ -27,4 +29,44 @@ export async function getRunOwnershipContextWithGuestSession(): Promise<RunOwner
   ]);
 
   return { userId, guestSessionId };
+}
+
+export type RequireRunAccessResult =
+  | {
+      ok: true;
+      run: {
+        id: string;
+        userId: string | null;
+        guestSessionId: string | null;
+      };
+    }
+  | { ok: false; reason: "not_found" | "forbidden" };
+
+export async function requireRunAccess(
+  runId: string,
+  scope: RunOwnershipScope,
+): Promise<RequireRunAccessResult> {
+  const run = await prisma.run.findUnique({
+    where: { id: runId },
+    select: { id: true, userId: true, guestSessionId: true },
+  });
+
+  if (!run) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  if (!canAccessRun(run, scope)) {
+    return { ok: false, reason: "forbidden" };
+  }
+
+  return { ok: true, run };
+}
+
+export function runAccessDeniedResponse(
+  access: Extract<RequireRunAccessResult, { ok: false }>,
+): Response {
+  if (access.reason === "not_found") {
+    return Response.json({ error: "Run not found" }, { status: 404 });
+  }
+  return Response.json({ error: "Forbidden" }, { status: 403 });
 }

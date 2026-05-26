@@ -1,10 +1,14 @@
 import { z } from "zod";
 
-import { runSimulation } from "@/ai/orchestration/run-simulation";
+import {
+  isSimulationAborted,
+  runSimulation,
+} from "@/ai/orchestration/run-simulation";
 import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
 import { getRunOwnershipContextWithGuestSession } from "@/lib/auth/run-ownership";
 import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { reconcileRunFailure } from "@/lib/db/run-reconcile";
 import { setRunUsageTotals } from "@/lib/db/runs";
 import {
   encodeSimulationEvent,
@@ -42,14 +46,26 @@ export async function POST(request: Request) {
 
   const { prompt } = parsed.data;
   const usageAccumulator = new RunUsageAccumulator();
+  const signal = request.signal;
   let runId: string | undefined;
+  let synthesisStarted = false;
 
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: SimulationStreamEvent) => {
-        controller.enqueue(
-          new TextEncoder().encode(encodeSimulationEvent(event)),
-        );
+        if (signal.aborted) {
+          return;
+        }
+        try {
+          controller.enqueue(
+            new TextEncoder().encode(encodeSimulationEvent(event)),
+          );
+        } catch (error) {
+          console.warn("Simulation stream: failed to enqueue event", {
+            eventType: event.type,
+            error,
+          });
+        }
       };
 
       try {
@@ -57,14 +73,34 @@ export async function POST(request: Request) {
           userId,
           guestSessionId,
           usageAccumulator,
+          abortSignal: signal,
         });
         runId = simulation.runId;
 
+        if (signal.aborted) {
+          await reconcileRunFailure(runId, {
+            debateComplete: true,
+            artifactPhaseStarted: false,
+          });
+          await setRunUsageTotals(runId, usageAccumulator.getTotals());
+          return;
+        }
+
+        synthesisStarted = true;
         const synthesis = await regenerateRunArtifacts(runId, {
           usageAccumulator,
         });
         if (!synthesis.ok) {
           console.error("Artifact synthesis failed:", synthesis);
+        }
+
+        if (signal.aborted) {
+          await reconcileRunFailure(runId, {
+            debateComplete: true,
+            artifactPhaseStarted: synthesisStarted,
+          });
+          await setRunUsageTotals(runId, usageAccumulator.getTotals());
+          return;
         }
 
         await setRunUsageTotals(runId, usageAccumulator.getTotals());
@@ -73,6 +109,20 @@ export async function POST(request: Request) {
         if (runId) {
           await setRunUsageTotals(runId, usageAccumulator.getTotals());
         }
+
+        if (isSimulationAborted(error) || signal.aborted) {
+          if (runId && !isSimulationAborted(error)) {
+            await reconcileRunFailure(runId, {
+              debateComplete: true,
+              artifactPhaseStarted: synthesisStarted,
+            });
+          }
+          if (!signal.aborted) {
+            send({ type: "error", message: "Simulation cancelled" });
+          }
+          return;
+        }
+
         const message =
           error instanceof Error ? error.message : "Simulation failed";
         send({ type: "error", message });

@@ -3,8 +3,11 @@ import {
   buildRunMarkdownFilename,
 } from "@/lib/export/run-markdown";
 import { getRunForWorkspace } from "@/lib/db/runs";
+import {
+  requireRunAccess,
+  runAccessDeniedResponse,
+} from "@/lib/auth/run-ownership";
 import { getSessionUser } from "@/lib/auth/session";
-import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
@@ -22,17 +25,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
   }
 
   const { id } = await params;
-  const ownership = await prisma.run.findUnique({
-    where: { id },
-    select: { id: true, userId: true },
+  const access = await requireRunAccess(id, {
+    userId,
+    guestSessionId: null,
   });
-
-  if (!ownership) {
-    return Response.json({ error: "Run not found" }, { status: 404 });
-  }
-
-  if (ownership.userId !== userId) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
+  if (!access.ok) {
+    return runAccessDeniedResponse(access);
   }
 
   const run = await getRunForWorkspace(id);

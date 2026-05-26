@@ -46,6 +46,7 @@ export function SavedRunWorkspace({
       artifactsStatus={artifactsStatus}
       regenerateRunId={regenerateRunId}
       canRegenerateArtifacts={canRegenerateArtifacts}
+      debateOutcome={run.debateOutcome ?? null}
     >
       <AppShellFrame
         sidebar={
@@ -64,6 +65,7 @@ export function SavedRunWorkspace({
                 agentTitle: message.agentTitle,
               }))}
               teamRoster={teamRoster}
+              debateOutcome={run.debateOutcome ?? null}
             />
           ) : null
         }

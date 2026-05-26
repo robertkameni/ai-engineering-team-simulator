@@ -17,8 +17,10 @@ import {
   normalizeAgentPersistedText,
 } from "@/ai/orchestration/agent-stream-text";
 import {
+  type DebateExitOutcome,
   MAX_SIMULATION_TURNS,
   parseReviewerDecision,
+  resolveUnknownReviewerDecision,
   stripReviewerDecisionTag,
 } from "@/ai/orchestration/reviewer-decision";
 import { getAgentSystemPrompt } from "@/ai/prompts";
@@ -34,28 +36,53 @@ import {
   createRun,
   setRunUsageTotals,
   touchRunActivity,
+  updateRunSummary,
 } from "@/lib/db/runs";
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
 const STREAM_HEARTBEAT_MS = 15_000;
 const AGENT_TURN_FALLBACK = "[Tool Error: Agent failed to respond]";
 
+export class SimulationAbortedError extends Error {
+  override readonly name = "SimulationAbortedError";
+
+  constructor(message = "Simulation cancelled") {
+    super(message);
+  }
+}
+
+export function isSimulationAborted(error: unknown): boolean {
+  if (error instanceof SimulationAbortedError) {
+    return true;
+  }
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function assertNotAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new SimulationAbortedError();
+  }
+}
+
 export interface RunSimulationOptions {
   userId?: string | null;
   guestSessionId?: string | null;
   usageAccumulator?: RunUsageAccumulator;
+  abortSignal?: AbortSignal;
 }
 
 export interface RunSimulationResult {
   runId: string;
   usageAccumulator: RunUsageAccumulator;
+  debateExitOutcome: DebateExitOutcome;
 }
 
 function getTurnMaxOutputTokens(role: SimulationAgentRole): number {
   switch (role) {
     case "pm":
-    case "reviewer":
       return 600;
+    case "reviewer":
+      return 1100;
     case "architect":
       return 650;
     case "frontend":
@@ -85,6 +112,7 @@ export async function runSimulation(
 ): Promise<RunSimulationResult> {
   const usageAccumulator =
     options.usageAccumulator ?? new RunUsageAccumulator();
+  const abortSignal = options.abortSignal;
   const run = await createRun(productIdea, {
     userId: options.userId,
     guestSessionId: options.guestSessionId,
@@ -96,6 +124,8 @@ export async function runSimulation(
   let artifactPhaseStarted = false;
 
   try {
+    assertNotAborted(abortSignal);
+
     const classification = await classifyProjectTeamTemplate(
       productIdea,
       usageAccumulator,
@@ -134,8 +164,11 @@ export async function runSimulation(
     let roleIndex = 0;
     let returnToReviewer = false;
     let nextRole: SimulationAgentRole = SIMULATION_AGENT_ORDER[0];
+    let debateExitOutcome: DebateExitOutcome | null = null;
 
     while (turnCount < MAX_SIMULATION_TURNS) {
+      assertNotAborted(abortSignal);
+
       const role = nextRole;
 
       await touchRunActivity(run.id);
@@ -152,9 +185,13 @@ export async function runSimulation(
           roster,
           templateId: classification.templateId,
           usageAccumulator,
+          abortSignal,
           send: notify,
         });
       } catch (turnError) {
+        if (isSimulationAborted(turnError)) {
+          throw turnError;
+        }
         console.error(`Agent turn failed (${role}):`, turnError);
         fullText = AGENT_TURN_FALLBACK;
         emitFallbackAgentTurn(role, member.name, member.title, fullText, notify);
@@ -187,6 +224,7 @@ export async function runSimulation(
         const parsed = parseReviewerDecision(fullText);
 
         if (parsed.decision === "approve") {
+          debateExitOutcome = "approved";
           break;
         }
 
@@ -196,10 +234,20 @@ export async function runSimulation(
           continue;
         }
 
-        console.warn("Invalid reviewer decision, defaulting to approve", {
+        console.warn("Invalid reviewer decision, routing correction", {
           runId: run.id,
           decision: parsed.decision,
+          rejectRole: parsed.rejectRole,
         });
+
+        const fallback = resolveUnknownReviewerDecision();
+        if (turnCount < MAX_SIMULATION_TURNS) {
+          nextRole = fallback.rejectRole ?? "pm";
+          returnToReviewer = true;
+          continue;
+        }
+
+        debateExitOutcome = "unknown_reject_fallback";
         break;
       }
 
@@ -219,13 +267,24 @@ export async function runSimulation(
       console.warn("Simulation reached MAX_SIMULATION_TURNS", { runId: run.id });
     }
 
+    if (debateExitOutcome === null) {
+      debateExitOutcome = "cap_reached";
+    }
+
+    assertNotAborted(abortSignal);
+
     debateComplete = true;
+
+    await updateRunSummary(
+      run.id,
+      JSON.stringify({ debateOutcome: debateExitOutcome, turnCount }),
+    );
 
     await updateArtifactStatus(run.id, "pending");
     artifactPhaseStarted = true;
 
     notify({ type: "artifacts_start" });
-    return { runId: run.id, usageAccumulator };
+    return { runId: run.id, usageAccumulator, debateExitOutcome };
   } catch (error) {
     await setRunUsageTotals(run.id, usageAccumulator.getTotals());
     await reconcileRunFailure(run.id, {
@@ -257,6 +316,7 @@ async function streamAgentTurn({
   roster,
   templateId,
   usageAccumulator,
+  abortSignal,
   send,
 }: {
   runId: string;
@@ -266,6 +326,7 @@ async function streamAgentTurn({
   roster: TeamRoster;
   templateId: TeamTemplateId;
   usageAccumulator: RunUsageAccumulator;
+  abortSignal?: AbortSignal;
   send: (event: SimulationStreamEvent) => void;
 }): Promise<string> {
   const config = withTurnTokenLimit(role);
@@ -289,10 +350,12 @@ async function streamAgentTurn({
       templateId,
       config,
       usageAccumulator,
+      abortSignal,
       send,
     });
 
     if (!fullText.trim()) {
+      assertNotAborted(abortSignal);
       console.warn(
         `${role}: empty stream, retrying with chat model (no reasoning)`,
       );
@@ -311,6 +374,7 @@ async function streamAgentTurn({
         templateId,
         config: retryConfig,
         usageAccumulator,
+        abortSignal,
         send,
       });
     }
@@ -385,6 +449,7 @@ async function collectAgentStream({
   templateId,
   config,
   usageAccumulator,
+  abortSignal,
   send,
 }: {
   runId: string;
@@ -395,6 +460,7 @@ async function collectAgentStream({
   templateId: TeamTemplateId;
   config: ReturnType<typeof getAgentConfig>;
   usageAccumulator: RunUsageAccumulator;
+  abortSignal?: AbortSignal;
   send: (event: SimulationStreamEvent) => void;
 }): Promise<string> {
   const result = streamText({
@@ -405,6 +471,7 @@ async function collectAgentStream({
     temperature: config.temperature,
     tools: resolveToolsForTurn(role, templateId, productIdea),
     stopWhen: stepCountIs(3),
+    abortSignal,
     providerOptions: {
       deepseek: config.deepseek,
     },
@@ -418,6 +485,8 @@ async function collectAgentStream({
   let lastHeartbeatAt = Date.now();
   try {
     for await (const part of result.fullStream) {
+      assertNotAborted(abortSignal);
+
       if (part.type === "text-delta") {
         fullText += part.text;
         emittedLength = emitVisibleDelta(role, fullText, emittedLength, send);
@@ -459,6 +528,9 @@ async function collectAgentStream({
     await recordStreamUsage(result, config.model, usageAccumulator);
   } catch (error) {
     await recordStreamUsage(result, config.model, usageAccumulator);
+    if (isSimulationAborted(error)) {
+      throw error;
+    }
     if (fullText.trim()) {
       return fullText.trim();
     }

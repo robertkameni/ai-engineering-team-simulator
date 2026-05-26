@@ -144,6 +144,7 @@ export async function regenerateRunArtifacts(
       productIdea: run.userPrompt,
       transcript: mapMessagesToTranscript(simulationMessages),
       roster,
+      runSummary: run.summary,
       usageAccumulator: options.usageAccumulator,
       onArtifactComplete: async (type, document) => {
         await saveSingleArtifact(runId, type, document);

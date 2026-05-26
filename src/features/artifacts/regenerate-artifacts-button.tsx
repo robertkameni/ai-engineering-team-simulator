@@ -1,9 +1,13 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
-import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 
-import { regenerateRunArtifactsAction } from "@/features/artifacts/regenerate-artifacts-action";
+import {
+  regenerateArtifactsInitialState,
+  regenerateRunArtifactsAction,
+  type RegenerateArtifactsActionState,
+} from "@/features/artifacts/regenerate-artifacts-action";
 import { Button } from "@/components/ui/button";
 import { workspaceHeaderRegenerateButtonClass } from "@/features/workspace/workspace-header-button-styles";
 import { cn } from "@/lib/utils";
@@ -19,8 +23,8 @@ function RegenerateSubmit({
   disabled,
   className,
   variant,
-}: Omit<RegenerateArtifactsButtonProps, "runId">) {
-  const { pending } = useFormStatus();
+  pending,
+}: Omit<RegenerateArtifactsButtonProps, "runId"> & { pending: boolean }) {
   const isPlaceholder = variant === "placeholder";
   const loading = pending;
   const tooltip = loading ? "Regenerating artifacts" : "Regenerate artifacts";
@@ -56,20 +60,51 @@ function RegenerateSubmit({
   );
 }
 
+function RegenerateActionFeedback({ state }: { state: RegenerateArtifactsActionState }) {
+  if (state.error) {
+    return (
+      <p
+        role="alert"
+        className="mt-2 text-center text-xs text-destructive @max-sm/artifact-panel:px-4"
+      >
+        {state.error}
+      </p>
+    );
+  }
+  if (state.success) {
+    return (
+      <p className="mt-2 text-center text-xs text-muted-foreground @max-sm/artifact-panel:px-4">
+        Artifacts regenerated.
+      </p>
+    );
+  }
+  return null;
+}
+
 export function RegenerateArtifactsButton({
   runId,
   disabled = false,
   className,
   variant = "header",
 }: RegenerateArtifactsButtonProps) {
+  const [state, formAction, pending] = useActionState(
+    regenerateRunArtifactsAction,
+    regenerateArtifactsInitialState,
+  );
+  const isPlaceholder = variant === "placeholder";
+
   return (
-    <form action={regenerateRunArtifactsAction}>
-      <input type="hidden" name="runId" value={runId} />
-      <RegenerateSubmit
-        disabled={disabled}
-        className={className}
-        variant={variant}
-      />
-    </form>
+    <div className={cn(isPlaceholder ? "flex w-full flex-col items-center" : undefined)}>
+      <form action={formAction}>
+        <input type="hidden" name="runId" value={runId} />
+        <RegenerateSubmit
+          disabled={disabled}
+          className={className}
+          variant={variant}
+          pending={pending}
+        />
+      </form>
+      <RegenerateActionFeedback state={state} />
+    </div>
   );
 }

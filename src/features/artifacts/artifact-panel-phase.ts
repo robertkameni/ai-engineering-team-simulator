@@ -1,7 +1,6 @@
 import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
-import { MAX_SIMULATION_TURNS } from "@/ai/orchestration/reviewer-decision";
 import { ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
-import type { AgentRole } from "@/features/agents/types";
+import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
 import type {
   ArtifactsPanelStatus,
   PartialRunArtifacts,
@@ -11,6 +10,22 @@ export interface DebateProgress {
   completed: number;
   total: number;
   activeRole: AgentRole | null;
+}
+
+export function isUnapprovedDebateOutcome(
+  outcome: DebateExitOutcome | null | undefined,
+): outcome is "cap_reached" | "unknown_reject_fallback" {
+  return outcome === "cap_reached" || outcome === "unknown_reject_fallback";
+}
+
+export function debateOutcomeWarningMessage(outcome: DebateExitOutcome): string {
+  if (outcome === "cap_reached") {
+    return "Debate hit the turn limit without [APPROVE]. Deliverables are provisional.";
+  }
+  if (outcome === "unknown_reject_fallback") {
+    return "Reviewer did not return a valid decision before turns ended. Deliverables are provisional.";
+  }
+  return "";
 }
 
 export function countRunArtifacts(
@@ -34,6 +49,7 @@ export function artifactPanelSubtitle(
   status: ArtifactsPanelStatus,
   debateProgress?: DebateProgress,
   artifactCount?: number,
+  debateOutcome?: DebateExitOutcome | null,
 ): string {
   switch (status) {
     case "pending":
@@ -47,6 +63,9 @@ export function artifactPanelSubtitle(
       }
       return "Phase 2 · synthesizing deliverables";
     case "ready":
+      if (isUnapprovedDebateOutcome(debateOutcome)) {
+        return "Phase 3 · Finished with open risks (unapproved)";
+      }
       return "Phase 3 · ready to review";
     case "unavailable":
       return "Deliverables unavailable";
@@ -63,7 +82,7 @@ export function debateProgressFromMessages(
 
   return {
     completed,
-    total: MAX_SIMULATION_TURNS,
+    total: SIMULATION_AGENT_ORDER.length,
     activeRole: activeAgent,
   };
 }

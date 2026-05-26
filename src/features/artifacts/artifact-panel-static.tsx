@@ -1,10 +1,12 @@
 import { ArtifactSections } from "@/features/artifacts/artifact-sections";
 import { ArtifactPanelPlaceholder } from "@/features/artifacts/artifact-panel-placeholder";
 import { RegenerateArtifactsButton } from "@/features/artifacts/regenerate-artifacts-button";
+import { ArtifactDebateWarningBanner } from "@/features/artifacts/artifact-debate-warning-banner";
 import {
   artifactPanelSubtitle,
   countRunArtifacts,
   debateProgressFromMessages,
+  isUnapprovedDebateOutcome,
   shouldShowArtifactTabs,
 } from "@/features/artifacts/artifact-panel-phase";
 import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skeleton";
@@ -13,7 +15,7 @@ import type {
   ArtifactsPanelStatus,
   PartialRunArtifacts,
 } from "@/features/artifacts/types";
-import type { AgentRole } from "@/features/agents/types";
+import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +26,7 @@ interface ArtifactPanelStaticProps {
   canRegenerateArtifacts?: boolean;
   debateMessages?: { role: AgentRole; isStreaming?: boolean; agentTitle?: string }[];
   teamRoster?: TeamRosterPreview | null;
+  debateOutcome?: DebateExitOutcome | null;
 }
 
 /** Server artifact panel — CSS tabs + native scroll (no Radix). */
@@ -34,12 +37,21 @@ export function ArtifactPanelStatic({
   canRegenerateArtifacts = false,
   debateMessages = [],
   teamRoster = null,
+  debateOutcome = null,
 }: ArtifactPanelStaticProps) {
   const showTabs = shouldShowArtifactTabs(status, artifacts);
   const showRegenerate = canRegenerateArtifacts && regenerateRunId != null;
   const debateProgress = debateProgressFromMessages(debateMessages, null);
   const artifactCount = countRunArtifacts(artifacts);
-  const subtitle = artifactPanelSubtitle(status, debateProgress, artifactCount);
+  const subtitle = artifactPanelSubtitle(
+    status,
+    debateProgress,
+    artifactCount,
+    debateOutcome,
+  );
+  const showDebateWarning =
+    isUnapprovedDebateOutcome(debateOutcome) &&
+    (status === "ready" || status === "generating");
   const artifactTabs = getArtifactTabConfig(teamRoster?.templateId ?? "software");
 
   return (
@@ -61,6 +73,10 @@ export function ArtifactPanelStatic({
           />
         ) : null}
       </header>
+
+      {showDebateWarning ? (
+        <ArtifactDebateWarningBanner debateOutcome={debateOutcome} />
+      ) : null}
 
       {showTabs ? (
         <div className="artifact-static-tabs flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

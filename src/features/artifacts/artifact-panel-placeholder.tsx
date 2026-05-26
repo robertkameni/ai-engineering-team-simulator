@@ -41,7 +41,7 @@ export function ArtifactPanelPlaceholder({
   const copy =
     status === "pending"
       ? debateProgress && debateProgress.completed > 0
-        ? `${debateProgress.completed} of ${debateProgress.total} teammates have spoken. Artifacts generate when the discussion finishes.`
+        ? `Discussion in progress (${debateProgress.completed} turn${debateProgress.completed === 1 ? "" : "s"}). Artifacts generate when the debate finishes.`
         : "The team is assembling. Structured artifacts will generate after the debate."
       : status === "unavailable"
         ? "Artifacts could not be generated for this run. Regenerate from the saved debate or start a new simulation."

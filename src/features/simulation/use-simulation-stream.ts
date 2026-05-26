@@ -4,7 +4,12 @@ import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
 import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
-import type { AgentRole, RunStatus, SimulationMessage } from "@/features/agents/types";
+import type {
+  AgentRole,
+  DebateExitOutcome,
+  RunStatus,
+  SimulationMessage,
+} from "@/features/agents/types";
 import { parseSimulationEvent } from "@/lib/simulation-stream";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 
@@ -19,11 +24,12 @@ type ArtifactsFetchResult =
       ok: true;
       artifacts: PartialRunArtifacts | null;
       status: ArtifactsPanelStatus;
+      debateOutcome: DebateExitOutcome | null;
     }
   | { ok: false; retryable: boolean };
 
 function isRetryableArtifactsHttpStatus(status: number): boolean {
-  return status === 404 || status === 408 || status === 429 || status >= 500;
+  return status === 408 || status === 429 || status >= 500;
 }
 
 async function fetchArtifactsState(id: string): Promise<ArtifactsFetchResult> {
@@ -44,12 +50,14 @@ async function fetchArtifactsState(id: string): Promise<ArtifactsFetchResult> {
   const data = (await response.json()) as {
     artifacts: PartialRunArtifacts | null;
     status: ArtifactsPanelStatus;
+    debateOutcome?: DebateExitOutcome | null;
   };
 
   return {
     ok: true,
     artifacts: data.artifacts,
     status: data.status,
+    debateOutcome: data.debateOutcome ?? null,
   };
 }
 
@@ -70,6 +78,9 @@ export function useSimulationStream() {
   const [artifactsStatus, setArtifactsStatus] =
     useState<ArtifactsPanelStatus>("idle");
   const [teamRoster, setTeamRoster] = useState<TeamRosterPreview | null>(null);
+  const [debateOutcome, setDebateOutcome] = useState<DebateExitOutcome | null>(
+    null,
+  );
   const abortRef = useRef<AbortController | null>(null);
   const activeMessageIdRef = useRef<string | null>(null);
 
@@ -82,6 +93,7 @@ export function useSimulationStream() {
       if (result.ok) {
         setArtifacts(result.artifacts);
         setArtifactsStatus(result.status);
+        setDebateOutcome(result.debateOutcome);
         return;
       }
       if (!result.retryable) {
@@ -110,6 +122,7 @@ export function useSimulationStream() {
 
         setArtifacts(result.artifacts);
         setArtifactsStatus(result.status);
+        setDebateOutcome(result.debateOutcome);
 
         if (result.status === "ready" || result.status === "unavailable") {
           return result.status;
@@ -122,6 +135,7 @@ export function useSimulationStream() {
       if (finalResult.ok) {
         setArtifacts(finalResult.artifacts);
         setArtifactsStatus(finalResult.status);
+        setDebateOutcome(finalResult.debateOutcome);
         return finalResult.status;
       }
 
@@ -145,6 +159,7 @@ export function useSimulationStream() {
       setArtifacts(null);
       setArtifactsStatus("pending");
       setTeamRoster(null);
+      setDebateOutcome(null);
       activeMessageIdRef.current = null;
       let currentRunId: string | null = null;
 
@@ -349,6 +364,7 @@ export function useSimulationStream() {
     setActiveAgent(null);
     setArtifactsStatus("idle");
     setTeamRoster(null);
+    setDebateOutcome(null);
   }, []);
 
   return {
@@ -360,6 +376,7 @@ export function useSimulationStream() {
     artifacts,
     artifactsStatus: panelArtifactsStatus,
     teamRoster,
+    debateOutcome,
     start,
     cancel,
   };

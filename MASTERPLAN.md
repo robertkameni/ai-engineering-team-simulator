@@ -27,7 +27,7 @@ A **multi-agent engineering simulator**: the user describes a product idea; AI t
 
 ### Agent pipeline (per run)
 
-Order (fixed slots): **PM → Architect → Backend → Frontend → Reviewer**
+Order (fixed slots): **PM → Architect → Backend → Frontend → DevOps → Reviewer**
 
 | Role | Model | Thinking | Max output tokens (debate turn) |
 |------|--------|----------|----------------------------------|
@@ -35,13 +35,14 @@ Order (fixed slots): **PM → Architect → Backend → Frontend → Reviewer**
 | Architect | `deepseek-v4-pro` | **Low** (`DEEPSEEK_REASONING_OPTIONS`) | 650 |
 | Backend | `deepseek-v4-pro` | Off | 600 |
 | Frontend | `deepseek-v4-flash` | Off | 500 |
+| DevOps | `deepseek-v4-flash` | Off | 550 |
 | Reviewer | `deepseek-v4-flash` | Off | 600 |
 
 Configured in `src/ai/agents/config.ts` (base caps). **Debate turns** override via `getTurnMaxOutputTokens()` in `run-simulation.ts`. PM, backend, frontend, and reviewer use `DEEPSEEK_CHAT_OPTIONS` (`thinking: disabled`). Architect uses low-effort reasoning for deeper technical turns without long hidden waits.
 
 **Debate style:** Short Slack-like turns (~80–140 words), semantic section headings (no hardcoded English titles), no markdown tables — see `src/ai/prompts/shared.ts`. Full detail lives in post-debate artifacts.
 
-**Language:** Agents and artifacts match the product idea’s language (`LANGUAGE_MATCH_DIRECTIVE` in `build-messages.ts`; localized artifact section titles via `ARTIFACT_LANGUAGE_DIRECTIVE`).
+**Language:** Agents and artifacts match the product idea’s language via heuristic detection (`detect-product-language.ts`: English, French, Chinese; Latin-script defaults to English). Directives in `build-messages.ts` and `ARTIFACT_LANGUAGE_DIRECTIVE` in artifact synthesis.
 
 **Team names:** Randomized per run via `createSimulationRoster(templateId)`; stored as `team-roster` artifact (includes `templateId`) + `Message.agentName`.
 
@@ -96,8 +97,8 @@ Before debate, `classifyProjectTeamTemplate()` picks a template from the prompt 
 | [5](#phase-5--structured-artifacts) | Structured artifacts | **Done** |
 | [6](#phase-6--polish) | Polish & UX (+ SSR/perf paths) | **Done** |
 | [7](#phase-7--deploy) | Deploy to Vercel | **Done** — [Production](https://ai-engineering-team-simulator.vercel.app) |
-| [8](#phase-8--auth-optional) | Auth (optional) | **Not started** |
-| [9](#phase-9--stretch) | Stretch goals | **Not started** |
+| [8](#phase-8--auth-optional) | Auth + run ownership | **Mostly done** — custom JWT auth, guest sessions, scoped sidebar/delete |
+| [9](#phase-9--stretch) | Stretch goals | **Partial** — DevOps agent + usage/cost shipped |
 
 ---
 
@@ -171,10 +172,10 @@ Before debate, `classifyProjectTeamTemplate()` picks a template from the prompt 
 **Demo flow (today):**
 
 1. `/` → enter idea → `/workspace?prompt=...`
-2. Watch 5 agents stream in order (short messages)
+2. Watch 6 agents stream in order (short messages)
 3. Artifact panel shows “Synthesizing…” then four tabs when ready
-4. Land on `/runs/[id]` with persisted thread + artifacts
-5. Sidebar lists recent runs; hover delete (×) to remove
+4. Land on `/runs/[id]` with persisted thread + artifacts + usage pill
+5. Sidebar lists your recent runs (guest session or signed-in user); hover delete (×) to remove
 
 ---
 
@@ -254,17 +255,19 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 - [x] **`team_ready` SSE** — client shows correct role titles and artifact tab labels immediately after classification.
 - [x] **Dynamic UI labels** — debate stepper, typing indicator, and artifact tabs use roster titles (not hardcoded “Backend Developer”).
 
-**Not yet:** full dedicated `hybrid` prompt set (partial: compliance backend routing when physical keywords detected); DevOps agent (Phase 9).
+**Not yet:** full dedicated `hybrid` prompt set (partial: compliance backend routing when physical keywords detected).
+
+**Done (Phase 9):** DevOps agent as 6th pipeline slot *(2026-05-25)*.
 
 ### Phase 6+++ — Tool calling, orchestration stability, export *(shipped 2026-05-24)*
 
 - [x] **Agent tools** — `check_npm_package`, `search_technical_norm`; `fullStream` loop emits `tool_start` / `tool_end` SSE; live UI badges (French labels).
 - [x] **Stream text normalization** — `agent-stream-text.ts`: strip meta-commentary and tool narration, architect preamble buffer, markdown heading fix, separate stream vs persist text.
-- [x] **Debate token tuning** — role-aware `getTurnMaxOutputTokens()` (PM/reviewer/backend 600, architect 650, frontend 500).
+- [x] **Debate token tuning** — role-aware `getTurnMaxOutputTokens()` (PM/reviewer/backend 600, architect 650, frontend 500, devops 550).
 - [x] **Hybrid classification** — keyword pre-detection forces `hybrid`; backend slot routes to physical compliance expert when physical keywords present.
 - [x] **Artifact timing** — `regenerateRunArtifacts()` awaited in `/api/simulate` before `done` SSE (removed fire-and-forget race).
 - [x] **Reviewer fix** — parse `[APPROVE]` / `[REJECT]` from raw stream text before tag stripping.
-- [x] **Export reliability** — `exportRunMarkdown()` with File System Access API + blob fallback; stable SSR (no `Date.now()` in initial `href`); `GET /api/runs/[id]/export` for direct links.
+- [x] **Export reliability** — `exportRunMarkdown()` with File System Access API + blob fallback; stable SSR (no `Date.now()` in initial `href`); `GET /api/runs/[id]/export` for direct links *(export requires sign-in since Phase 8)*.
 
 **Perf note:** Lighthouse and field metrics on `next dev` are **not representative** — always verify with `npm run build && npm start` before judging LCP/TBT.
 
@@ -284,13 +287,25 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 
 ---
 
-## Phase 8 — Auth (optional)
+## Phase 8 — Auth + run ownership
 
-**Goal:** Per-user runs and private history.
+**Goal:** Per-user runs, guest sessions, and scoped history.
 
-- [ ] Auth provider (Clerk / Auth0 / NextAuth — TBD)
-- [ ] `User` model + `Run.userId`
-- [ ] Protect API routes and run pages
+- [x] `User` model + `Run.userId` + `Run.guestSessionId` (Prisma migrations)
+- [x] Custom auth — email/password, `bcryptjs` hashing, JWT session cookie (`jose`) — `src/lib/auth/`, `POST /api/auth/login`, `register`, `logout`
+- [x] Guest session cookie — runs scoped to browser until sign-in
+- [x] Claim guest runs on login/register — `POST /api/auth/claim-guest-runs`
+- [x] Ownership-scoped sidebar + run creation (`createRun` with `userId` / `guestSessionId`)
+- [x] Ownership-checked delete — `deleteRunIfOwned`, `403` on foreign runs
+- [x] Rate limiting — Upstash Redis on `POST /api/simulate` and `DELETE /api/runs/[id]` (`src/lib/rate-limit.ts`)
+- [x] Export gated to signed-in users — client modal for guests; `GET /api/runs/[id]/export` returns `401` without session
+- [x] UI — `AuthStatusBadge`, sign-out, export auth modal, header actions
+
+**Not yet:**
+
+- [ ] Ownership check on `/runs/[id]` page and `GET/POST /api/runs/[id]/artifacts` (run ID is still guessable if shared)
+- [ ] Third-party auth provider (Clerk / Auth0) — custom JWT chosen instead
+- [ ] Admin role surfaced in UI (`UserRole` migration exists; `scripts/create-admin-user.ts` for bootstrap)
 
 ---
 
@@ -298,12 +313,22 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 
 **Goal:** Differentiation and depth.
 
-- [ ] DevOps agent in pipeline
+- [x] **DevOps agent in pipeline** — 6th slot; software + physical prompts (`devops.ts`, `physical/devops-site.ts`); roster backward-compat for 5-agent runs
+- [x] **Cost / token usage display per run** — `RunUsageAccumulator`, `src/ai/pricing.ts`, persisted on `Run`; `RunUsagePill` in workspace header
 - [ ] Dedicated hybrid prompts (physical + software in one debate — partial routing exists today)
 - [ ] User-selectable team size / agents (templates are automatic today)
 - [ ] Share run via public link
-- [ ] Cost / token usage display per run
 - [ ] E2E tests (Playwright) for critical path
+
+### Phase 8+ / 9 — Post-launch increment *(shipped 2026-05-25)*
+
+- [x] **6-agent pipeline** — DevOps between Frontend and Reviewer; updated reviewer reject tags and turn token caps
+- [x] **Usage tracking** — accumulate prompt/completion tokens + estimated USD cost across debate + artifact synthesis; `setRunUsageTotals` before `done` SSE
+- [x] **Language detection** — `detect-product-language.ts` (English / French / Chinese); explicit directives to reduce DeepSeek Chinese drift on Latin prompts
+- [x] **Rate limits** — per-IP (guest) and per-user (auth) on simulate/delete; disabled in dev by default
+- [x] **Landing refresh** — `LandingFloatingAgents`, `LandingHero`, rotating placeholders, staggered example chips; `SiteFooter`
+- [x] **Prisma migrations on Neon** — `DIRECT_URL` / `resolve-migrate-database-url.mjs` for advisory locks; retry logic in `prisma-migrate-deploy-if-url.mjs`
+- [x] **Export UX** — guests prompted to sign in before export; authenticated users export immediately
 
 ---
 
@@ -314,12 +339,16 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 | `/` | — | Landing + prompt |
 | `/workspace` | — | Live simulation (`?prompt=`) or empty workspace |
 | `/runs/[id]` | — | Persisted run (thread + artifacts) |
-| `/api/simulate` | POST | Multi-agent SSE stream |
-| `/api/runs` | GET | Recent runs for sidebar |
-| `/api/runs/[id]` | DELETE | Delete run and related rows |
+| `/api/simulate` | POST | Multi-agent SSE stream (ownership + rate limit) |
+| `/api/runs` | GET | Recent runs for sidebar (scoped to guest session or user) |
+| `/api/runs/[id]` | DELETE | Delete run if owned (403 otherwise) |
 | `/api/runs/[id]/artifacts` | GET | Artifact bundle for a run |
 | `/api/runs/[id]/artifacts` | POST | Regenerate artifacts from saved debate |
-| `/api/runs/[id]/export` | GET | Download run as Markdown (`Content-Disposition: attachment`) |
+| `/api/runs/[id]/export` | GET | Download run as Markdown — **auth required** |
+| `/api/auth/register` | POST | Create account + session |
+| `/api/auth/login` | POST | Sign in + session |
+| `/api/auth/logout` | POST | Clear session |
+| `/api/auth/claim-guest-runs` | POST | Attach guest runs to signed-in user |
 | _(Server Actions)_ | — | `regenerateRunArtifactsAction`, `deleteRunAction` — used on saved-run UI; invalidate via `revalidatePath` |
 
 ---
@@ -330,19 +359,24 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 src/
   app/                    # Routes, API handlers (`runs/[id]` server component for replay)
   ai/
-    agents/               # config, roster, team-templates.ts
+    agents/               # config (6 slots), roster, team-templates.ts
     artifacts/            # generate-run-artifacts, templates (per templateId), transcript
     orchestration/        # run-simulation.ts, classify-project.ts, agent-stream-text.ts
-    prompts/              # software prompts + physical/ subfolder; index routes by templateId
+    prompts/              # software + physical/ (+ devops-site); index routes by templateId
     tools/                # agentTools registry (npm, technical norms)
-    context/              # build-messages.ts (language directive)
+    context/              # build-messages.ts, detect-product-language.ts
+    pricing.ts            # DeepSeek v4 USD estimates per model
   features/
     artifacts/            # ArtifactPanel (+ static), debate stepper, tab labels per template
-    simulation/           # stream hook, tool-activity-label, team-roster-preview, typing indicator
-    workspace/            # AppShell, SavedRunWorkspace, export-run-button, sidebar SSR on workspace page
+    simulation/           # stream hook, tool-activity-label, run-usage-pill, typing indicator
+    workspace/            # AppShell, auth badge, export auth modal, SavedRunWorkspace
+    landing/              # LandingHero, floating agents, example prompts
   lib/
-    db/                   # Prisma helpers (incl. listRecentRunsForSidebar)
+    auth/                 # JWT session, guest cookie, run ownership, claim-guest-runs
+    ai/                   # run-usage accumulator + totals types
+    db/                   # Prisma helpers (ownership-scoped listRecentRuns)
     export/               # run-markdown.ts
+    rate-limit.ts         # Upstash simulate/delete limits
     format-time.ts        # stable SSR message timestamps + relative sidebar labels
 ```
 
@@ -354,7 +388,9 @@ src/
 # .env.local (repo root)
 DEEPSEEK_API_KEY=
 DATABASE_URL=          # Neon pooled URL
-# DIRECT_URL=          # optional, for migrations
+# DIRECT_URL=          # optional, non-pooled URL for migrations (Neon advisory locks)
+AUTH_SECRET=           # required in production (JWT session signing)
+# UPSTASH_REDIS_REST_URL= / UPSTASH_REDIS_REST_TOKEN=  # rate limits in production
 ```
 
 ```bash
@@ -370,7 +406,7 @@ After Prisma schema changes: run `npm run db:generate` and **restart** `npm run 
 ## Suggested implementation order
 
 ```
-Phase 8 (auth, if needed) → Phase 9 (stretch), or iterate on UX/perf post-launch.
+Finish Phase 8 ownership gaps (runs/[id] + artifacts API) → Phase 9 remainder (share links, hybrid prompts, E2E), or iterate on UX/perf post-launch.
 ```
 
 ---
@@ -379,6 +415,9 @@ Phase 8 (auth, if needed) → Phase 9 (stretch), or iterate on UX/perf post-laun
 
 | Date | Change |
 |------|--------|
+| 2026-05-25 | **Auth + ownership:** `User` model, JWT sessions (`jose` + `bcryptjs`), guest sessions, claim-guest-runs, ownership-scoped sidebar/delete/simulate, export auth modal + API 401, `AuthStatusBadge`, sign-out. |
+| 2026-05-25 | **DevOps + usage:** 6th pipeline slot (DevOps); `RunUsageAccumulator` + `pricing.ts`; token/cost fields on `Run`; `RunUsagePill` in header. |
+| 2026-05-25 | **Rate limits + infra:** Upstash Redis on simulate/delete; `DIRECT_URL` migration helper; landing refresh (`LandingHero`, floating agents); `detect-product-language.ts`; `SiteFooter`. |
 | 2026-05-26 | Phase 7: smoke-tested production preview URL end-to-end ([Team Sim production](https://ai-engineering-team-simulator.vercel.app)). |
 | 2026-05-26 | Phase 7 dashboard: Vercel ↔ Neon linked; `DEEPSEEK_API_KEY` and `DATABASE_URL` on preview + production (already in repo: `maxDuration`, `prisma migrate deploy` during build when `DATABASE_URL` set, [DEPLOYMENT.md](./DEPLOYMENT.md)). |
 | 2026-05-24 | **Tool calling + stability:** agent tools (npm + norm lookup), `tool_start`/`tool_end` SSE + UI badges, `agent-stream-text.ts` normalization, role-aware debate tokens, hybrid keyword classification + compliance backend routing, artifact synthesis before `done` SSE, reviewer raw-text decision parse, export via `showSaveFilePicker` + blob fallback + `GET /api/runs/[id]/export`. |
@@ -396,4 +435,4 @@ Phase 8 (auth, if needed) → Phase 9 (stretch), or iterate on UX/perf post-laun
 
 ---
 
-*Last updated: 2026-05-26 (Phase 7 complete incl. production smoke test)*
+*Last updated: 2026-05-25 (Phase 8 mostly done; Phase 9 partial — DevOps + usage/cost)*

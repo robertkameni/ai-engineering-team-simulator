@@ -1,6 +1,6 @@
-# Phase 7 — Deploy to Vercel
+# Deploy to Vercel
 
-This app is a **Next.js 16** App Router project with **long-running** API routes (`/api/simulate`, artifact regeneration). Use this checklist for a first production or preview deploy.
+This app is a **Next.js 16** App Router project with **long-running** API routes (`/api/simulate`, artifact regeneration), **auth sessions**, and **Upstash rate limits**. Use this checklist for a first production or preview deploy.
 
 **Production URL:** [https://ai-engineering-team-simulator.vercel.app](https://ai-engineering-team-simulator.vercel.app)
 
@@ -9,6 +9,8 @@ This app is a **Next.js 16** App Router project with **long-running** API routes
 - GitHub (or GitLab / Bitbucket) repo connected to Vercel.
 - A **Neon** Postgres database (recommended: install the [Neon Vercel integration](https://vercel.com/marketplace/neon); it wires `DATABASE_URL` for Preview and Production).
 - A **DeepSeek** API key for `DEEPSEEK_API_KEY`.
+- An **Upstash Redis** database for rate limiting (Marketplace → Upstash, or create at [upstash.com](https://upstash.com)).
+- A strong **`AUTH_SECRET`** for JWT session signing (e.g. `openssl rand -base64 32`).
 
 ## 2. Environment variables
 
@@ -17,13 +19,21 @@ In the Vercel project → **Settings → Environment Variables**, configure at l
 | Variable | Production | Preview | Notes |
 |----------|------------|---------|--------|
 | `DATABASE_URL` | ✓ | ✓ | Pooled Postgres URL from Neon (integration sets this). |
-| `DEEPSEEK_API_KEY` | ✓ | ✓ | Needed for simulations and artifact generation over the API. |
+| `DEEPSEEK_API_KEY` | ✓ | ✓ | Simulations and artifact generation. |
+| `AUTH_SECRET` | ✓ | ✓ | **Required in production** — JWT session signing (`src/lib/auth/auth-session.ts`). |
+| `UPSTASH_REDIS_REST_URL` | ✓ | ✓ | Rate limiting for `/api/simulate` and delete. |
+| `UPSTASH_REDIS_REST_TOKEN` | ✓ | ✓ | Pair with URL above. |
 
-Optional for some Neon setups:
+Optional:
 
 | Variable | Notes |
 |---------|-------|
-| `DIRECT_URL` | Non-pooled URL if you use Accelerate/split URLs; this repo uses `DATABASE_URL` in `prisma.config.ts`. Align with Neon’s Prisma+Vercel guide. |
+| `DIRECT_URL` | Non-pooled Neon URL for `prisma migrate deploy` (advisory locks). Resolved automatically when set; see `scripts/resolve-migrate-database-url.mjs`. |
+| `RATE_LIMIT_SIMULATE_GUEST` | Default `3` simulations per hour per IP (guest). |
+| `RATE_LIMIT_SIMULATE_AUTH` | Default `30` simulations per hour per signed-in user. |
+| `RATE_LIMIT_DELETE` | Default `30` deletes per hour. |
+| `RATE_LIMIT_DISABLED` | Set `true` to bypass limits (not recommended in production). |
+| `DEEPSEEK_*_USD_PER_M` | Override model pricing for usage/cost estimates — see [.env.example](.env.example). |
 
 Pull locally for parity:
 
@@ -31,14 +41,14 @@ Pull locally for parity:
 npx vercel env pull .env.local
 ```
 
-See [.env.example](.env.example) for a minimal local template.
+See [.env.example](.env.example) for a full local template.
 
 ## 3. Build command
 
 Default **Build Command** is `npm run build`, which runs:
 
 1. `prisma generate`
-2. `prisma migrate deploy` — **only when `DATABASE_URL` is defined** at build time (after loading `.env` / `.env.local` locally, or from Vercel env on the builder)
+2. `prisma migrate deploy` — **only when `DATABASE_URL` is defined** at build time (uses `DIRECT_URL` when set for Neon advisory locks)
 3. `next build`
 
 If `DATABASE_URL` is missing during build (e.g. CI), migrations are skipped with a warning; **Vercel production/preview builds must have `DATABASE_URL`** so migrations apply before the app boots.
@@ -54,29 +64,50 @@ These routes set `maxDuration = 300` (5 minutes):
 
 **Plan limits:** On Vercel, maximum duration depends on your plan (Hobby vs Pro vs Enterprise). If builds or requests time out, shorten the simulation in code or upgrade the plan. See [Vercel function limits](https://vercel.com/docs/functions/limitations).
 
+Six agents + artifact synthesis can approach the 300s ceiling on long debates — monitor function logs.
+
 ## 5. First deploy
 
 1. **Import** the repository in Vercel.
 2. **Add Neon** (Marketplace → Neon) and link the project, or paste `DATABASE_URL` manually for Production and Preview.
-3. Add `DEEPSEEK_API_KEY` for both environments.
-4. Deploy. Watch the build log for `prisma migrate deploy` succeeding.
+3. Add **`DIRECT_URL`** if Neon provides a separate non-pooled connection string (recommended for reliable migrations).
+4. Add `DEEPSEEK_API_KEY`, `AUTH_SECRET`, and Upstash Redis vars for both environments.
+5. Deploy. Watch the build log for `prisma migrate deploy` succeeding.
+
+### Bootstrap admin user (optional)
+
+After the first deploy with a working `DATABASE_URL`:
+
+```bash
+DATABASE_URL=... ADMIN_INITIAL_PASSWORD=... npx tsx scripts/create-admin-user.ts
+```
+
+Creates `admin@ai-team-simulation.dev` if it does not exist. Store the password securely.
 
 ## 6. Smoke test (preview or production)
 
 After deploy:
 
-1. Open `/` — landing loads.
-2. Submit a short prompt from `/workspace?prompt=…` or the landing form — stream completes and redirects to `/runs/[id]`.
-3. Open `/runs/[id]` — thread and artifacts (or generating state) appear.
-4. Sidebar recent runs lists the new run (if applicable to your layout).
+1. Open `/` — landing loads (animated hero + footer).
+2. Submit a short prompt — six agents stream, usage pill appears in header, redirect to `/runs/[id]`.
+3. Open `/runs/[id]` — thread, artifacts, and token/cost badge appear.
+4. Sidebar lists the run under your guest session (or signed-in account).
+5. **Export** — guests are prompted to sign in; register/login, then export succeeds.
+6. **Delete** — remove a run from the sidebar; foreign runs return `403`.
+7. **Rate limit** — repeated simulate calls eventually return `429` (if Upstash is configured).
 
-If streaming fails with 5xx, check Vercel **Functions** logs and confirm `DEEPSEEK_API_KEY` and `DATABASE_URL` are set for the deployment environment you are hitting.
+If streaming fails with 5xx, check Vercel **Functions** logs and confirm `DEEPSEEK_API_KEY`, `DATABASE_URL`, and `AUTH_SECRET` are set for the deployment environment you are hitting.
+
+If simulate returns `503` with a rate-limit message, confirm Upstash env vars are present.
 
 ## 7. Ongoing operations
 
 - **Schema changes:** commit a new Prisma migration under `prisma/migrations/`, then deploy; `migrate deploy` applies pending migrations on the next build.
 - **Do not** commit `.env.local` or real API keys.
+- **Usage costs:** `Run.estimatedCostUsd` uses DeepSeek v4 pricing defaults in `src/ai/pricing.ts`; update env overrides when DeepSeek changes rates.
 
 ---
 
-*See [MASTERPLAN.md](MASTERPLAN.md) Phase 7 for roadmap context.*
+*See [MASTERPLAN.md](MASTERPLAN.md) for roadmap context (Phases 7–9).*
+
+*Last updated: 2026-05-25*

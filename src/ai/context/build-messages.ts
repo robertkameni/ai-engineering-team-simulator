@@ -1,6 +1,6 @@
 import type { ModelMessage } from "ai";
 
-import type { TeamRoster } from "@/ai/agents/roster";
+import { getTeamMember, type TeamRoster } from "@/ai/agents/roster";
 import { buildLanguageMatchDirective } from "@/ai/context/detect-product-language";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { getAgentTurnPrompt } from "@/ai/prompts";
@@ -24,9 +24,10 @@ export function buildAgentMessages(
   ];
 
   for (const entry of transcript) {
+    const teammateTitle = getTeamMember(roster, entry.role).title;
     messages.push({
-      role: "assistant",
-      content: formatTranscriptMessage(entry),
+      role: "user",
+      content: `[MESSAGE FROM TEAMMATE ${entry.agentName} (${teammateTitle})]:\n\n${formatTranscriptMessage(entry)}`,
     });
   }
 

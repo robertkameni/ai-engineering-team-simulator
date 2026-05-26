@@ -18,9 +18,11 @@ import {
   ARTIFACT_TAB_TRIGGER_BASE,
   getArtifactTabConfig,
 } from "@/features/artifacts/artifact-tab-styles";
+import { ArtifactDebateWarningBanner } from "@/features/artifacts/artifact-debate-warning-banner";
 import {
   artifactPanelSubtitle,
   countRunArtifacts,
+  isUnapprovedDebateOutcome,
   shouldShowArtifactTabs,
   type DebateProgress,
 } from "@/features/artifacts/artifact-panel-phase";
@@ -28,7 +30,7 @@ import type {
   ArtifactsPanelStatus,
   PartialRunArtifacts,
 } from "@/features/artifacts/types";
-import type { AgentRole } from "@/features/agents/types";
+import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +44,7 @@ interface ArtifactPanelProps {
   debateMessages?: { role: AgentRole; isStreaming?: boolean; agentTitle?: string }[];
   activeAgent?: AgentRole | null;
   teamRoster?: TeamRosterPreview | null;
+  debateOutcome?: DebateExitOutcome | null;
 }
 
 export function ArtifactPanel({
@@ -54,12 +57,21 @@ export function ArtifactPanel({
   debateMessages,
   activeAgent = null,
   teamRoster = null,
+  debateOutcome = null,
 }: ArtifactPanelProps) {
   const showTabs = shouldShowArtifactTabs(status, artifacts);
   const isSheet = layout === "sheet";
   const showRegenerate = canRegenerateArtifacts && regenerateRunId != null;
   const artifactCount = countRunArtifacts(artifacts);
-  const subtitle = artifactPanelSubtitle(status, debateProgress, artifactCount);
+  const subtitle = artifactPanelSubtitle(
+    status,
+    debateProgress,
+    artifactCount,
+    debateOutcome,
+  );
+  const showDebateWarning =
+    isUnapprovedDebateOutcome(debateOutcome) &&
+    (status === "ready" || status === "generating");
   const artifactTabs = getArtifactTabConfig(teamRoster?.templateId ?? "software");
 
   return (
@@ -98,6 +110,10 @@ export function ArtifactPanel({
           ) : null}
         </div>
       </header>
+
+      {showDebateWarning ? (
+        <ArtifactDebateWarningBanner debateOutcome={debateOutcome} />
+      ) : null}
 
       {showTabs ? (
         <Tabs

@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { ArtifactPanel } from "@/features/artifacts/artifact-panel";
 import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
 import type { DebateProgress } from "@/features/artifacts/artifact-panel-phase";
-import type { AgentRole } from "@/features/agents/types";
+import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 
 interface ArtifactsMobileSheetProps {
@@ -18,6 +18,7 @@ interface ArtifactsMobileSheetProps {
   debateMessages?: { role: AgentRole; isStreaming?: boolean; agentTitle?: string }[];
   activeAgent?: AgentRole | null;
   teamRoster?: TeamRosterPreview | null;
+  debateOutcome?: DebateExitOutcome | null;
 }
 
 export function ArtifactsMobileSheet({
@@ -31,6 +32,7 @@ export function ArtifactsMobileSheet({
   debateMessages,
   activeAgent = null,
   teamRoster = null,
+  debateOutcome = null,
 }: ArtifactsMobileSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -53,6 +55,7 @@ export function ArtifactsMobileSheet({
           debateMessages={debateMessages}
           activeAgent={activeAgent}
           teamRoster={teamRoster}
+          debateOutcome={debateOutcome}
         />
       </SheetContent>
     </Sheet>

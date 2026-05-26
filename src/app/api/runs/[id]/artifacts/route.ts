@@ -1,4 +1,10 @@
 import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
+import { parseDebateOutcomeFromRunSummary } from "@/ai/orchestration/reviewer-decision";
+import {
+  getRunOwnershipContext,
+  requireRunAccess,
+  runAccessDeniedResponse,
+} from "@/lib/auth/run-ownership";
 import { mapDbArtifactsToRunArtifacts } from "@/lib/db/artifacts";
 import {
   deriveArtifactsPanelStatus,
@@ -44,6 +50,12 @@ async function getRunForArtifacts(runId: string) {
 
 export async function GET(_request: Request, { params }: RouteParams) {
   const { id } = await params;
+  const scope = await getRunOwnershipContext();
+  const access = await requireRunAccess(id, scope);
+  if (!access.ok) {
+    return runAccessDeniedResponse(access);
+  }
+
   const run = await getRunForArtifacts(id);
 
   if (!run) {
@@ -60,11 +72,18 @@ export async function GET(_request: Request, { params }: RouteParams) {
   return Response.json({
     artifacts,
     status: panelStatus,
+    debateOutcome: parseDebateOutcomeFromRunSummary(run.summary),
   });
 }
 
 export async function POST(_request: Request, { params }: RouteParams) {
   const { id } = await params;
+  const scope = await getRunOwnershipContext();
+  const access = await requireRunAccess(id, scope);
+  if (!access.ok) {
+    return runAccessDeniedResponse(access);
+  }
+
   const result = await regenerateRunArtifacts(id);
 
   if (!result.ok) {

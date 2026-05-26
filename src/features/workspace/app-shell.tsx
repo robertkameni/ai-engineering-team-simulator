@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { ArtifactPanel } from "@/features/artifacts/artifact-panel";
 import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
 import type { DebateProgress } from "@/features/artifacts/artifact-panel-phase";
-import type { AgentRole } from "@/features/agents/types";
+import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 import { Sidebar } from "@/features/workspace/sidebar";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
@@ -42,6 +42,7 @@ interface AppShellProps {
   debateMessages?: { role: AgentRole; isStreaming?: boolean; agentTitle?: string }[];
   activeAgent?: AgentRole | null;
   teamRoster?: TeamRosterPreview | null;
+  debateOutcome?: DebateExitOutcome | null;
 }
 
 export function AppShell({
@@ -55,6 +56,7 @@ export function AppShell({
   debateMessages,
   activeAgent = null,
   teamRoster = null,
+  debateOutcome = null,
 }: AppShellProps) {
   const pathname = usePathname();
   const isWide = useMinWidth(960);
@@ -94,6 +96,7 @@ export function AppShell({
     debateMessages,
     activeAgent,
     teamRoster,
+    debateOutcome,
   };
 
   return (
