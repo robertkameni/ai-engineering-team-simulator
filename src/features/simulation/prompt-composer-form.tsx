@@ -15,6 +15,8 @@ export interface PromptComposerFormProps {
   disabled?: boolean;
   placeholder?: string;
   defaultValue?: string;
+  value?: string;
+  onChange?: (value: string) => void;
   onSimulate?: (prompt: string) => void | Promise<void>;
   onSubmitted?: () => void;
   showHint?: boolean;
@@ -25,14 +27,24 @@ export function PromptComposerForm({
   disabled = false,
   placeholder = "Describe your product idea…",
   defaultValue = "",
+  value,
+  onChange,
   onSimulate,
   onSubmitted,
   showHint = true,
   idPrefix = "workspace",
 }: PromptComposerFormProps) {
   const router = useRouter();
-  const [value, setValue] = useState(defaultValue);
+  const [internalValue, setInternalValue] = useState(defaultValue);
+  const text = value ?? internalValue;
   const shortcutLabel = useSubmitShortcutLabel();
+
+  function handleTextChange(nextText: string) {
+    onChange?.(nextText);
+    if (value === undefined) {
+      setInternalValue(nextText);
+    }
+  }
 
   const submitPrompt = useCallback(
     async (prompt: string) => {
@@ -66,12 +78,12 @@ export function PromptComposerForm({
         <Textarea
           id={textareaId}
           name="prompt"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
+          value={text}
+          onChange={(e) => handleTextChange(e.target.value)}
           onKeyDown={(event) => {
             if (!isSubmitShortcut(event)) return;
             event.preventDefault();
-            void submitPrompt(value);
+            void submitPrompt(text);
           }}
           disabled={disabled}
           placeholder={placeholder}
@@ -82,7 +94,7 @@ export function PromptComposerForm({
           <Button
             type="submit"
             size="icon"
-            disabled={disabled || !value.trim()}
+            disabled={disabled || !text.trim()}
             className="size-8 rounded-lg transition-transform duration-200 hover:scale-105 active:scale-95"
             aria-label={onSimulate ? "Run simulation" : "Start simulation"}
           >

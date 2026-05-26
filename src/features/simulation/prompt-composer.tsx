@@ -22,6 +22,8 @@ interface PromptComposerProps {
   placeholder?: string;
   className?: string;
   defaultValue?: string;
+  value?: string;
+  onChange?: (value: string) => void;
   onSimulate?: (prompt: string) => void | Promise<void>;
 }
 
@@ -30,6 +32,8 @@ export function PromptComposer({
   placeholder,
   className,
   defaultValue = "",
+  value,
+  onChange,
   onSimulate,
 }: PromptComposerProps) {
   const isDesktop = useMinWidth(720);
@@ -49,6 +53,8 @@ export function PromptComposer({
             disabled={disabled}
             placeholder={placeholder}
             defaultValue={defaultValue}
+            value={value}
+            onChange={onChange}
             onSimulate={onSimulate}
           />
         </div>
@@ -79,6 +85,8 @@ export function PromptComposer({
               disabled={disabled}
               placeholder={placeholder}
               defaultValue={defaultValue}
+              value={value}
+              onChange={onChange}
               onSimulate={onSimulate}
             />
           ) : null}

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { SavedRunWorkspace } from "@/features/workspace/saved-run-workspace";
 import {
-  getRunForWorkspace,
+  getRunForWorkspaceIfOwned,
   listRecentRunsForSidebar,
 } from "@/lib/db/runs";
 import { getTeamRoster } from "@/lib/db/team-roster";
@@ -16,13 +16,16 @@ interface RunPageProps {
   params: Promise<{ id: string }>;
 }
 
-const getCachedRun = cache(getRunForWorkspace);
+const getCachedRunPageView = cache(async (id: string) => {
+  const scope = await getRunOwnershipContext();
+  return getRunForWorkspaceIfOwned(id, scope);
+});
 
 export async function generateMetadata({
   params,
 }: RunPageProps): Promise<Metadata> {
   const { id } = await params;
-  const run = await getCachedRun(id);
+  const run = await getCachedRunPageView(id);
   if (!run) return { title: "Run not found" };
   return { title: run.title };
 }
@@ -31,7 +34,7 @@ export default async function RunPage({ params }: RunPageProps) {
   const { id } = await params;
   const ownership = await getRunOwnershipContext();
   const [run, recentRuns, teamRosterRecord, session] = await Promise.all([
-    getCachedRun(id),
+    getCachedRunPageView(id),
     listRecentRunsForSidebar(ownership, 12),
     getTeamRoster(id),
     getSessionUser(),

@@ -10,8 +10,7 @@ import {
   deriveArtifactsPanelStatus,
   toAppArtifactStatus,
 } from "@/lib/db/artifact-status";
-import { getRunWithMessages } from "@/lib/db/runs";
-import { reconcileStaleRunIfNeeded } from "@/lib/db/run-reconcile";
+import { getRunForArtifactsIfOwned } from "@/lib/db/runs";
 import { toAppRunStatus } from "@/lib/db/run-status";
 
 export const runtime = "nodejs";
@@ -21,45 +20,13 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-async function getRunForArtifacts(runId: string) {
-  const run = await getRunWithMessages(runId);
-  if (!run) return null;
-
-  const reconciled = await reconcileStaleRunIfNeeded({
-    id: run.id,
-    status: run.status,
-    artifactStatus: run.artifactStatus,
-    updatedAt: run.updatedAt,
-    messageCount: run.messages.length,
-  });
-
-  if (!reconciled) {
-    return run;
-  }
-
-  const refreshed = await getRunWithMessages(runId);
-  if (!refreshed) {
-    console.warn("Artifacts lookup: run missing after stale reconcile", {
-      runId,
-    });
-    return run;
-  }
-
-  return refreshed;
-}
-
 export async function GET(_request: Request, { params }: RouteParams) {
   const { id } = await params;
   const scope = await getRunOwnershipContext();
-  const access = await requireRunAccess(id, scope);
-  if (!access.ok) {
-    return runAccessDeniedResponse(access);
-  }
-
-  const run = await getRunForArtifacts(id);
+  const run = await getRunForArtifactsIfOwned(id, scope);
 
   if (!run) {
-    console.warn("Artifacts GET: run not found", { runId: id });
+    console.warn("Artifacts GET: run not found or forbidden", { runId: id });
     return Response.json({ error: "Run not found" }, { status: 404 });
   }
 

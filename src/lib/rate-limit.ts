@@ -3,6 +3,8 @@ import "server-only";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
+import { getGuestSessionId } from "@/lib/auth/guest-session";
+
 export type RateLimitAction = "simulate" | "delete";
 
 export type RateLimitResult =
@@ -48,6 +50,27 @@ function getClientIp(request: Request): string {
   const realIp = request.headers.get("x-real-ip")?.trim();
   if (realIp) return realIp;
   return "unknown";
+}
+
+async function resolveRateLimitIdentifier(
+  request: Request,
+  userId?: string | null,
+): Promise<string> {
+  if (userId) {
+    return `user:${userId}`;
+  }
+
+  const ip = getClientIp(request);
+  if (ip !== "unknown") {
+    return `ip:${ip}`;
+  }
+
+  const guestSessionId = await getGuestSessionId();
+  if (guestSessionId) {
+    return `guest:${guestSessionId}`;
+  }
+
+  return "global:unknown";
 }
 
 let redisClient: Redis | null = null;
@@ -119,8 +142,7 @@ export async function assertRateLimit(
   }
 
   const authenticated = Boolean(userId);
-  const identifier =
-    authenticated && userId ? `user:${userId}` : `ip:${getClientIp(request)}`;
+  const identifier = await resolveRateLimitIdentifier(request, userId);
 
   try {
     const limiter = getLimiter(action, authenticated);

@@ -86,25 +86,6 @@ export function useSimulationStream() {
 
   const panelArtifactsStatus = artifactsStatus;
 
-  const loadArtifacts = useCallback(async (id: string) => {
-    const deadline = Date.now() + POLL_ARTIFACT_MAX_MS;
-    while (Date.now() < deadline) {
-      const result = await fetchArtifactsState(id);
-      if (result.ok) {
-        setArtifacts(result.artifacts);
-        setArtifactsStatus(result.status);
-        setDebateOutcome(result.debateOutcome);
-        return;
-      }
-      if (!result.retryable) {
-        setArtifactsStatus("unavailable");
-        return;
-      }
-      await waitForArtifactPoll();
-    }
-    setArtifactsStatus("unavailable");
-  }, []);
-
   const pollArtifactsUntilSettled = useCallback(
     async (id: string): Promise<ArtifactsPanelStatus> => {
       const deadline = Date.now() + POLL_ARTIFACT_MAX_MS;
@@ -309,7 +290,7 @@ export function useSimulationStream() {
               }
 
               if (currentRunId) {
-                await loadArtifacts(currentRunId);
+                await pollArtifactsUntilSettled(currentRunId);
               } else {
                 setArtifactsStatus("unavailable");
               }
@@ -337,9 +318,10 @@ export function useSimulationStream() {
         if (!streamSettled) {
           setStatus("failed");
           setError("Simulation interrupted before completion");
-          setArtifactsStatus("unavailable");
           if (currentRunId) {
-            await loadArtifacts(currentRunId);
+            await pollArtifactsUntilSettled(currentRunId);
+          } else {
+            setArtifactsStatus("unavailable");
           }
         }
 
@@ -354,7 +336,7 @@ export function useSimulationStream() {
         setError(err instanceof Error ? err.message : "Simulation failed");
       }
     },
-    [loadArtifacts, pollArtifactsUntilSettled, router],
+    [pollArtifactsUntilSettled, router],
   );
 
   const cancel = useCallback(() => {

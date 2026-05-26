@@ -15,6 +15,8 @@ interface PromptComposerMobileSheetProps {
   disabled?: boolean;
   placeholder?: string;
   defaultValue?: string;
+  value?: string;
+  onChange?: (value: string) => void;
   onSimulate?: (prompt: string) => void | Promise<void>;
 }
 
@@ -24,6 +26,8 @@ export function PromptComposerMobileSheet({
   disabled,
   placeholder,
   defaultValue,
+  value,
+  onChange,
   onSimulate,
 }: PromptComposerMobileSheetProps) {
   return (
@@ -42,6 +46,8 @@ export function PromptComposerMobileSheet({
           disabled={disabled}
           placeholder={placeholder}
           defaultValue={defaultValue}
+          value={value}
+          onChange={onChange}
           onSimulate={onSimulate}
           onSubmitted={() => onOpenChange(false)}
           idPrefix="mobile-workspace"

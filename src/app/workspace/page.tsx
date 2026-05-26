@@ -23,8 +23,8 @@ export default async function WorkspacePage({
   if (prompt) {
     return (
       <SimulationWorkspace
+        key={prompt}
         userPrompt={prompt}
-        title={truncateTitle(prompt)}
         initialRecentRuns={recentRuns}
         isAuthenticated={isAuthenticated}
         userEmail={session.email}
@@ -49,9 +49,4 @@ export default async function WorkspacePage({
       }}
     />
   );
-}
-
-function truncateTitle(prompt: string, max = 48) {
-  if (prompt.length <= max) return prompt;
-  return `${prompt.slice(0, max).trim()}…`;
 }

@@ -299,10 +299,19 @@ export function mapDbMessagesToSimulation(
   });
 }
 
-export async function getRunForWorkspace(runId: string) {
-  let run = await getRunWithMessages(runId);
-  if (!run) return null;
+type RunWithMessagesAndArtifacts = NonNullable<
+  Awaited<ReturnType<typeof getRunWithMessages>>
+>;
 
+const runMessagesArtifactsInclude = {
+  messages: { orderBy: { order: "asc" as const } },
+  artifacts: true,
+} satisfies Prisma.RunInclude;
+
+async function refreshRunAfterReconcile(
+  runId: string,
+  run: RunWithMessagesAndArtifacts,
+): Promise<RunWithMessagesAndArtifacts | null> {
   const reconciled = await reconcileStaleRunIfNeeded({
     id: run.id,
     status: run.status,
@@ -310,16 +319,19 @@ export async function getRunForWorkspace(runId: string) {
     updatedAt: run.updatedAt,
     messageCount: run.messages.length,
   });
-  if (reconciled) {
-    run = await getRunWithMessages(runId);
-    if (!run) return null;
+  if (!reconciled) {
+    return run;
   }
+  return getRunWithMessages(runId);
+}
 
+async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
   const rosterFromArtifact = run.artifacts.find(
     (artifact) => artifact.type === "team-roster",
   );
   const roster =
-    parseTeamRoster(rosterFromArtifact?.data) ?? (await getTeamRoster(runId));
+    parseTeamRoster(rosterFromArtifact?.data) ??
+    (await getTeamRoster(run.id));
 
   const title = formatRunTitle(run.userPrompt);
 
@@ -341,4 +353,82 @@ export async function getRunForWorkspace(runId: string) {
     artifactsStatus,
     debateOutcome: parseDebateOutcomeFromRunSummary(run.summary),
   };
+}
+
+export async function getRunForWorkspace(runId: string) {
+  let run = await getRunWithMessages(runId);
+  if (!run) return null;
+
+  run = await refreshRunAfterReconcile(runId, run);
+  if (!run) return null;
+
+  return mapRunToWorkspace(run);
+}
+
+export async function getRunForWorkspaceIfOwned(
+  runId: string,
+  scope: RunOwnershipScope,
+) {
+  let run = await getRunWithMessages(runId);
+  if (!run) return null;
+
+  if (
+    !canAccessRun(
+      { userId: run.userId, guestSessionId: run.guestSessionId },
+      scope,
+    )
+  ) {
+    return null;
+  }
+
+  run = await refreshRunAfterReconcile(runId, run);
+  if (!run) return null;
+
+  return mapRunToWorkspace(run);
+}
+
+export async function getRunForArtifactsIfOwned(
+  runId: string,
+  scope: RunOwnershipScope,
+) {
+  const ownershipWhere = buildRunOwnershipWhere(scope);
+  if (ownershipWhere == null) {
+    return null;
+  }
+
+  const scopedWhere: Prisma.RunWhereInput = {
+    id: runId,
+    ...ownershipWhere,
+  };
+
+  const fetchScoped = () =>
+    prisma.run.findFirst({
+      where: scopedWhere,
+      include: runMessagesArtifactsInclude,
+    });
+
+  const run = await fetchScoped();
+  if (!run) return null;
+
+  const reconciled = await reconcileStaleRunIfNeeded({
+    id: run.id,
+    status: run.status,
+    artifactStatus: run.artifactStatus,
+    updatedAt: run.updatedAt,
+    messageCount: run.messages.length,
+  });
+
+  if (!reconciled) {
+    return run;
+  }
+
+  const refreshed = await fetchScoped();
+  if (!refreshed) {
+    console.warn("Artifacts lookup: run missing after stale reconcile", {
+      runId,
+    });
+    return run;
+  }
+
+  return refreshed;
 }

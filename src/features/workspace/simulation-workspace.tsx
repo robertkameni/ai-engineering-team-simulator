@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { isSimulationAgent } from "@/ai/agents/config";
 import type { MockRun } from "@/features/agents/types";
 import { AppShell } from "@/features/workspace/app-shell";
 import { WorkspaceMain } from "@/features/workspace/workspace-main";
@@ -16,10 +15,10 @@ import { useSimulationStream } from "@/features/simulation/use-simulation-stream
 import { teamMemberPreview } from "@/features/simulation/team-roster-preview";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { useWorkspaceMobile } from "@/features/workspace/workspace-mobile-context";
+import { truncateTitle } from "@/lib/truncate-title";
 
 interface SimulationWorkspaceProps {
   userPrompt: string;
-  title: string;
   initialRecentRuns?: SidebarRunItemData[];
   isAuthenticated?: boolean;
   userEmail?: string | null;
@@ -27,7 +26,6 @@ interface SimulationWorkspaceProps {
 
 export function SimulationWorkspace({
   userPrompt,
-  title,
   initialRecentRuns,
   isAuthenticated = false,
   userEmail = null,
@@ -45,9 +43,24 @@ export function SimulationWorkspace({
     start,
   } = useSimulationStream();
 
+  const [currentPrompt, setCurrentPrompt] = useState(userPrompt);
+  const [prevUserPrompt, setPrevUserPrompt] = useState(userPrompt);
   const mobile = useWorkspaceMobile();
   const artifactsSheetOpenedRef = useRef(false);
   const startedRef = useRef(false);
+
+  if (userPrompt !== prevUserPrompt) {
+    setPrevUserPrompt(userPrompt);
+    setCurrentPrompt(userPrompt);
+  }
+
+  const displayTitle = truncateTitle(currentPrompt);
+
+  useEffect(() => {
+    if (status === "running") {
+      artifactsSheetOpenedRef.current = false;
+    }
+  }, [status]);
 
   useEffect(() => {
     if (artifactsStatus !== "generating" || artifactsSheetOpenedRef.current) {
@@ -69,13 +82,6 @@ export function SimulationWorkspace({
   const showBootstrapping =
     status === "running" && messages.length === 0 && !error;
 
-  const latestMessage = messages.at(-1);
-  const showHandoff =
-    status === "running" &&
-    activeAgent != null &&
-    latestMessage?.isStreaming === true &&
-    latestMessage.content === "";
-
   const debateProgress = useMemo(
     () => debateProgressFromMessages(messages, activeAgent),
     [messages, activeAgent],
@@ -84,8 +90,8 @@ export function SimulationWorkspace({
   const exportRun = useMemo<MockRun>(
     () => ({
       id: runId ?? "live",
-      title,
-      userPrompt,
+      title: displayTitle,
+      userPrompt: currentPrompt,
       status,
       updatedAt: new Date().toISOString(),
       messages,
@@ -95,8 +101,8 @@ export function SimulationWorkspace({
     }),
     [
       runId,
-      title,
-      userPrompt,
+      displayTitle,
+      currentPrompt,
       status,
       messages,
       artifacts,
@@ -105,10 +111,6 @@ export function SimulationWorkspace({
     ],
   );
 
-  const activeMember =
-    activeAgent != null && isSimulationAgent(activeAgent)
-      ? teamMemberPreview(teamRoster, activeAgent)
-      : undefined;
   const bootstrappingMember = teamMemberPreview(teamRoster, "pm");
 
   return (
@@ -123,9 +125,9 @@ export function SimulationWorkspace({
       debateOutcome={debateOutcome}
     >
       <WorkspaceHeader
-        title={title}
+        title={displayTitle}
         status={status}
-        subtitle={userPrompt}
+        subtitle={currentPrompt}
         artifactsStatus={artifactsStatus}
         debateProgress={debateProgress}
         isAuthenticated={isAuthenticated}
@@ -136,7 +138,7 @@ export function SimulationWorkspace({
         {error ? (
           <SimulationErrorBanner
             message={error}
-            onRetry={() => void start(userPrompt)}
+            onRetry={() => void start(currentPrompt.trim())}
           />
         ) : null}
         {showBootstrapping ? (
@@ -147,14 +149,6 @@ export function SimulationWorkspace({
             agentTitle={bootstrappingMember?.title}
           />
         ) : null}
-        {showHandoff && activeAgent ? (
-          <AgentTypingIndicator
-            role={activeAgent}
-            label="Preparing contribution…"
-            agentName={activeMember?.name}
-            agentTitle={activeMember?.title}
-          />
-        ) : null}
         <MessageThread
           messages={messages}
           empty={status === "idle" && messages.length === 0}
@@ -162,9 +156,9 @@ export function SimulationWorkspace({
         />
       </WorkspaceMain>
       <PromptComposer
-        key={userPrompt}
         disabled={status === "running"}
-        defaultValue={userPrompt}
+        value={currentPrompt}
+        onChange={setCurrentPrompt}
         onSimulate={start}
       />
     </AppShell>
