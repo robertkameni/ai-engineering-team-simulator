@@ -1,6 +1,6 @@
 import type { TeamRoster } from "@/ai/agents/roster";
 import { getTeamMember } from "@/ai/agents/roster";
-import { buildDiscussionDepthRules, CONCISE_OUTPUT_HINT } from "@/ai/prompts/shared";
+import { buildDiscussionDepthRules } from "@/ai/prompts/shared";
 
 const NO_SOFTWARE_RULE =
   "Do NOT propose software architecture, apps, APIs, databases, or IT stacks. Focus on physical systems, materials, and site execution.";
@@ -21,8 +21,7 @@ Rules:
 - Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
 - ${NO_SOFTWARE_RULE}
 - No repeating the PM doc. Do not mention that you are an AI.
-${buildDiscussionDepthRules(roster)}
-${CONCISE_OUTPUT_HINT}`;
+${buildDiscussionDepthRules(roster)}`;
 }
 
 export function buildPhysicalTechnicalEngineerTurnPrompt(): string {

@@ -1,6 +1,6 @@
 import type { TeamRoster } from "@/ai/agents/roster";
 import { getTeamMember } from "@/ai/agents/roster";
-import { buildDiscussionDepthRules, CONCISE_OUTPUT_HINT } from "@/ai/prompts/shared";
+import { buildDiscussionDepthRules } from "@/ai/prompts/shared";
 
 export function buildPhysicalDevOpsSystemPrompt(roster: TeamRoster): string {
   const self = getTeamMember(roster, "devops");
@@ -18,8 +18,7 @@ Rules:
 - No software stack proposals unless explicitly required by the product idea.
 - Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
 - Do not mention that you are an AI.
-${buildDiscussionDepthRules(roster)}
-${CONCISE_OUTPUT_HINT}`;
+${buildDiscussionDepthRules(roster)}`;
 }
 
 export function buildPhysicalDevOpsTurnPrompt(): string {

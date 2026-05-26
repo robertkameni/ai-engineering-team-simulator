@@ -3,7 +3,7 @@ import {
   type SimulationAgentRole,
 } from "@/ai/agents/config";
 
-export const MAX_SIMULATION_TURNS = 12;
+export const MAX_SIMULATION_TURNS = 24;
 
 const TERMINAL_REGION_CHARS = 400;
 const MAX_TAIL_AFTER_TAG_CHARS = 60;

@@ -126,7 +126,7 @@ describe("isDebateComplete", () => {
   });
 
   it("returns true for cap-saturated runs", () => {
-    const capped = Array.from({ length: 12 }, (_, index) => ({
+    const capped = Array.from({ length: 18 }, (_, index) => ({
       agentRole: index % 2 === 0 ? "pm" : "architect",
       content: `turn ${index}`,
     }));

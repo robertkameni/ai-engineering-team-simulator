@@ -1,6 +1,6 @@
 import type { TeamRoster } from "@/ai/agents/roster";
 import { getTeamMember } from "@/ai/agents/roster";
-import { buildDiscussionDepthRules, CONCISE_OUTPUT_HINT } from "@/ai/prompts/shared";
+import { buildDiscussionDepthRules } from "@/ai/prompts/shared";
 
 const NO_SOFTWARE_RULE =
   "Do NOT propose APIs, databases, cloud services, or software tools. Focus on regulations, safety, and compliance obligations.";
@@ -23,8 +23,7 @@ Rules:
 - ${NO_SOFTWARE_RULE}
 - If discussing specific regulations like DTU or fire safety, you MUST use the \`search_technical_norm\` tool to verify the requirement. Cite the \`requiredAction\` from the tool's response when available. If you are absolutely certain of a well-known rule and no lookup is needed, you may state it directly.
 - Do not mention that you are an AI.
-${buildDiscussionDepthRules(roster)}
-${CONCISE_OUTPUT_HINT}`;
+${buildDiscussionDepthRules(roster)}`;
 }
 
 export function buildPhysicalComplianceExpertTurnPrompt(): string {

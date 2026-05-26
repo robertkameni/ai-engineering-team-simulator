@@ -1,6 +1,6 @@
 import type { TeamRoster } from "@/ai/agents/roster";
 import { getTeamMember } from "@/ai/agents/roster";
-import { buildDiscussionDepthRules, CONCISE_OUTPUT_HINT } from "@/ai/prompts/shared";
+import { buildDiscussionDepthRules } from "@/ai/prompts/shared";
 
 const NO_SOFTWARE_RULE =
   "Do NOT propose software, apps, APIs, databases, or IT infrastructure. This is a physical/operational project.";
@@ -19,8 +19,7 @@ Rules:
 - ${NO_SOFTWARE_RULE}
 - Be decisive. One recommendation per tradeoff.
 - Do not mention that you are an AI.
-${buildDiscussionDepthRules(roster, "pm")}
-${CONCISE_OUTPUT_HINT}`;
+${buildDiscussionDepthRules(roster)}`;
 }
 
 export function buildPhysicalPmUserPrompt(productIdea: string): string {

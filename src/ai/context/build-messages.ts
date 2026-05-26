@@ -1,13 +1,60 @@
 import type { ModelMessage } from "ai";
 
+import type { SimulationAgentRole } from "@/ai/agents/config";
 import { getTeamMember, type TeamRoster } from "@/ai/agents/roster";
 import { buildLanguageMatchDirective } from "@/ai/context/detect-product-language";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { getAgentTurnPrompt } from "@/ai/prompts";
 import type { AgentRole } from "@/features/agents/types";
 
+export interface DebateTurnContext {
+  correction?: {
+    reviewerName: string;
+    feedback: string;
+    targetRole: SimulationAgentRole;
+  };
+  isReReview?: boolean;
+}
+
 function formatProductIdeaBlock(productIdea: string): string {
   return `## Product idea\n\n${productIdea}\n\n${buildLanguageMatchDirective(productIdea)}`;
+}
+
+export function resolveDebateTurnContext(
+  role: SimulationAgentRole,
+  transcript: TranscriptEntry[],
+  roster: TeamRoster,
+  lastRejectTarget: SimulationAgentRole | null,
+  lastRejectFeedback: string | null,
+): DebateTurnContext {
+  const reviewerName = getTeamMember(roster, "reviewer").name;
+
+  if (
+    role === lastRejectTarget &&
+    lastRejectFeedback &&
+    transcript.length > 0 &&
+    transcript[transcript.length - 1]?.role === "reviewer"
+  ) {
+    return {
+      correction: {
+        reviewerName,
+        feedback: lastRejectFeedback,
+        targetRole: role,
+      },
+    };
+  }
+
+  if (
+    role === "reviewer" &&
+    lastRejectTarget &&
+    lastRejectFeedback &&
+    transcript.length > 0 &&
+    transcript[transcript.length - 1]?.role === lastRejectTarget
+  ) {
+    return { isReReview: true };
+  }
+
+  return {};
 }
 
 export function buildAgentMessages(
@@ -15,6 +62,7 @@ export function buildAgentMessages(
   productIdea: string,
   transcript: TranscriptEntry[],
   roster: TeamRoster,
+  debateContext: DebateTurnContext = {},
 ): ModelMessage[] {
   const messages: ModelMessage[] = [
     {
@@ -31,10 +79,6 @@ export function buildAgentMessages(
     });
   }
 
-  const isCorrection =
-    transcript.length > 0 &&
-    transcript[transcript.length - 1].role === "reviewer";
-
   messages.push({
     role: "user",
     content: getAgentTurnPrompt(
@@ -42,7 +86,7 @@ export function buildAgentMessages(
       productIdea,
       roster,
       roster.templateId,
-      isCorrection,
+      debateContext,
     ),
   });
 

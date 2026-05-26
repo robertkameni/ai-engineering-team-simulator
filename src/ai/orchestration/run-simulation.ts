@@ -9,7 +9,7 @@ import {
 import { createSimulationRoster, getTeamMember } from "@/ai/agents/roster";
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
-import { buildAgentMessages } from "@/ai/context/build-messages";
+import { buildAgentMessages, resolveDebateTurnContext, type DebateTurnContext } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { classifyProjectTeamTemplate, hasPhysicalKeywords } from "@/ai/orchestration/classify-project";
 import {
@@ -77,34 +77,6 @@ export interface RunSimulationResult {
   debateExitOutcome: DebateExitOutcome;
 }
 
-function getTurnMaxOutputTokens(role: SimulationAgentRole): number {
-  switch (role) {
-    case "pm":
-      return 600;
-    case "reviewer":
-      return 1100;
-    case "architect":
-      return 650;
-    case "frontend":
-      return 500;
-    case "backend":
-      return 600;
-    case "devops":
-      return 550;
-    default:
-      return 400;
-  }
-}
-
-function withTurnTokenLimit(
-  role: SimulationAgentRole,
-): ReturnType<typeof getAgentConfig> {
-  return {
-    ...getAgentConfig(role),
-    maxOutputTokens: getTurnMaxOutputTokens(role),
-  };
-}
-
 export async function runSimulation(
   productIdea: string,
   send: (event: SimulationStreamEvent) => void,
@@ -165,6 +137,8 @@ export async function runSimulation(
     let returnToReviewer = false;
     let nextRole: SimulationAgentRole = SIMULATION_AGENT_ORDER[0];
     let debateExitOutcome: DebateExitOutcome | null = null;
+    let lastRejectFeedback: string | null = null;
+    let lastRejectTarget: SimulationAgentRole | null = null;
 
     while (turnCount < MAX_SIMULATION_TURNS) {
       assertNotAborted(abortSignal);
@@ -176,6 +150,14 @@ export async function runSimulation(
       const member = getTeamMember(roster, role);
       let fullText: string;
 
+      const debateContext = resolveDebateTurnContext(
+        role,
+        transcript,
+        roster,
+        lastRejectTarget,
+        lastRejectFeedback,
+      );
+
       try {
         fullText = await streamAgentTurn({
           runId: run.id,
@@ -186,6 +168,7 @@ export async function runSimulation(
           templateId: classification.templateId,
           usageAccumulator,
           abortSignal,
+          debateContext,
           send: notify,
         });
       } catch (turnError) {
@@ -225,10 +208,14 @@ export async function runSimulation(
 
         if (parsed.decision === "approve") {
           debateExitOutcome = "approved";
+          lastRejectFeedback = null;
+          lastRejectTarget = null;
           break;
         }
 
         if (parsed.decision === "reject" && parsed.rejectRole) {
+          lastRejectFeedback = parsed.displayText.trim() || null;
+          lastRejectTarget = parsed.rejectRole;
           nextRole = parsed.rejectRole;
           returnToReviewer = true;
           continue;
@@ -242,6 +229,8 @@ export async function runSimulation(
 
         const fallback = resolveUnknownReviewerDecision();
         if (turnCount < MAX_SIMULATION_TURNS) {
+          lastRejectFeedback = parsed.displayText.trim() || null;
+          lastRejectTarget = fallback.rejectRole ?? "pm";
           nextRole = fallback.rejectRole ?? "pm";
           returnToReviewer = true;
           continue;
@@ -317,6 +306,7 @@ async function streamAgentTurn({
   templateId,
   usageAccumulator,
   abortSignal,
+  debateContext,
   send,
 }: {
   runId: string;
@@ -327,9 +317,10 @@ async function streamAgentTurn({
   templateId: TeamTemplateId;
   usageAccumulator: RunUsageAccumulator;
   abortSignal?: AbortSignal;
+  debateContext?: DebateTurnContext;
   send: (event: SimulationStreamEvent) => void;
 }): Promise<string> {
-  const config = withTurnTokenLimit(role);
+  const config = getAgentConfig(role);
   const member = getTeamMember(roster, role);
 
   send({
@@ -349,6 +340,7 @@ async function streamAgentTurn({
       roster,
       templateId,
       config,
+      debateContext,
       usageAccumulator,
       abortSignal,
       send,
@@ -362,7 +354,7 @@ async function streamAgentTurn({
       const retryConfig = {
         ...config,
         model: "deepseek-v4-flash" as const,
-        maxOutputTokens: Math.max(config.maxOutputTokens * 2, 900),
+        maxOutputTokens: Math.max(config.maxOutputTokens * 1.5, 1500),
         deepseek: DEEPSEEK_CHAT_OPTIONS,
       };
       fullText = await collectAgentStream({
@@ -373,6 +365,7 @@ async function streamAgentTurn({
         roster,
         templateId,
         config: retryConfig,
+        debateContext,
         usageAccumulator,
         abortSignal,
         send,
@@ -448,6 +441,7 @@ async function collectAgentStream({
   roster,
   templateId,
   config,
+  debateContext,
   usageAccumulator,
   abortSignal,
   send,
@@ -459,6 +453,7 @@ async function collectAgentStream({
   roster: TeamRoster;
   templateId: TeamTemplateId;
   config: ReturnType<typeof getAgentConfig>;
+  debateContext?: DebateTurnContext;
   usageAccumulator: RunUsageAccumulator;
   abortSignal?: AbortSignal;
   send: (event: SimulationStreamEvent) => void;
@@ -466,7 +461,13 @@ async function collectAgentStream({
   const result = streamText({
     model: getDeepSeekModel(config.model),
     system: getAgentSystemPrompt(role, roster, templateId, productIdea),
-    messages: buildAgentMessages(role, productIdea, transcript, roster),
+    messages: buildAgentMessages(
+      role,
+      productIdea,
+      transcript,
+      roster,
+      debateContext,
+    ),
     maxOutputTokens: config.maxOutputTokens,
     temperature: config.temperature,
     tools: resolveToolsForTurn(role, templateId, productIdea),

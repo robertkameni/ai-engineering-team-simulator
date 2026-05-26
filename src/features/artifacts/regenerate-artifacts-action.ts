@@ -3,13 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
-
-export type RegenerateArtifactsActionState = {
-  success: boolean;
-  error?: string;
-};
-
-const INITIAL_STATE: RegenerateArtifactsActionState = { success: false };
+import type { RegenerateArtifactsActionState } from "@/features/artifacts/regenerate-artifacts-state";
 
 function mapRegenerateError(
   error: "not_found" | "no_messages" | "run_in_progress" | "generation_failed",
@@ -49,5 +43,3 @@ export async function regenerateRunArtifactsAction(
   revalidatePath(`/runs/${runId}`);
   return { success: true };
 }
-
-export { INITIAL_STATE as regenerateArtifactsInitialState };

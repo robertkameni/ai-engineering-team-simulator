@@ -1,27 +1,35 @@
 import type { TeamRoster } from "@/ai/agents/roster";
 import { getTeamMember } from "@/ai/agents/roster";
-import { buildDiscussionDepthRules, buildImplementationQuoteHint, CONCISE_OUTPUT_HINT } from "@/ai/prompts/shared";
+import { buildDiscussionDepthRules, buildImplementationQuoteHint } from "@/ai/prompts/shared";
 
 export function buildReviewerSystemPrompt(roster: TeamRoster): string {
   const self = getTeamMember(roster, "reviewer");
 
-  return `You are ${self.name}, the technical ${self.title} on an engineering team.
+  return `You are ${self.name}, the Lead Technical ${self.title}. Your job is to safeguard system integrity, flag fatal trade-offs, and enforce engineering excellence.
 
-Stress-test the team's plan in a short review.
+Conduct a rigorous, unsparing technical code and design review of the team's combined plans.
 
 Rules:
-- You MUST cover these topics: review (respond to two specific claims — one line quote plus Agree/Disagree/Refine each), risks (2 bullets in distinct areas: security, delivery, ops, etc.), recommendations (3 actionable bullets).
-- Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
-- Be direct. Do not repeat prior messages. Do not mention that you are an AI.
-- DECISION TAG (mandatory, last line only, not part of the review body):
-  - If there are no major blocking flaws, end your message with a new line containing exactly: [APPROVE]
-  - If a major flaw requires correction, end with a new line containing exactly: [REJECT: role] where role is one of: pm, architect, backend, frontend, devops. Never use [REJECT: reviewer].
-  - The tag must be the final line. Write your full review first, then the tag alone on the last line.
-- CRITICAL: The decision tag ([APPROVE] or [REJECT: role]) at the end of your response is mandatory. If you are reaching your word limit, shorten your recommendations to ensure the tag is printed.
-${buildDiscussionDepthRules(roster, "reviewer")}
-${CONCISE_OUTPUT_HINT}`;
+- ## Review: For at least two prior claims, quote a short excerpt, then provide a 3–5 sentence technical argument labeled **Agree**, **Disagree**, or **Refine** with evidence (performance, security, operability, delivery risk).
+- ## Critical Risks: Surface 2 high-impact technical risks across distinct systemic areas (Security, Delivery, Ops, Infrastructure, or Data Corruption). Detail the exact failure scenario and blast radius.
+- ## Actionable Recommendations: Provide 3 concrete engineering milestones or architectural refactors with acceptance criteria.
+- Translate section titles into the language of the Product Idea. Do not mention you are an AI.
+- MANDATORY DECISION TAG (last line only):
+  - If no structural blocking flaws remain, end with exactly: [APPROVE]
+  - If a major flaw requires immediate architectural correction, end with exactly: [REJECT: role] (where role is: pm, architect, backend, frontend, or devops).
+  - Ensure the tag rests on its own terminal line.
+${buildDiscussionDepthRules(roster)}`;
 }
 
-export function buildReviewerTurnPrompt(roster: TeamRoster): string {
-  return `Write a short review. Quote at least two claims from the previous agents. ${buildImplementationQuoteHint(roster)} Stay under 220 words. End with [APPROVE] or [REJECT: role] on its own last line (role = pm, architect, backend, frontend, or devops).`;
+export function buildReviewerTurnPrompt(
+  roster: TeamRoster,
+  options?: { isReReview?: boolean },
+): string {
+  const base = `Write your engineering review. Quote and analyze at least two technical claims from the team. ${buildImplementationQuoteHint(roster)} Deliver thorough multi-sentence **Agree** / **Disagree** / **Refine** arguments. Conclude with [APPROVE] or [REJECT: role] on the absolute last line.`;
+
+  if (options?.isReReview) {
+    return `${base} This is a re-review. Evaluate whether the rejected agent adequately addressed your prior objections before deciding.`;
+  }
+
+  return base;
 }

@@ -5,9 +5,9 @@ import { useActionState } from "react";
 
 import {
   regenerateArtifactsInitialState,
-  regenerateRunArtifactsAction,
   type RegenerateArtifactsActionState,
-} from "@/features/artifacts/regenerate-artifacts-action";
+} from "@/features/artifacts/regenerate-artifacts-state";
+import { regenerateRunArtifactsAction } from "@/features/artifacts/regenerate-artifacts-action";
 import { Button } from "@/components/ui/button";
 import { workspaceHeaderRegenerateButtonClass } from "@/features/workspace/workspace-header-button-styles";
 import { cn } from "@/lib/utils";

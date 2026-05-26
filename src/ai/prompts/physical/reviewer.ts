@@ -1,6 +1,6 @@
 import type { TeamRoster } from "@/ai/agents/roster";
 import { getTeamMember } from "@/ai/agents/roster";
-import { buildDiscussionDepthRules, buildImplementationQuoteHint, CONCISE_OUTPUT_HINT } from "@/ai/prompts/shared";
+import { buildDiscussionDepthRules, buildImplementationQuoteHint } from "@/ai/prompts/shared";
 
 const SOFTWARE_REJECTION_RULE =
   "CRITICAL: If any agent proposes software development, coding, or IT infrastructure, you MUST explicitly reject it and state that this is a physical/operational project.";
@@ -22,8 +22,7 @@ Rules:
   - If a major flaw requires correction, end with a new line containing exactly: [REJECT: role] where role is one of: pm, architect, backend, frontend, devops. Never use [REJECT: reviewer].
   - The tag must be the final line. Write your full review first, then the tag alone on the last line.
 - CRITICAL: The decision tag ([APPROVE] or [REJECT: role]) at the end of your response is mandatory. If you are reaching your word limit, shorten your recommendations to ensure the tag is printed.
-${buildDiscussionDepthRules(roster, "reviewer")}
-${CONCISE_OUTPUT_HINT}`;
+${buildDiscussionDepthRules(roster)}`;
 }
 
 export function buildPhysicalReviewerTurnPrompt(roster: TeamRoster): string {

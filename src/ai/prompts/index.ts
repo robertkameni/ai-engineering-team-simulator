@@ -1,7 +1,10 @@
+import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
+import type { DebateTurnContext } from "@/ai/context/build-messages";
 import type { AgentRole } from "@/features/agents/types";
 import { hasPhysicalKeywords } from "@/ai/orchestration/classify-project";
+import { truncateFeedbackExcerpt } from "@/ai/prompts/shared";
 
 import {
   buildArchitectSystemPrompt,
@@ -40,8 +43,23 @@ import {
   buildReviewerTurnPrompt,
 } from "@/ai/prompts/reviewer";
 
-const CORRECTION_TURN_SUFFIX =
-  "\n\nCRITICAL: The Reviewer has rejected your previous proposal. You must directly address their criticism, correct the flaws, and provide an updated plan.";
+export function buildCorrectionTurnPrompt(
+  role: SimulationAgentRole,
+  reviewerName: string,
+  feedbackExcerpt: string,
+): string {
+  const excerpt = truncateFeedbackExcerpt(feedbackExcerpt);
+  return `
+
+CRITICAL — ${reviewerName} rejected your previous ${role} proposal. Quote their specific objection below, then address each flagged flaw with concrete revisions to your plan.
+
+Reviewer feedback:
+"""
+${excerpt}
+"""
+
+You must respond point-by-point. Do not ignore their criticism. Re-engage the cross-critique rule: if relevant, reference another teammate's choice you are optimizing or defending.`;
+}
 
 function resolvePromptTemplateId(templateId: TeamTemplateId): "software" | "physical" {
   return templateId === "physical" ? "physical" : "software";
@@ -113,7 +131,7 @@ export function getAgentTurnPrompt(
   productIdea: string,
   roster: TeamRoster,
   templateId: TeamTemplateId = roster.templateId,
-  isCorrection?: boolean,
+  debateContext: DebateTurnContext = {},
 ): string {
   let turnPrompt: string;
 
@@ -163,7 +181,9 @@ export function getAgentTurnPrompt(
         turnPrompt = buildDevOpsTurnPrompt();
         break;
       case "reviewer":
-        turnPrompt = buildReviewerTurnPrompt(roster);
+        turnPrompt = buildReviewerTurnPrompt(roster, {
+          isReReview: debateContext.isReReview,
+        });
         break;
       default:
         throw new Error(`No turn prompt for role: ${role}`);
@@ -171,8 +191,13 @@ export function getAgentTurnPrompt(
   }
   }
 
-  if (isCorrection && role !== "reviewer") {
-    turnPrompt += CORRECTION_TURN_SUFFIX;
+  const correction = debateContext.correction;
+  if (correction && role !== "reviewer" && role === correction.targetRole) {
+    turnPrompt += buildCorrectionTurnPrompt(
+      correction.targetRole,
+      correction.reviewerName,
+      correction.feedback,
+    );
   }
 
   return turnPrompt;
