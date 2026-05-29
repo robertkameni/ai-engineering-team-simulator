@@ -1,6 +1,5 @@
 import type { AgentRole } from "@/features/agents/types";
 
-/** Resolved hex tokens from `globals.css` (no oklch / CSS variables). */
 export const exportTheme = {
   background: "#121218",
   foreground: "#f5f5f7",
@@ -26,7 +25,6 @@ export function agentAccentHex(role: AgentRole): string {
   return exportTheme.agent[role];
 }
 
-/** Print/PDF stylesheet: light paper, agent accents, readable blockquotes. */
 export const EXPORT_PRINT_CSS = `
   @page {
     size: A4;

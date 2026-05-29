@@ -28,7 +28,7 @@ async function fetchPdfBlob(url: string): Promise<Blob> {
       const data = (await response.json()) as { error?: string };
       if (data.error) message = data.error;
     } catch {
-      // ignore
+      /* ignore */
     }
     throw new Error(message);
   }
@@ -43,24 +43,6 @@ async function fetchPdfBlob(url: string): Promise<Blob> {
   return blob;
 }
 
-/**
- * Saved runs.
- *
- * When the native Save picker is available (Chrome/Edge):
- *   1. `openSavePickerForBlob` and `fetchPdfBlob` are started **in parallel**,
- *      both before any `await`, so the Save dialog opens at the same instant
- *      the server starts generating the PDF.
- *   2. `openSavePickerForBlob` is called first (synchronously, before any
- *      await) so it is still within the browser's user-gesture window — the
- *      dialog opens on every click, not just the first.
- *   3. `onFetchStarted` fires immediately (spinner on) so the user sees
- *      feedback while choosing a save location.
- *   4. `Promise.allSettled` waits for both; we only write to disk once we
- *      have both the file handle and the blob.
- *
- * Fallback (Firefox / no File System Access API):
- *   fetch → blob → <a download>.click().
- */
 async function exportSavedRunPdf(
   run: MockRun,
   onFetchStarted?: () => void,
@@ -70,23 +52,20 @@ async function exportSavedRunPdf(
   const filename = buildRunPdfFilename(run.title, exportId);
 
   if (canUseNativeSavePicker()) {
-    // ⚠️  openSavePickerForBlob MUST be called before fetchPdfBlob (no await
-    //     before it) to stay in the user-gesture window every time.
+    // openSavePickerForBlob must come before fetchPdfBlob — no await before it —
+    // so it runs within the browser's user-gesture window on every click.
     const pickerPromise = openSavePickerForBlob(filename, "PDF document", {
       "application/pdf": [".pdf"],
     });
-    // Start the fetch in parallel so the PDF generates while the user
-    // is choosing a save location.
     const fetchPromise = fetchPdfBlob(url);
 
-    onFetchStarted?.(); // spinner ON — both operations are now running
+    onFetchStarted?.();
 
     const [pickerResult, fetchResult] = await Promise.allSettled([
       pickerPromise,
       fetchPromise,
     ]);
 
-    // If the fetch failed, re-throw so performExport shows the error.
     if (fetchResult.status === "rejected") {
       throw fetchResult.reason as Error;
     }
@@ -95,7 +74,6 @@ async function exportSavedRunPdf(
       pickerResult.status === "fulfilled" ? pickerResult.value : null;
 
     if (save === null) {
-      // User cancelled the dialog (AbortError) — silent no-op.
       return;
     }
 
@@ -103,13 +81,11 @@ async function exportSavedRunPdf(
     return;
   }
 
-  // Fallback: no native picker — show spinner before the fetch.
   onFetchStarted?.();
   const blob = await fetchPdfBlob(url);
   downloadExportBlob(blob, filename, "application/pdf");
 }
 
-/** Live (unsaved) runs — must send JSON payload to the server. */
 async function exportLiveRunPdf(
   run: MockRun,
   templateId: TeamTemplateId | undefined,
@@ -130,7 +106,7 @@ async function exportLiveRunPdf(
       const data = (await response.json()) as { error?: string };
       if (data.error) message = data.error;
     } catch {
-      // ignore
+      /* ignore */
     }
     throw new Error(message);
   }

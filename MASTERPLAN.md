@@ -29,14 +29,14 @@ A **multi-agent engineering simulator**: the user describes a product idea; AI t
 
 Order (fixed slots): **PM → Architect → Backend → Frontend → DevOps → Reviewer**
 
-| Role | Model | Thinking | Max output tokens (debate turn) |
-|------|--------|----------|----------------------------------|
-| PM | `deepseek-v4-flash` | Off | 600 |
-| Architect | `deepseek-v4-pro` | **Low** (`DEEPSEEK_REASONING_OPTIONS`) | 650 |
-| Backend | `deepseek-v4-pro` | Off | 600 |
-| Frontend | `deepseek-v4-flash` | Off | 500 |
-| DevOps | `deepseek-v4-flash` | Off | 550 |
-| Reviewer | `deepseek-v4-flash` | Off | 600 |
+| Role | Model | Thinking | Max output tokens (debate turn) | Temperature |
+|------|--------|----------|----------------------------------|-------------|
+| PM | `deepseek-v4-flash` | Off | 1000 | 0.4 |
+| Architect | `deepseek-v4-pro` | **Low** (`DEEPSEEK_REASONING_OPTIONS`) | 1200 | 0.4 |
+| Backend | `deepseek-v4-pro` | Off | 1200 | 0.35 |
+| Frontend | `deepseek-v4-flash` | Off | 1000 | 0.4 |
+| DevOps | `deepseek-v4-flash` | Off | 1000 | 0.4 |
+| Reviewer | `deepseek-v4-flash` | Off | 1400 | 0.35 |
 
 Configured in `src/ai/agents/config.ts` (base caps). **Debate turns** override via `getTurnMaxOutputTokens()` in `run-simulation.ts`. PM, backend, frontend, and reviewer use `DEEPSEEK_CHAT_OPTIONS` (`thinking: disabled`). Architect uses low-effort reasoning for deeper technical turns without long hidden waits.
 
@@ -214,6 +214,7 @@ Before debate, `classifyProjectTeamTemplate()` picks a template from the prompt 
 - [x] **Hydration stability** — `suppressHydrationWarning` on textarea; stable `formatMessageTime()` (`de-DE`, UTC) for SSR/client parity
 - [x] **Parse reviewer quotes** → `QuotedBlock` UI (`parse-message-blocks.ts`)
 - [x] **Export run as Markdown** — header button + `exportRunMarkdown()` (`lib/export/run-markdown.ts`): client-side markdown from run data; Chrome/Edge uses native **Save As** (`showSaveFilePicker`); other browsers fall back to blob download. Optional direct download: `GET /api/runs/[id]/export`
+- [x] **Export run as PDF** — server-side generation (`md-to-pdf` + Puppeteer); saved runs: `GET /api/runs/[id]/export/pdf`; live runs: `POST /api/export/pdf`; styled HTML (agent accent colors, dark-to-light theme); Chrome/Edge native Save picker + `<a download>` fallback; spinner while generating; human-readable debate outcome labels; date formatted without time. Export requires sign-in (modal for guests).
 - [x] **Loading skeletons** — message thread + artifact panel while bootstrapping / generating
 - [x] **Regenerate artifacts** — `POST /api/runs/[id]/artifacts` re-synthesizes from saved debate; UI in artifact panel header + unavailable placeholder
 
@@ -268,6 +269,7 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 - [x] **Artifact timing** — `regenerateRunArtifacts()` awaited in `/api/simulate` before `done` SSE (removed fire-and-forget race).
 - [x] **Reviewer fix** — parse `[APPROVE]` / `[REJECT]` from raw stream text before tag stripping.
 - [x] **Export reliability** — `exportRunMarkdown()` with File System Access API + blob fallback; stable SSR (no `Date.now()` in initial `href`); `GET /api/runs/[id]/export` for direct links *(export requires sign-in since Phase 8)*.
+- [x] **PDF export** — `compileRunPdfFromMarkdown()` (`lib/export/run-pdf.ts`) serializes debate + artifacts to styled HTML → PDF via Puppeteer; queued one-at-a-time to avoid blocking the dev server; client orchestration (`run-pdf-client.ts`) opens native Save dialog and PDF fetch in parallel so the spinner is visible immediately; human-readable `debateOutcomeLabel()` for outcome field; `formatExportDate()` for date-only simulation timestamp.
 
 **Perf note:** Lighthouse and field metrics on `next dev` are **not representative** — always verify with `npm run build && npm start` before judging LCP/TBT.
 
@@ -345,6 +347,8 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 | `/api/runs/[id]/artifacts` | GET | Artifact bundle for a run |
 | `/api/runs/[id]/artifacts` | POST | Regenerate artifacts from saved debate |
 | `/api/runs/[id]/export` | GET | Download run as Markdown — **auth required** |
+| `/api/runs/[id]/export/pdf` | GET | Download saved run as PDF — **auth required** |
+| `/api/export/pdf` | POST | Download live run as PDF — **auth required** |
 | `/api/auth/register` | POST | Create account + session |
 | `/api/auth/login` | POST | Sign in + session |
 | `/api/auth/logout` | POST | Clear session |
@@ -375,7 +379,7 @@ src/
     auth/                 # JWT session, guest cookie, run ownership, claim-guest-runs
     ai/                   # run-usage accumulator + totals types
     db/                   # Prisma helpers (ownership-scoped listRecentRuns)
-    export/               # run-markdown.ts
+    export/               # run-markdown.ts, run-pdf-client.ts, run-pdf.ts (server), build-run-export-document.ts, export-theme.ts, save-export-file.ts, download-export-blob.ts, export-filename.ts
     rate-limit.ts         # Upstash simulate/delete limits
     format-time.ts        # stable SSR message timestamps + relative sidebar labels
 ```
@@ -415,6 +419,7 @@ Finish Phase 8 ownership gaps (runs/[id] + artifacts API) → Phase 9 remainder 
 
 | Date | Change |
 |------|--------|
+| 2026-05-29 | **PDF export:** server-side PDF generation (`md-to-pdf` + Puppeteer); styled HTML with agent accent colors; native Save picker + blob fallback; parallel dialog + fetch for responsive spinner; `debateOutcomeLabel()` for human-readable outcomes; `formatExportDate()` (date-only, UTC); gated to signed-in users. |
 | 2026-05-25 | **Auth + ownership:** `User` model, JWT sessions (`jose` + `bcryptjs`), guest sessions, claim-guest-runs, ownership-scoped sidebar/delete/simulate, export auth modal + API 401, `AuthStatusBadge`, sign-out. |
 | 2026-05-25 | **DevOps + usage:** 6th pipeline slot (DevOps); `RunUsageAccumulator` + `pricing.ts`; token/cost fields on `Run`; `RunUsagePill` in header. |
 | 2026-05-25 | **Rate limits + infra:** Upstash Redis on simulate/delete; `DIRECT_URL` migration helper; landing refresh (`LandingHero`, floating agents); `detect-product-language.ts`; `SiteFooter`. |
@@ -435,4 +440,4 @@ Finish Phase 8 ownership gaps (runs/[id] + artifacts API) → Phase 9 remainder 
 
 ---
 
-*Last updated: 2026-05-25 (Phase 8 mostly done; Phase 9 partial — DevOps + usage/cost)*
+*Last updated: 2026-05-29 (PDF export shipped; Phase 8 mostly done; Phase 9 partial — DevOps + usage/cost)*

@@ -56,7 +56,6 @@ export function ExportRunButton({
       setExportError(null);
       try {
         if (format === "pdf") {
-          // Spinner starts as soon as the dialog opens (fetch runs in parallel).
           await exportRunPdf(targetRun, templateId, () =>
             setExportingFormat("pdf"),
           );

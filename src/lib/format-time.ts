@@ -1,4 +1,3 @@
-/** Stable time label for SSR + client (avoids locale/timezone hydration drift). */
 export function formatMessageTime(date: Date): string {
   return date.toLocaleTimeString("de-DE", {
     hour: "2-digit",
@@ -8,10 +7,9 @@ export function formatMessageTime(date: Date): string {
   });
 }
 
-/** Full date for exports and document headers (date only, no timezone ambiguity). */
 export function formatExportDate(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleDateString("de-DE", {
+  return d.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -19,7 +17,6 @@ export function formatExportDate(date: Date | string): string {
   });
 }
 
-/** Relative label for sidebar (stable enough for SSR + client). */
 export function formatRelativeTime(date: Date): string {
   const diffMs = Date.now() - date.getTime();
   const minutes = Math.floor(diffMs / 60_000);

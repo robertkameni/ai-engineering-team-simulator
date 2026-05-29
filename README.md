@@ -36,7 +36,7 @@ Open [http://localhost:3000](http://localhost:3000).
 4. During debate, agents may call tools (npm package lookup, technical norm search) — live activity pills appear on streaming messages
 5. Artifacts synthesize after the debate (requirements/scope, architecture/technical, implementation/execution, review)
 6. Run persists to Neon with **token usage and estimated cost**; sidebar lists your recent history; `/runs/[id]` replays the saved debate
-7. **Export** as Markdown from the header — **sign in required** (modal for guests; Chrome/Edge: native Save As; other browsers: blob download)
+7. **Export** as **Markdown or PDF** from the header — **sign in required** (modal for guests); Markdown is generated client-side; PDF is generated server-side (Puppeteer) with agent accent colors and debate outcome summary; Chrome/Edge uses the native Save As dialog, other browsers fall back to a blob download
 
 ## Sessions & auth
 
@@ -77,4 +77,4 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Vercel + Neon env vars, build/migra
 
 ---
 
-*README last updated: 2026-05-25 — 6-agent pipeline (DevOps), auth + guest sessions, usage/cost pill, rate limiting, landing refresh, language detection.*
+*README last updated: 2026-05-29 — PDF export (server-side, styled, native Save picker); 6-agent pipeline (DevOps), auth + guest sessions, usage/cost pill, rate limiting, landing refresh, language detection.*

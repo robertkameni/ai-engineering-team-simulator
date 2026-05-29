@@ -17,13 +17,6 @@ function getShowSaveFilePicker(): ShowSaveFilePickerFn {
     .showSaveFilePicker;
 }
 
-/**
- * Open the native Save dialog immediately (must be called before any `await`
- * to stay within the user-gesture window) and return a function that writes
- * the final blob to the chosen location.
- *
- * Returns null if the picker is unavailable or the user cancels.
- */
 export async function openSavePickerForBlob(
   filename: string,
   description: string,
@@ -37,11 +30,8 @@ export async function openSavePickerForBlob(
       suggestedName: filename,
       types: [{ description, accept }],
     });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return null; // user cancelled — treat as no-op
-    }
-    return null; // NotAllowedError (no gesture) or unsupported — fall through
+  } catch {
+    return null;
   }
 
   return async (blob: Blob) => {
@@ -53,7 +43,6 @@ export async function openSavePickerForBlob(
 
 export type SavePickerResult = "saved" | "aborted" | "unavailable";
 
-/** Legacy helper used by Markdown export. */
 export async function saveBlobWithNativePicker(
   blob: Blob,
   filename: string,

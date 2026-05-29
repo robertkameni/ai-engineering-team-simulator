@@ -1,7 +1,3 @@
-/**
- * Start a same-origin file download in the current user-gesture stack (no await before this).
- * Use for server-generated files (e.g. saved-run PDF) so repeat downloads are not blocked.
- */
 export function downloadExportUrl(url: string, filename: string): void {
   const link = document.createElement("a");
   link.href = url;

@@ -9,7 +9,6 @@ export interface CompileRunPdfOptions {
   author?: string;
 }
 
-/** One Puppeteer run at a time — concurrent PDF jobs block the dev server and flood RSC refetches. */
 let pdfCompileChain: Promise<void> = Promise.resolve();
 
 function enqueuePdfCompile<T>(task: () => Promise<T>): Promise<T> {

@@ -35,7 +35,6 @@ export async function exportRunMarkdown(
   const { markdown, filename } = buildRunExportPayload(run, templateId);
   const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
 
-  // Picker must be the first await to stay in the user-gesture window.
   const save = await openSavePickerForBlob(filename, "Markdown document", {
     "text/markdown": [".md"],
   });
