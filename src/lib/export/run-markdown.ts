@@ -6,7 +6,7 @@ import {
   buildRunMarkdownFilename,
 } from "@/lib/export/export-filename";
 import { downloadExportBlob } from "@/lib/export/download-export-blob";
-import { saveBlobWithNativePicker } from "@/lib/export/save-export-file";
+import { openSavePickerForBlob } from "@/lib/export/save-export-file";
 import type { MockRun } from "@/features/agents/types";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 
@@ -33,22 +33,19 @@ export async function exportRunMarkdown(
   templateId?: TeamTemplateId,
 ): Promise<void> {
   const { markdown, filename } = buildRunExportPayload(run, templateId);
+  const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
 
-  const pickerResult = await saveBlobWithNativePicker(
-    new Blob([markdown], { type: "text/markdown;charset=utf-8" }),
-    filename,
-    "Markdown document",
-    { "text/markdown": [".md"] },
-  );
-  if (pickerResult === "saved" || pickerResult === "aborted") {
+  // Picker must be the first await to stay in the user-gesture window.
+  const save = await openSavePickerForBlob(filename, "Markdown document", {
+    "text/markdown": [".md"],
+  });
+
+  if (save !== null) {
+    await save(blob);
     return;
   }
 
-  downloadExportBlob(
-    new Blob([markdown], { type: "text/markdown;charset=utf-8" }),
-    filename,
-    "text/markdown",
-  );
+  downloadExportBlob(blob, filename, "text/markdown");
 }
 
 export function canExportRunFromServer(run: MockRun): boolean {
