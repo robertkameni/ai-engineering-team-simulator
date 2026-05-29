@@ -69,6 +69,16 @@ export async function POST(_request: Request, { params }: RouteParams) {
         { status: 409 },
       );
     }
+    if (result.error === "generation_active") {
+      return Response.json(
+        {
+          error:
+            result.message ??
+            "A generation process is already active for this workspace.",
+        },
+        { status: 409 },
+      );
+    }
     return Response.json(
       { error: result.message ?? "Artifact generation failed" },
       { status: 500 },

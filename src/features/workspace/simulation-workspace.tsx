@@ -47,7 +47,6 @@ export function SimulationWorkspace({
   const [prevUserPrompt, setPrevUserPrompt] = useState(userPrompt);
   const mobile = useWorkspaceMobile();
   const artifactsSheetOpenedRef = useRef(false);
-  const startedRef = useRef(false);
 
   if (userPrompt !== prevUserPrompt) {
     setPrevUserPrompt(userPrompt);
@@ -74,9 +73,9 @@ export function SimulationWorkspace({
   }, [artifactsStatus, mobile]);
 
   useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-    void start(userPrompt);
+    const controller = new AbortController();
+    void start(userPrompt, { signal: controller.signal });
+    return () => controller.abort();
   }, [userPrompt, start]);
 
   const showBootstrapping =
@@ -132,6 +131,7 @@ export function SimulationWorkspace({
         debateProgress={debateProgress}
         isAuthenticated={isAuthenticated}
         userEmail={userEmail}
+        templateId={teamRoster?.templateId}
         run={messages.length > 0 ? exportRun : undefined}
       />
       <WorkspaceMain>

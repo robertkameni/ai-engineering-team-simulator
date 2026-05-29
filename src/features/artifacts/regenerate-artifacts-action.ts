@@ -4,9 +4,18 @@ import { revalidatePath } from "next/cache";
 
 import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
 import type { RegenerateArtifactsActionState } from "@/features/artifacts/regenerate-artifacts-state";
+import {
+  getRunOwnershipContext,
+  requireRunAccess,
+} from "@/lib/auth/run-ownership";
 
 function mapRegenerateError(
-  error: "not_found" | "no_messages" | "run_in_progress" | "generation_failed",
+  error:
+    | "not_found"
+    | "no_messages"
+    | "run_in_progress"
+    | "generation_active"
+    | "generation_failed",
   message?: string,
 ): string {
   switch (error) {
@@ -16,6 +25,11 @@ function mapRegenerateError(
       return "No debate messages to synthesize from.";
     case "run_in_progress":
       return "Run still in progress. Wait for the debate to finish.";
+    case "generation_active":
+      return (
+        message ??
+        "A generation process is already active for this workspace."
+      );
     case "generation_failed":
       return message ?? "Artifact generation failed.";
     default:
@@ -30,6 +44,15 @@ export async function regenerateRunArtifactsAction(
   const runId = formData.get("runId");
   if (typeof runId !== "string" || runId.length === 0) {
     return { success: false, error: "Invalid run." };
+  }
+
+  const scope = await getRunOwnershipContext();
+  const access = await requireRunAccess(runId, scope);
+  if (!access.ok) {
+    return {
+      success: false,
+      error: "Unauthorized access to this workspace.",
+    };
   }
 
   const result = await regenerateRunArtifacts(runId);

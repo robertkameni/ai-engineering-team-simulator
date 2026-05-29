@@ -34,7 +34,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **SSE events:** `run_started`, `team_ready`, `agent_start`, `text-delta`, `tool_start`, `tool_end`, `agent_end`, `artifacts_start`, `done`, `error` — shapes in `src/lib/simulation-stream.ts`. Emit `team_ready` right after classification. Artifact synthesis completes in `/api/simulate` before `done`.
 - **Debate outcome UI:** `Run.summary` JSON (`debateOutcome`) → `MockRun.debateOutcome` via `getRunForWorkspace` and `GET /api/runs/[id]/artifacts`. Unapproved outcomes (`cap_reached`, `unknown_reject_fallback`) show an amber banner and subtitle in the artifact panel.
 - **Ownership:** `createRun()` stores `userId` or `guestSessionId`. Sidebar and delete use `buildRunOwnershipWhere()` / `canAccessRun()`. `/runs/[id]` and artifacts GET/POST do **not** yet enforce ownership (ID-guessable).
-- **Export:** `exportRunMarkdown()` in `src/lib/export/run-markdown.ts` — client-side markdown; **sign-in required** (guests see `ExportAuthModal`); `showSaveFilePicker` on Chrome/Edge; blob fallback elsewhere. `GET /api/runs/[id]/export` returns `401` without session.
+- **Export:** `exportRunMarkdown()` / `exportRunPdf()` — shared `build-run-export-document.ts` (template-aware labels, parsed debate blocks, usage/outcome); MD client-side (`showSaveFilePicker` + blob); PDF via `md-to-pdf` on server (`GET /api/runs/[id]/export/pdf`, `POST /api/export/pdf` for live runs). **Sign-in required** (guests see `ExportAuthModal`). `GET /api/runs/[id]/export` returns markdown with same guards.
 
 ## Conventions
 

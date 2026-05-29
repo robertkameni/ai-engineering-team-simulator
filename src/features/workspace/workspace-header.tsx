@@ -13,6 +13,7 @@ import { SignOutButton } from "@/features/workspace/sign-out-button";
 import { WorkspaceHeaderActions } from "@/features/workspace/workspace-header-actions";
 import { workspaceHeaderHomeButtonClass } from "@/features/workspace/workspace-header-button-styles";
 import { useWorkspaceMobile } from "@/features/workspace/workspace-mobile-context";
+import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { MockRun } from "@/features/agents/types";
 import type { RunStatus } from "@/features/agents/types";
 import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
@@ -28,6 +29,7 @@ interface WorkspaceHeaderProps {
   debateProgress?: DebateProgress;
   isAuthenticated?: boolean;
   userEmail?: string | null;
+  templateId?: TeamTemplateId;
   className?: string;
 }
 
@@ -40,6 +42,7 @@ export function WorkspaceHeader({
   debateProgress,
   isAuthenticated = false,
   userEmail = null,
+  templateId,
   className,
 }: WorkspaceHeaderProps) {
   const mobile = useWorkspaceMobile();
@@ -105,7 +108,11 @@ export function WorkspaceHeader({
           <AuthStatusBadge isAuthenticated={false} />
         )}
         {run ? (
-          <ExportRunButton run={run} isAuthenticated={isAuthenticated} />
+          <ExportRunButton
+            run={run}
+            isAuthenticated={isAuthenticated}
+            templateId={templateId}
+          />
         ) : null}
         {run?.usage ? (
           <RunUsagePill usage={run.usage} compactOnMobile />

@@ -1,8 +1,7 @@
-import {
-  buildRunMarkdown,
-  buildRunMarkdownFilename,
-} from "@/lib/export/run-markdown";
+import { buildRunMarkdown } from "@/lib/export/build-run-export-document";
+import { buildRunMarkdownFilename } from "@/lib/export/export-filename";
 import { getRunForWorkspace } from "@/lib/db/runs";
+import { getTeamRoster } from "@/lib/db/team-roster";
 import {
   requireRunAccess,
   runAccessDeniedResponse,
@@ -38,7 +37,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
     return Response.json({ error: "Run not found" }, { status: 404 });
   }
 
-  const markdown = buildRunMarkdown(run);
+  const roster = await getTeamRoster(id);
+  const markdown = buildRunMarkdown({
+    run,
+    templateId: roster?.templateId,
+  });
   const exportId = Date.now();
   const filename = buildRunMarkdownFilename(run.title, exportId);
 

@@ -12,6 +12,7 @@ import {
   saveSingleArtifact,
 } from "@/lib/db/artifacts";
 import {
+  claimArtifactGeneration,
   toAppArtifactStatus,
   updateArtifactStatus,
 } from "@/lib/db/artifact-status";
@@ -29,6 +30,7 @@ export type RegenerateRunArtifactsError =
   | "not_found"
   | "no_messages"
   | "run_in_progress"
+  | "generation_active"
   | "generation_failed";
 
 export type RegenerateRunArtifactsResult =
@@ -136,8 +138,16 @@ export async function regenerateRunArtifacts(
     (await getTeamRoster(runId)) ??
     buildRosterFromMessages(simulationMessages);
 
+  const claimed = await claimArtifactGeneration(runId);
+  if (!claimed) {
+    return {
+      ok: false,
+      error: "generation_active",
+      message: "A generation process is already active for this workspace.",
+    };
+  }
+
   try {
-    await updateArtifactStatus(runId, "generating");
     await touchRunActivity(runId);
 
     const artifactOutput = await generateRunArtifacts({

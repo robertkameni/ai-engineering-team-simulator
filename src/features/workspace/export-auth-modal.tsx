@@ -11,12 +11,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import type { ExportFormat } from "@/features/workspace/export-format";
+
 type AuthMode = "register" | "login";
 
 interface ExportAuthModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAuthSuccess: () => Promise<void>;
+  exportFormat?: ExportFormat;
 }
 
 async function postAuth(
@@ -54,7 +57,9 @@ export function ExportAuthModal({
   open,
   onOpenChange,
   onAuthSuccess,
+  exportFormat = "markdown",
 }: ExportAuthModalProps) {
+  const formatLabel = exportFormat === "pdf" ? "PDF" : "Markdown";
   const [mode, setMode] = useState<AuthMode>("register");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -93,8 +98,8 @@ export function ExportAuthModal({
           <DialogDescription asChild>
             <div className="space-y-2 text-left text-caption">
               <p>
-                Create a free account to download this simulation as Markdown —
-                debate, artifacts, and usage included.
+                Create a free account to download this simulation as {formatLabel}{" "}
+                — debate, artifacts, and usage included.
               </p>
               <ul className="list-disc space-y-1 pl-4">
                 <li>Running simulations stays free without an account.</li>

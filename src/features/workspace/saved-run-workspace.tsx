@@ -78,6 +78,7 @@ export function SavedRunWorkspace({
           showArtifactsAction={showArtifactPanel}
           isAuthenticated={isAuthenticated}
           userEmail={userEmail}
+          templateId={teamRoster?.templateId}
         />
         <WorkspaceMain>
           <MessageThreadStatic messages={run.messages} />

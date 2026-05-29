@@ -32,11 +32,17 @@ function isRetryableArtifactsHttpStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
-async function fetchArtifactsState(id: string): Promise<ArtifactsFetchResult> {
+async function fetchArtifactsState(
+  id: string,
+  signal?: AbortSignal,
+): Promise<ArtifactsFetchResult> {
   let response: Response;
   try {
-    response = await fetch(`/api/runs/${id}/artifacts`);
-  } catch {
+    response = await fetch(`/api/runs/${id}/artifacts`, { signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return { ok: false, retryable: false };
+    }
     return { ok: false, retryable: true };
   }
 
@@ -61,10 +67,29 @@ async function fetchArtifactsState(id: string): Promise<ArtifactsFetchResult> {
   };
 }
 
-function waitForArtifactPoll(): Promise<void> {
-  return new Promise((resolve) =>
-    globalThis.setTimeout(resolve, POLL_ARTIFACT_INTERVAL_MS),
-  );
+function waitForArtifactPoll(signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = globalThis.setTimeout(resolve, POLL_ARTIFACT_INTERVAL_MS);
+    if (signal) {
+      if (signal.aborted) {
+        globalThis.clearTimeout(timer);
+        reject(new DOMException("Aborted", "AbortError"));
+        return;
+      }
+      signal.addEventListener(
+        "abort",
+        () => {
+          globalThis.clearTimeout(timer);
+          reject(new DOMException("Aborted", "AbortError"));
+        },
+        { once: true },
+      );
+    }
+  });
+}
+
+export interface StartSimulationOptions {
+  signal?: AbortSignal;
 }
 
 export function useSimulationStream() {
@@ -87,32 +112,57 @@ export function useSimulationStream() {
   const panelArtifactsStatus = artifactsStatus;
 
   const pollArtifactsUntilSettled = useCallback(
-    async (id: string): Promise<ArtifactsPanelStatus> => {
+    async (
+      id: string,
+      signal?: AbortSignal,
+    ): Promise<ArtifactsPanelStatus | null> => {
+      const isActive = () => signal == null || !signal.aborted;
+
       const deadline = Date.now() + POLL_ARTIFACT_MAX_MS;
       while (Date.now() < deadline) {
-        const result = await fetchArtifactsState(id);
+        if (!isActive()) return null;
+
+        const result = await fetchArtifactsState(id, signal);
+
+        if (!isActive()) return null;
 
         if (!result.ok) {
           if (result.retryable) {
-            await waitForArtifactPoll();
+            try {
+              await waitForArtifactPoll(signal);
+            } catch {
+              return null;
+            }
             continue;
           }
-          setArtifactsStatus("unavailable");
+          if (isActive()) {
+            setArtifactsStatus("unavailable");
+          }
           return "unavailable";
         }
 
-        setArtifacts(result.artifacts);
-        setArtifactsStatus(result.status);
-        setDebateOutcome(result.debateOutcome);
+        if (isActive()) {
+          setArtifacts(result.artifacts);
+          setArtifactsStatus(result.status);
+          setDebateOutcome(result.debateOutcome);
+        }
 
         if (result.status === "ready" || result.status === "unavailable") {
           return result.status;
         }
 
-        await waitForArtifactPoll();
+        try {
+          await waitForArtifactPoll(signal);
+        } catch {
+          return null;
+        }
       }
 
-      const finalResult = await fetchArtifactsState(id);
+      if (!isActive()) return null;
+
+      const finalResult = await fetchArtifactsState(id, signal);
+      if (!isActive()) return null;
+
       if (finalResult.ok) {
         setArtifacts(finalResult.artifacts);
         setArtifactsStatus(finalResult.status);
@@ -127,20 +177,32 @@ export function useSimulationStream() {
   );
 
   const start = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, options: StartSimulationOptions = {}) => {
       abortRef.current?.abort();
-      const abortController = new AbortController();
-      abortRef.current = abortController;
 
-      setStatus("running");
-      setError(null);
-      setMessages([]);
-      setRunId(null);
-      setActiveAgent(null);
-      setArtifacts(null);
-      setArtifactsStatus("pending");
-      setTeamRoster(null);
-      setDebateOutcome(null);
+      const ownsController = options.signal == null;
+      const abortController = ownsController ? new AbortController() : null;
+      const signal = options.signal ?? abortController!.signal;
+
+      if (abortController) {
+        abortRef.current = abortController;
+      } else {
+        abortRef.current = null;
+      }
+
+      const isActive = () => !signal.aborted;
+
+      if (isActive()) {
+        setStatus("running");
+        setError(null);
+        setMessages([]);
+        setRunId(null);
+        setActiveAgent(null);
+        setArtifacts(null);
+        setArtifactsStatus("pending");
+        setTeamRoster(null);
+        setDebateOutcome(null);
+      }
       activeMessageIdRef.current = null;
       let currentRunId: string | null = null;
 
@@ -149,8 +211,10 @@ export function useSimulationStream() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt }),
-          signal: abortController.signal,
+          signal,
         });
+
+        if (!isActive()) return;
 
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as {
@@ -175,151 +239,183 @@ export function useSimulationStream() {
         let buffer = "";
         let streamSettled = false;
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        try {
+          while (true) {
+            if (!isActive()) {
+              await reader.cancel();
+              return;
+            }
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
+            const { done, value } = await reader.read();
 
-          for (const line of lines) {
-            const event = parseSimulationEvent(line);
-            if (!event) continue;
+            if (!isActive()) {
+              await reader.cancel();
+              return;
+            }
 
-            if (event.type === "run_started") {
-              currentRunId = event.runId;
-              setRunId(event.runId);
-              setArtifactsStatus("pending");
-            } else if (event.type === "team_ready") {
-              setTeamRoster({
-                templateId: event.templateId,
-                members: event.members,
-              });
-            } else if (event.type === "agent_start") {
-              setActiveAgent(event.role);
-              const id = crypto.randomUUID();
-              activeMessageIdRef.current = id;
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id,
-                  role: event.role,
-                  agentName: event.name,
-                  agentTitle: event.title,
-                  content: "",
-                  isStreaming: true,
-                  activeTools: [],
-                  createdAt: formatMessageTime(new Date()),
-                },
-              ]);
-            } else if (event.type === "tool_start") {
-              const activeId = activeMessageIdRef.current;
-              if (!activeId) continue;
+            if (done) break;
 
-              setMessages((prev) =>
-                prev.map((message) =>
-                  message.id === activeId
-                    ? {
-                        ...message,
-                        activeTools: [
-                          ...(message.activeTools ?? []),
-                          { name: event.toolName, args: event.args },
-                        ],
-                      }
-                    : message,
-                ),
-              );
-            } else if (event.type === "tool_end") {
-              const activeId = activeMessageIdRef.current;
-              if (!activeId) continue;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() ?? "";
 
-              setMessages((prev) =>
-                prev.map((message) => {
-                  if (message.id !== activeId) return message;
-                  const tools = [...(message.activeTools ?? [])];
-                  const index = tools.findIndex((tool) => tool.name === event.toolName);
-                  if (index !== -1) tools.splice(index, 1);
-                  return { ...message, activeTools: tools };
-                }),
-              );
-            } else if (event.type === "text-delta") {
-              const activeId = activeMessageIdRef.current;
-              
-              if (!activeId) continue;
-              
-              setMessages((prev) =>
-                prev.map((message) =>
-                  message.id === activeId
-                    ? { ...message, content: message.content + event.delta }
-                    : message,
-                ),
-              );
-            } else if (event.type === "agent_end") {
-              const activeId = activeMessageIdRef.current;
-              
-              if (activeId) {
-                setMessages((prev) =>
-                  prev.map((message) =>
-                    message.id === activeId
-                      ? { ...message, isStreaming: false, activeTools: [] }
-                      : message,
-                  ),
-                );
+            for (const line of lines) {
+              if (!isActive()) {
+                await reader.cancel();
+                return;
               }
-              activeMessageIdRef.current = null;
-              setActiveAgent(null);
-            } else if (event.type === "artifacts_start") {
-              setArtifactsStatus("generating");
-            } else if (event.type === "error") {
-              streamSettled = true;
-              setError(event.message);
-              setStatus("failed");
-              setActiveAgent(null);
 
-              const activeId = activeMessageIdRef.current;
-              if (activeId) {
+              const event = parseSimulationEvent(line);
+              if (!event) continue;
+
+              if (event.type === "run_started") {
+                currentRunId = event.runId;
+                setRunId(event.runId);
+                setArtifactsStatus("pending");
+              } else if (event.type === "team_ready") {
+                setTeamRoster({
+                  templateId: event.templateId,
+                  members: event.members,
+                });
+              } else if (event.type === "agent_start") {
+                setActiveAgent(event.role);
+                const id = crypto.randomUUID();
+                activeMessageIdRef.current = id;
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id,
+                    role: event.role,
+                    agentName: event.name,
+                    agentTitle: event.title,
+                    content: "",
+                    isStreaming: true,
+                    activeTools: [],
+                    createdAt: formatMessageTime(new Date()),
+                  },
+                ]);
+              } else if (event.type === "tool_start") {
+                const activeId = activeMessageIdRef.current;
+                if (!activeId) continue;
+
                 setMessages((prev) =>
                   prev.map((message) =>
                     message.id === activeId
-                      ? { ...message, isStreaming: false, activeTools: [] }
+                      ? {
+                          ...message,
+                          activeTools: [
+                            ...(message.activeTools ?? []),
+                            { name: event.toolName, args: event.args },
+                          ],
+                        }
                       : message,
                   ),
                 );
+              } else if (event.type === "tool_end") {
+                const activeId = activeMessageIdRef.current;
+                if (!activeId) continue;
+
+                setMessages((prev) =>
+                  prev.map((message) => {
+                    if (message.id !== activeId) return message;
+                    const tools = [...(message.activeTools ?? [])];
+                    const index = tools.findIndex(
+                      (tool) => tool.name === event.toolName,
+                    );
+                    if (index !== -1) tools.splice(index, 1);
+                    return { ...message, activeTools: tools };
+                  }),
+                );
+              } else if (event.type === "text-delta") {
+                const activeId = activeMessageIdRef.current;
+
+                if (!activeId) continue;
+
+                setMessages((prev) =>
+                  prev.map((message) =>
+                    message.id === activeId
+                      ? { ...message, content: message.content + event.delta }
+                      : message,
+                  ),
+                );
+              } else if (event.type === "agent_end") {
+                const activeId = activeMessageIdRef.current;
+
+                if (activeId) {
+                  setMessages((prev) =>
+                    prev.map((message) =>
+                      message.id === activeId
+                        ? { ...message, isStreaming: false, activeTools: [] }
+                        : message,
+                    ),
+                  );
+                }
                 activeMessageIdRef.current = null;
-              }
+                setActiveAgent(null);
+              } else if (event.type === "artifacts_start") {
+                setArtifactsStatus("generating");
+              } else if (event.type === "error") {
+                streamSettled = true;
+                setError(event.message);
+                setStatus("failed");
+                setActiveAgent(null);
 
-              if (currentRunId) {
-                await pollArtifactsUntilSettled(currentRunId);
-              } else {
-                setArtifactsStatus("unavailable");
-              }
-            } else if (event.type === "done") {
-              streamSettled = true;
-              setRunId(event.runId);
-              currentRunId = event.runId;
+                const activeId = activeMessageIdRef.current;
+                if (activeId) {
+                  setMessages((prev) =>
+                    prev.map((message) =>
+                      message.id === activeId
+                        ? { ...message, isStreaming: false, activeTools: [] }
+                        : message,
+                    ),
+                  );
+                  activeMessageIdRef.current = null;
+                }
 
-              const finalPanel = await pollArtifactsUntilSettled(event.runId);
-              
-              if (finalPanel === "unavailable") {
-                setStatus("complete");
-                setError((prev) => prev ?? "Artifact synthesis failed");
-              } else {
-                setStatus((current) =>
-                  current === "failed" ? current : "complete",
+                if (currentRunId) {
+                  await pollArtifactsUntilSettled(currentRunId, signal);
+                } else if (isActive()) {
+                  setArtifactsStatus("unavailable");
+                }
+              } else if (event.type === "done") {
+                streamSettled = true;
+
+                if (!isActive()) return;
+
+                setRunId(event.runId);
+                currentRunId = event.runId;
+
+                const finalPanel = await pollArtifactsUntilSettled(
+                  event.runId,
+                  signal,
                 );
-              }
 
-              router.replace(`/runs/${event.runId}`);
+                if (!isActive()) return;
+
+                if (finalPanel === "unavailable") {
+                  setStatus("complete");
+                  setError((prev) => prev ?? "Artifact synthesis failed");
+                } else if (finalPanel != null) {
+                  setStatus((current) =>
+                    current === "failed" ? current : "complete",
+                  );
+                }
+
+                router.replace(`/runs/${event.runId}`);
+              }
             }
           }
+        } finally {
+          reader.releaseLock();
         }
+
+        if (!isActive()) return;
 
         if (!streamSettled) {
           setStatus("failed");
           setError("Simulation interrupted before completion");
           if (currentRunId) {
-            await pollArtifactsUntilSettled(currentRunId);
+            await pollArtifactsUntilSettled(currentRunId, signal);
           } else {
             setArtifactsStatus("unavailable");
           }
@@ -330,6 +426,8 @@ export function useSimulationStream() {
         if (err instanceof DOMException && err.name === "AbortError") {
           return;
         }
+        if (!isActive()) return;
+
         setStatus("failed");
         setActiveAgent(null);
         setArtifactsStatus("unavailable");

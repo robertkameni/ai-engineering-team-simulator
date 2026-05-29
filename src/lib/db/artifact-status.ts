@@ -71,3 +71,16 @@ export async function updateArtifactStatus(
     data: { artifactStatus: toPrismaArtifactStatus(status) },
   });
 }
+
+/** Atomically transition to GENERATING; returns false if already generating. */
+export async function claimArtifactGeneration(runId: string): Promise<boolean> {
+  const result = await prisma.run.updateMany({
+    where: {
+      id: runId,
+      artifactStatus: { not: "GENERATING" },
+    },
+    data: { artifactStatus: "GENERATING" },
+  });
+
+  return result.count === 1;
+}
