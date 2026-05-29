@@ -6,11 +6,7 @@ import { buildRunPdfFilename } from "@/lib/export/export-filename";
 import { compileRunPdfFromMarkdown } from "@/lib/export/run-pdf";
 import { getRunForWorkspace } from "@/lib/db/runs";
 import { getTeamRoster } from "@/lib/db/team-roster";
-import {
-  getRunOwnershipContext,
-  requireRunAccess,
-  runAccessDeniedResponse,
-} from "@/lib/auth/run-ownership";
+import { getSessionUser } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -20,8 +16,8 @@ interface RouteParams {
 }
 
 export async function GET(_request: Request, { params }: RouteParams) {
-  const scope = await getRunOwnershipContext();
-  if (!scope.userId && !scope.guestSessionId) {
+  const { userId } = await getSessionUser();
+  if (!userId) {
     return Response.json(
       { error: "Authentication required to export" },
       { status: 401 },
@@ -29,11 +25,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
   }
 
   const { id } = await params;
-  const access = await requireRunAccess(id, scope);
-  if (!access.ok) {
-    return runAccessDeniedResponse(access);
-  }
-
   const run = await getRunForWorkspace(id);
   if (!run) {
     return Response.json({ error: "Run not found" }, { status: 404 });

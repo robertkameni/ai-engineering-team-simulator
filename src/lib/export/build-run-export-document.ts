@@ -2,6 +2,7 @@ import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import { ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
 import type { ArtifactType } from "@/features/artifacts/artifact-constants";
 import {
+  debateOutcomeLabel,
   debateOutcomeWarningMessage,
   isUnapprovedDebateOutcome,
 } from "@/features/artifacts/artifact-panel-phase";
@@ -62,16 +63,17 @@ function appendMetadata(lines: string[], ctx: RunExportContext): void {
   }
 
   if (run.debateOutcome) {
+    const label = debateOutcomeLabel(run.debateOutcome);
     if (isUnapprovedDebateOutcome(run.debateOutcome)) {
       lines.push(
         "**Debate outcome:** " +
-          run.debateOutcome +
+          label +
           " — " +
           debateOutcomeWarningMessage(run.debateOutcome),
         "",
       );
     } else {
-      lines.push("**Debate outcome:** " + run.debateOutcome, "");
+      lines.push("**Debate outcome:** " + label, "");
     }
   }
 }
@@ -109,10 +111,11 @@ function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
   }
 
   if (run.debateOutcome) {
+    const label = escapeHtml(debateOutcomeLabel(run.debateOutcome));
     if (isUnapprovedDebateOutcome(run.debateOutcome)) {
       parts.push(
         '<div class="export-warning"><strong>Debate outcome:</strong> ' +
-          escapeHtml(run.debateOutcome) +
+          label +
           " — " +
           escapeHtml(debateOutcomeWarningMessage(run.debateOutcome)) +
           "</div>",
@@ -120,7 +123,7 @@ function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
     } else {
       parts.push(
         '<p class="meta-block"><strong>Debate outcome:</strong> ' +
-          escapeHtml(run.debateOutcome) +
+          label +
           "</p>",
       );
     }

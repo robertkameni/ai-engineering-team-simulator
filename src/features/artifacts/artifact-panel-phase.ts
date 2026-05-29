@@ -28,6 +28,13 @@ export function debateOutcomeWarningMessage(outcome: DebateExitOutcome): string 
   return "";
 }
 
+export function debateOutcomeLabel(outcome: DebateExitOutcome): string {
+  if (outcome === "approved") return "Approved";
+  if (outcome === "cap_reached") return "Turn limit reached";
+  if (outcome === "unknown_reject_fallback") return "Reviewer decision unclear";
+  return outcome;
+}
+
 export function countRunArtifacts(
   artifacts: PartialRunArtifacts | null | undefined,
 ): number {
