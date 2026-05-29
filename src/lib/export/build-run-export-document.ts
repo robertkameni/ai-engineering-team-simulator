@@ -1,4 +1,5 @@
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
+import { formatExportDate } from "@/lib/format-time";
 import { ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
 import type { ArtifactType } from "@/features/artifacts/artifact-constants";
 import {
@@ -40,7 +41,7 @@ function appendMetadata(lines: string[], ctx: RunExportContext): void {
   const { run } = ctx;
   lines.push("**Prompt:** " + run.userPrompt, "");
   lines.push(
-    "**Status:** " + run.status + " · **Updated:** " + run.updatedAt,
+    "**Simulated:** " + formatExportDate(run.updatedAt),
     "",
   );
 
@@ -84,10 +85,8 @@ function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
     '<p class="meta-block"><strong>Prompt:</strong> ' +
       formatInlineMarkdown(run.userPrompt) +
       "</p>",
-    '<p class="meta-block"><strong>Status:</strong> ' +
-      escapeHtml(run.status) +
-      " · <strong>Updated:</strong> " +
-      escapeHtml(run.updatedAt) +
+    '<p class="meta-block"><strong>Simulated:</strong> ' +
+      escapeHtml(formatExportDate(run.updatedAt)) +
       "</p>",
   );
 

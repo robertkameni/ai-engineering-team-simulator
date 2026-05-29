@@ -54,11 +54,14 @@ export function ExportRunButton({
   const performExport = useCallback(
     async (targetRun: MockRun, format: ExportFormat) => {
       setExportError(null);
-      setExportingFormat(format);
       try {
         if (format === "pdf") {
-          await exportRunPdf(targetRun, templateId);
+          // Spinner starts as soon as the dialog opens (fetch runs in parallel).
+          await exportRunPdf(targetRun, templateId, () =>
+            setExportingFormat("pdf"),
+          );
         } else {
+          setExportingFormat(format);
           await exportRunMarkdown(targetRun, templateId);
         }
       } catch (error) {

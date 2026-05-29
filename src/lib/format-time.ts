@@ -8,6 +8,17 @@ export function formatMessageTime(date: Date): string {
   });
 }
 
+/** Full date for exports and document headers (date only, no timezone ambiguity). */
+export function formatExportDate(date: Date | string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("de-DE", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 /** Relative label for sidebar (stable enough for SSR + client). */
 export function formatRelativeTime(date: Date): string {
   const diffMs = Date.now() - date.getTime();
