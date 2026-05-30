@@ -162,7 +162,7 @@ export async function regenerateRunArtifacts(
     });
     const bundle = runArtifactsOutputToBundle(artifactOutput);
     await updateArtifactStatus(runId, "ready");
-    if (status === "running") {
+    if (status !== "complete") {
       await updateRunStatus(runId, "complete");
     }
 
