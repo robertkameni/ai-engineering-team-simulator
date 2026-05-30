@@ -30,3 +30,35 @@ export async function claimGuestRunsForUser(
 
   return { claimedCount: result.count };
 }
+
+export interface ReleaseRunToGuestSessionResult {
+  released: boolean;
+}
+
+/** Moves one user-owned run back to a guest session (inverse of claim). */
+export async function releaseRunToGuestSession(
+  userId: string,
+  runId: string,
+  guestSessionId: string,
+): Promise<ReleaseRunToGuestSessionResult> {
+  const trimmedUserId = userId.trim();
+  const trimmedRunId = runId.trim();
+  const trimmedGuestSessionId = guestSessionId.trim();
+
+  if (!trimmedUserId || !trimmedRunId || !trimmedGuestSessionId) {
+    return { released: false };
+  }
+
+  const result = await prisma.run.updateMany({
+    where: {
+      id: trimmedRunId,
+      userId: trimmedUserId,
+    },
+    data: {
+      userId: null,
+      guestSessionId: trimmedGuestSessionId,
+    },
+  });
+
+  return { released: result.count > 0 };
+}

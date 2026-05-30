@@ -131,6 +131,7 @@ export function SimulationWorkspace({
         debateProgress={debateProgress}
         isAuthenticated={isAuthenticated}
         userEmail={userEmail}
+        releaseRunId={runId}
         templateId={teamRoster?.templateId}
         run={messages.length > 0 ? exportRun : undefined}
       />

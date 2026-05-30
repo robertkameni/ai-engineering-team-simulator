@@ -7,18 +7,34 @@ import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { workspaceHeaderAccountButtonClass } from "@/features/workspace/workspace-header-button-styles";
 
-interface SignOutButtonProps {
-  email?: string | null;
+const NON_RELEASABLE_RUN_IDS = new Set(["live", "new"]);
+
+function isReleasableRunId(runId: string | null | undefined): runId is string {
+  return (
+    typeof runId === "string" &&
+    runId.length > 0 &&
+    !NON_RELEASABLE_RUN_IDS.has(runId)
+  );
 }
 
-export function SignOutButton({ email }: SignOutButtonProps) {
+interface SignOutButtonProps {
+  email?: string | null;
+  releaseRunId?: string | null;
+}
+
+export function SignOutButton({ email, releaseRunId }: SignOutButtonProps) {
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   async function handleSignOut() {
     setIsSigningOut(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      const body = isReleasableRunId(releaseRunId) ? { runId: releaseRunId } : {};
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       router.refresh();
     } finally {
       setIsSigningOut(false);

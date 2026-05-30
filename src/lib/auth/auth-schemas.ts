@@ -6,3 +6,9 @@ export const authCredentialsSchema = z.object({
 });
 
 export type AuthCredentials = z.infer<typeof authCredentialsSchema>;
+
+export const logoutBodySchema = z.object({
+  runId: z.string().trim().min(1).optional(),
+});
+
+export type LogoutBody = z.infer<typeof logoutBodySchema>;

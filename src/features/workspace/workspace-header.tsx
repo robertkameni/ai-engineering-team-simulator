@@ -29,6 +29,7 @@ interface WorkspaceHeaderProps {
   debateProgress?: DebateProgress;
   isAuthenticated?: boolean;
   userEmail?: string | null;
+  releaseRunId?: string | null;
   templateId?: TeamTemplateId;
   className?: string;
 }
@@ -42,6 +43,7 @@ export function WorkspaceHeader({
   debateProgress,
   isAuthenticated = false,
   userEmail = null,
+  releaseRunId = null,
   templateId,
   className,
 }: WorkspaceHeaderProps) {
@@ -103,7 +105,7 @@ export function WorkspaceHeader({
           </Button>
         ) : null}
         {isAuthenticated ? (
-          <SignOutButton email={userEmail} />
+          <SignOutButton email={userEmail} releaseRunId={releaseRunId} />
         ) : (
           <AuthStatusBadge isAuthenticated={false} />
         )}

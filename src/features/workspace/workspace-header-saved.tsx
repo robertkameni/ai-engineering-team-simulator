@@ -70,7 +70,7 @@ export function WorkspaceHeaderSaved({
       </div>
       <WorkspaceHeaderActions>
         {isAuthenticated ? (
-          <SignOutButton email={userEmail} />
+          <SignOutButton email={userEmail} releaseRunId={run.id} />
         ) : (
           <AuthStatusBadge isAuthenticated={false} />
         )}
