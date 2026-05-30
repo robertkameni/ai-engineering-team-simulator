@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { MockRun } from "@/features/agents/types";
 import { AppShell } from "@/features/workspace/app-shell";
@@ -12,6 +12,7 @@ import { SimulationErrorBanner } from "@/features/simulation/simulation-error-ba
 import { AgentTypingIndicator } from "@/features/simulation/agent-typing-indicator";
 import { debateProgressFromMessages } from "@/features/artifacts/artifact-panel-phase";
 import { useSimulationStream } from "@/features/simulation/use-simulation-stream";
+import { useWorkspaceRunSession } from "@/features/workspace/workspace-run-context";
 import { teamMemberPreview } from "@/features/simulation/team-roster-preview";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { useWorkspaceMobile } from "@/features/workspace/workspace-mobile-context";
@@ -19,6 +20,7 @@ import { truncateTitle } from "@/lib/truncate-title";
 
 interface SimulationWorkspaceProps {
   userPrompt: string;
+  autoStart?: boolean;
   initialRecentRuns?: SidebarRunItemData[];
   isAuthenticated?: boolean;
   userEmail?: string | null;
@@ -26,6 +28,7 @@ interface SimulationWorkspaceProps {
 
 export function SimulationWorkspace({
   userPrompt,
+  autoStart = true,
   initialRecentRuns,
   isAuthenticated = false,
   userEmail = null,
@@ -73,10 +76,35 @@ export function SimulationWorkspace({
   }, [artifactsStatus, mobile]);
 
   useEffect(() => {
+    if (!autoStart) {
+      return;
+    }
     const controller = new AbortController();
     void start(userPrompt, { signal: controller.signal });
     return () => controller.abort();
-  }, [userPrompt, start]);
+  }, [autoStart, userPrompt, start]);
+
+  const rerunSimulation = useCallback(
+    (overridePrompt?: string) => {
+      const trimmed = (overridePrompt ?? currentPrompt).trim();
+      if (trimmed) {
+        setCurrentPrompt(trimmed);
+        void start(trimmed);
+      }
+    },
+    [currentPrompt, start],
+  );
+
+  const workspaceRunSession = useMemo(
+    () => ({
+      currentPrompt,
+      status,
+      rerun: rerunSimulation,
+    }),
+    [currentPrompt, status, rerunSimulation],
+  );
+
+  useWorkspaceRunSession(workspaceRunSession);
 
   const showBootstrapping =
     status === "running" && messages.length === 0 && !error;

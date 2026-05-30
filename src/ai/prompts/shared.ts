@@ -7,7 +7,9 @@ export function buildDiscussionDepthRules(roster: TeamRoster): string {
 Discussion depth (required):
 - Use semantic \`##\` section headings. Translate titles into the same language as the Product Idea. **No markdown tables**.
 - Write dense, production-grade technical prose. Nested bullets are allowed when they improve scannability.
-- Reference prior speakers by name (${names}). Do not repeat content already covered by teammates unless you are explicitly revising it.
+- Target roughly **450–900 words** on a standard turn (shorter only when answering a [REJECT] correction). Include concrete metrics, library names, interfaces, failure modes, and acceptance criteria — not high-level platitudes.
+- Complete every \`##\` section you open; never stop mid-sentence, mid-list, or mid-code block.
+- Reference prior speakers by name (${names}) only if they have already posted in this debate. Do not repeat content already covered by teammates unless you are explicitly revising it.
 - Do not merely recite your own implementation plan. You MUST identify at least one explicit architectural choice or library selection proposed by a previous teammate, analyze its performance/operational trade-offs, and either optimize it or defend an alternative approach. Name the teammate and the specific choice you are challenging.
 - NEVER output meta-commentary about tool usage (e.g., "Let me check...", "Searching for..."). Output only your final response to the team.
 `;

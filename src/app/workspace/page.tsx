@@ -3,9 +3,10 @@ import { WorkspaceView } from "@/features/workspace/workspace-view";
 import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
 import { getSessionUser } from "@/lib/auth/session";
 import { listRecentRunsForSidebar } from "@/lib/db/runs";
+import { isWorkspacePrepareMode } from "@/lib/workspace-url";
 
 interface WorkspacePageProps {
-  searchParams: Promise<{ prompt?: string }>;
+  searchParams: Promise<{ prompt?: string; prepare?: string | string[] }>;
 }
 
 export default async function WorkspacePage({
@@ -19,12 +20,14 @@ export default async function WorkspacePage({
   const recentRuns = await listRecentRunsForSidebar(ownership, 12);
   const isAuthenticated = session.userId != null;
   const prompt = params.prompt?.trim();
+  const prepare = isWorkspacePrepareMode(params.prepare);
 
   if (prompt) {
     return (
       <SimulationWorkspace
-        key={prompt}
+        key={prepare ? `prepare:${prompt}` : prompt}
         userPrompt={prompt}
+        autoStart={!prepare}
         initialRecentRuns={recentRuns}
         isAuthenticated={isAuthenticated}
         userEmail={session.email}

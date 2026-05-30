@@ -1,19 +1,22 @@
 import Link from "next/link";
-import { Plus, Sparkles, X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { deleteRunAction } from "@/features/workspace/delete-run-action";
+import { SidebarSimulationAction } from "@/features/workspace/sidebar-simulation-action";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { cn } from "@/lib/utils";
 
 interface SidebarContentStaticProps {
   pathname: string;
   runs: SidebarRunItemData[];
+  rerunPrompt?: string | null;
 }
 
 export function SidebarContentStatic({
   pathname,
   runs,
+  rerunPrompt,
 }: SidebarContentStaticProps) {
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -37,15 +40,7 @@ export function SidebarContentStatic({
       </header>
 
       <section className="px-3 pb-2">
-        <Button
-          className="w-full justify-start gap-2 transition-transform duration-200 hover:scale-[1.01] active:scale-[0.98]"
-          asChild
-        >
-          <Link href="/workspace">
-            <Plus />
-            New simulation
-          </Link>
-        </Button>
+        <SidebarSimulationAction rerunPrompt={rerunPrompt} />
       </section>
 
       <div className="mx-3 h-px bg-glass-border" />

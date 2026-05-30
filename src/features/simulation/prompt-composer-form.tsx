@@ -21,6 +21,7 @@ export interface PromptComposerFormProps {
   onSubmitted?: () => void;
   showHint?: boolean;
   idPrefix?: string;
+  isRerunMode?: boolean;
 }
 
 export function PromptComposerForm({
@@ -33,6 +34,7 @@ export function PromptComposerForm({
   onSubmitted,
   showHint = true,
   idPrefix = "workspace",
+  isRerunMode = false,
 }: PromptComposerFormProps) {
   const router = useRouter();
   const [internalValue, setInternalValue] = useState(defaultValue);
@@ -96,7 +98,9 @@ export function PromptComposerForm({
             size="icon"
             disabled={disabled || !text.trim()}
             className="size-8 rounded-lg transition-transform duration-200 hover:scale-105 active:scale-95"
-            aria-label={onSimulate ? "Run simulation" : "Start simulation"}
+            aria-label={
+              isRerunMode ? "Rerun simulation" : onSimulate ? "Run simulation" : "Start simulation"
+            }
           >
             <ArrowUp />
           </Button>
@@ -106,9 +110,11 @@ export function PromptComposerForm({
         <p className="text-caption text-muted-foreground" aria-live="polite">
           {disabled
             ? "Team is discussing…"
-            : onSimulate
-              ? `Press ${shortcutLabel} to run again`
-              : `Press ${shortcutLabel} to start the simulation`}
+            : isRerunMode
+              ? `Press ${shortcutLabel} to rerun, or use the button below`
+              : onSimulate
+                ? `Press ${shortcutLabel} to run again`
+                : `Press ${shortcutLabel} to start the simulation`}
         </p>
       ) : null}
     </form>

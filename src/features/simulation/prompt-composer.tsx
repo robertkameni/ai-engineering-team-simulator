@@ -2,11 +2,16 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
-import { Plus } from "lucide-react";
+import { Plus, RotateCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { PromptComposerForm } from "@/features/simulation/prompt-composer-form";
+import {
+  useWorkspaceRun,
+  workspaceRunCanRerun,
+} from "@/features/workspace/workspace-run-context";
 import { useMinWidth } from "@/lib/use-media-query";
+import { hasWorkspacePrompt } from "@/lib/workspace-url";
 import { cn } from "@/lib/utils";
 
 const PromptComposerMobileSheet = dynamic(
@@ -39,6 +44,37 @@ export function PromptComposer({
   const isDesktop = useMinWidth(720);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileSheetReady, setMobileSheetReady] = useState(false);
+  const workspaceRun = useWorkspaceRun();
+
+  const text = value ?? defaultValue;
+  const hasPrompt =
+    hasWorkspacePrompt(text) ||
+    (workspaceRun != null && hasWorkspacePrompt(workspaceRun.currentPrompt));
+  const isLiveWorkspace = onSimulate != null && hasPrompt;
+  const canRerun =
+    isLiveWorkspace &&
+    !disabled &&
+    hasWorkspacePrompt(text) &&
+    (workspaceRun == null || workspaceRunCanRerun(workspaceRun));
+
+  const handleRerun = (promptOverride?: string) => {
+    const trimmed = (promptOverride ?? text).trim();
+    if (!trimmed) {
+      return;
+    }
+    if (workspaceRun && workspaceRunCanRerun(workspaceRun)) {
+      workspaceRun.rerun(trimmed);
+      return;
+    }
+    if (onSimulate) {
+      void onSimulate(trimmed);
+    }
+  };
+
+  const sheetTitle = isLiveWorkspace ? "Rerun simulation" : "New simulation";
+  const sheetDescription = isLiveWorkspace
+    ? "Edit your product idea, then rerun the simulation."
+    : "Describe what you want the team to build.";
 
   return (
     <>
@@ -48,7 +84,7 @@ export function PromptComposer({
           className,
         )}
       >
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto flex max-w-3xl flex-col gap-2">
           <PromptComposerForm
             disabled={disabled}
             placeholder={placeholder}
@@ -56,7 +92,20 @@ export function PromptComposer({
             value={value}
             onChange={onChange}
             onSimulate={onSimulate}
+            isRerunMode={isLiveWorkspace}
           />
+          {isLiveWorkspace ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2"
+              disabled={!canRerun}
+              onClick={() => handleRerun()}
+            >
+              <RotateCw className="size-4" />
+              {disabled ? "Simulation running…" : "Rerun simulation"}
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -66,15 +115,25 @@ export function PromptComposer({
             <Button
               type="button"
               size="icon"
-              disabled={disabled}
+              disabled={disabled && !isLiveWorkspace}
               onClick={() => {
                 setMobileSheetReady(true);
                 setMobileOpen(true);
               }}
               className="pointer-events-auto size-12 rounded-full shadow-lg transition-transform duration-200 hover:scale-105 active:scale-95"
-              aria-label="New simulation"
+              aria-label={
+                isLiveWorkspace
+                  ? disabled
+                    ? "Simulation running"
+                    : "Edit and rerun simulation"
+                  : "New simulation"
+              }
             >
-              <Plus className="size-5" />
+              {isLiveWorkspace ? (
+                <RotateCw className="size-5" />
+              ) : (
+                <Plus className="size-5" />
+              )}
             </Button>
           </div>
 
@@ -87,7 +146,16 @@ export function PromptComposer({
               defaultValue={defaultValue}
               value={value}
               onChange={onChange}
-              onSimulate={onSimulate}
+              onSimulate={
+                isLiveWorkspace
+                  ? (prompt) => {
+                      handleRerun(prompt);
+                    }
+                  : onSimulate
+              }
+              title={sheetTitle}
+              description={sheetDescription}
+              isRerunMode={isLiveWorkspace}
             />
           ) : null}
         </>

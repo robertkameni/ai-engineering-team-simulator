@@ -10,7 +10,10 @@ import type {
   RunStatus,
   SimulationMessage,
 } from "@/features/agents/types";
-import { parseSimulationEvent } from "@/lib/simulation-stream";
+import {
+  parseSimulationEvent,
+  type SimulationStreamEvent,
+} from "@/lib/simulation-stream";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 
 import { formatMessageTime } from "@/lib/format-time";
@@ -147,7 +150,11 @@ export function useSimulationStream() {
           setDebateOutcome(result.debateOutcome);
         }
 
-        if (result.status === "ready" || result.status === "unavailable") {
+        if (result.status === "ready") {
+          return result.status;
+        }
+
+        if (result.status === "unavailable") {
           return result.status;
         }
 
@@ -239,6 +246,170 @@ export function useSimulationStream() {
         let buffer = "";
         let streamSettled = false;
 
+        const handleStreamEvent = async (event: SimulationStreamEvent) => {
+          if (event.type === "run_started") {
+            currentRunId = event.runId;
+            setRunId(event.runId);
+            setArtifactsStatus("pending");
+          } else if (event.type === "team_ready") {
+            setTeamRoster({
+              templateId: event.templateId,
+              members: event.members,
+            });
+          } else if (event.type === "agent_start") {
+            setActiveAgent(event.role);
+            const id = crypto.randomUUID();
+            activeMessageIdRef.current = id;
+            setMessages((prev) => [
+              ...prev,
+              {
+                id,
+                role: event.role,
+                agentName: event.name,
+                agentTitle: event.title,
+                content: "",
+                isStreaming: true,
+                activeTools: [],
+                createdAt: formatMessageTime(new Date()),
+              },
+            ]);
+          } else if (event.type === "tool_start") {
+            const activeId = activeMessageIdRef.current;
+            if (!activeId) return;
+
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === activeId
+                  ? {
+                      ...message,
+                      activeTools: [
+                        ...(message.activeTools ?? []),
+                        { name: event.toolName, args: event.args },
+                      ],
+                    }
+                  : message,
+              ),
+            );
+          } else if (event.type === "tool_end") {
+            const activeId = activeMessageIdRef.current;
+            if (!activeId) return;
+
+            setMessages((prev) =>
+              prev.map((message) => {
+                if (message.id !== activeId) return message;
+                const tools = [...(message.activeTools ?? [])];
+                const index = tools.findIndex(
+                  (tool) => tool.name === event.toolName,
+                );
+                if (index !== -1) tools.splice(index, 1);
+                return { ...message, activeTools: tools };
+              }),
+            );
+          } else if (event.type === "text-delta") {
+            const activeId = activeMessageIdRef.current;
+            if (!activeId) return;
+
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === activeId
+                  ? { ...message, content: message.content + event.delta }
+                  : message,
+              ),
+            );
+          } else if (event.type === "agent_end") {
+            const activeId = activeMessageIdRef.current;
+
+            if (activeId) {
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === activeId
+                    ? { ...message, isStreaming: false, activeTools: [] }
+                    : message,
+                ),
+              );
+            }
+            activeMessageIdRef.current = null;
+            setActiveAgent(null);
+          } else if (event.type === "artifacts_start") {
+            setArtifactsStatus("generating");
+          } else if (event.type === "error") {
+            streamSettled = true;
+            setError(event.message);
+            setStatus("failed");
+            setActiveAgent(null);
+
+            const activeId = activeMessageIdRef.current;
+            if (activeId) {
+              setMessages((prev) =>
+                prev.map((message) =>
+                  message.id === activeId
+                    ? { ...message, isStreaming: false, activeTools: [] }
+                    : message,
+                ),
+              );
+              activeMessageIdRef.current = null;
+            }
+
+            if (currentRunId) {
+              await pollArtifactsUntilSettled(currentRunId, signal);
+            } else if (isActive()) {
+              setArtifactsStatus("unavailable");
+            }
+          } else if (event.type === "done") {
+            streamSettled = true;
+
+            if (!isActive()) return;
+
+            setRunId(event.runId);
+            currentRunId = event.runId;
+
+            const finalPanel = await pollArtifactsUntilSettled(
+              event.runId,
+              signal,
+            );
+
+            if (!isActive()) return;
+
+            if (finalPanel === "unavailable") {
+              setStatus("complete");
+              setError((prev) => prev ?? "Artifact synthesis failed");
+            } else if (finalPanel === "ready") {
+              setError(null);
+              setStatus((current) =>
+                current === "failed" ? current : "complete",
+              );
+            } else if (finalPanel != null) {
+              setStatus((current) =>
+                current === "failed" ? current : "complete",
+              );
+            }
+
+            router.replace(`/runs/${event.runId}`);
+          }
+        };
+
+        const processBufferedLines = async (flush: boolean) => {
+          if (flush) {
+            buffer += decoder.decode(undefined, { stream: false });
+          }
+
+          const lines = buffer.split("\n");
+          buffer = flush ? "" : (lines.pop() ?? "");
+
+          for (const line of lines) {
+            if (!isActive()) {
+              await reader.cancel();
+              return false;
+            }
+
+            const event = parseSimulationEvent(line);
+            if (!event) continue;
+            await handleStreamEvent(event);
+          }
+
+          return true;
+        };
+
         try {
           while (true) {
             if (!isActive()) {
@@ -253,156 +424,17 @@ export function useSimulationStream() {
               return;
             }
 
-            if (done) break;
+            if (value) {
+              buffer += decoder.decode(value, { stream: true });
+            }
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() ?? "";
+            const continuing = await processBufferedLines(false);
+            if (!continuing) return;
 
-            for (const line of lines) {
-              if (!isActive()) {
-                await reader.cancel();
-                return;
-              }
-
-              const event = parseSimulationEvent(line);
-              if (!event) continue;
-
-              if (event.type === "run_started") {
-                currentRunId = event.runId;
-                setRunId(event.runId);
-                setArtifactsStatus("pending");
-              } else if (event.type === "team_ready") {
-                setTeamRoster({
-                  templateId: event.templateId,
-                  members: event.members,
-                });
-              } else if (event.type === "agent_start") {
-                setActiveAgent(event.role);
-                const id = crypto.randomUUID();
-                activeMessageIdRef.current = id;
-                setMessages((prev) => [
-                  ...prev,
-                  {
-                    id,
-                    role: event.role,
-                    agentName: event.name,
-                    agentTitle: event.title,
-                    content: "",
-                    isStreaming: true,
-                    activeTools: [],
-                    createdAt: formatMessageTime(new Date()),
-                  },
-                ]);
-              } else if (event.type === "tool_start") {
-                const activeId = activeMessageIdRef.current;
-                if (!activeId) continue;
-
-                setMessages((prev) =>
-                  prev.map((message) =>
-                    message.id === activeId
-                      ? {
-                          ...message,
-                          activeTools: [
-                            ...(message.activeTools ?? []),
-                            { name: event.toolName, args: event.args },
-                          ],
-                        }
-                      : message,
-                  ),
-                );
-              } else if (event.type === "tool_end") {
-                const activeId = activeMessageIdRef.current;
-                if (!activeId) continue;
-
-                setMessages((prev) =>
-                  prev.map((message) => {
-                    if (message.id !== activeId) return message;
-                    const tools = [...(message.activeTools ?? [])];
-                    const index = tools.findIndex(
-                      (tool) => tool.name === event.toolName,
-                    );
-                    if (index !== -1) tools.splice(index, 1);
-                    return { ...message, activeTools: tools };
-                  }),
-                );
-              } else if (event.type === "text-delta") {
-                const activeId = activeMessageIdRef.current;
-
-                if (!activeId) continue;
-
-                setMessages((prev) =>
-                  prev.map((message) =>
-                    message.id === activeId
-                      ? { ...message, content: message.content + event.delta }
-                      : message,
-                  ),
-                );
-              } else if (event.type === "agent_end") {
-                const activeId = activeMessageIdRef.current;
-
-                if (activeId) {
-                  setMessages((prev) =>
-                    prev.map((message) =>
-                      message.id === activeId
-                        ? { ...message, isStreaming: false, activeTools: [] }
-                        : message,
-                    ),
-                  );
-                }
-                activeMessageIdRef.current = null;
-                setActiveAgent(null);
-              } else if (event.type === "artifacts_start") {
-                setArtifactsStatus("generating");
-              } else if (event.type === "error") {
-                streamSettled = true;
-                setError(event.message);
-                setStatus("failed");
-                setActiveAgent(null);
-
-                const activeId = activeMessageIdRef.current;
-                if (activeId) {
-                  setMessages((prev) =>
-                    prev.map((message) =>
-                      message.id === activeId
-                        ? { ...message, isStreaming: false, activeTools: [] }
-                        : message,
-                    ),
-                  );
-                  activeMessageIdRef.current = null;
-                }
-
-                if (currentRunId) {
-                  await pollArtifactsUntilSettled(currentRunId, signal);
-                } else if (isActive()) {
-                  setArtifactsStatus("unavailable");
-                }
-              } else if (event.type === "done") {
-                streamSettled = true;
-
-                if (!isActive()) return;
-
-                setRunId(event.runId);
-                currentRunId = event.runId;
-
-                const finalPanel = await pollArtifactsUntilSettled(
-                  event.runId,
-                  signal,
-                );
-
-                if (!isActive()) return;
-
-                if (finalPanel === "unavailable") {
-                  setStatus("complete");
-                  setError((prev) => prev ?? "Artifact synthesis failed");
-                } else if (finalPanel != null) {
-                  setStatus((current) =>
-                    current === "failed" ? current : "complete",
-                  );
-                }
-
-                router.replace(`/runs/${event.runId}`);
-              }
+            if (done) {
+              const flushed = await processBufferedLines(true);
+              if (!flushed) return;
+              break;
             }
           }
         } finally {

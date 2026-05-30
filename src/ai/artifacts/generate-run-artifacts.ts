@@ -85,7 +85,7 @@ Focus: ${focus}
 Output rules:
 - The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}
 - ${languageDirective}
-- 3–5 concise bullets per section; each bullet is one complete sentence (max ~20 words).
+- 4–6 bullets per section; each bullet is 1–2 complete sentences with concrete detail (up to ~50 words per bullet).
 - Write as a polished internal document — NOT meeting notes.
 - Do NOT append speaker names to bullets (no "(Name)" suffixes).
 - Synthesize consensus; note disagreement only in the review artifact.
@@ -96,7 +96,7 @@ Output rules:
       model: getDeepSeekModel(ARTIFACT_MODEL),
       system,
       prompt: transcriptPrompt,
-      maxOutputTokens: 1200,
+      maxOutputTokens: 2400,
       temperature: 0.2,
       output: Output.object({ schema: artifactDocumentSchema }),
       providerOptions: {
@@ -122,7 +122,7 @@ Output rules:
 
 Respond with ONLY a JSON object: { "sections": [{ "title": string, "items": string[] }] }`,
     prompt: transcriptPrompt,
-    maxOutputTokens: 1200,
+    maxOutputTokens: 2400,
     temperature: 0.2,
     providerOptions: {
       deepseek: DEEPSEEK_CHAT_OPTIONS,

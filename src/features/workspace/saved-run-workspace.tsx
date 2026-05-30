@@ -50,7 +50,11 @@ export function SavedRunWorkspace({
     >
       <AppShellFrame
         sidebar={
-          <SidebarStatic pathname={pathname} runs={initialRecentRuns} />
+          <SidebarStatic
+            pathname={pathname}
+            runs={initialRecentRuns}
+            rerunPrompt={run.userPrompt}
+          />
         }
         artifacts={
           showArtifactPanel ? (
@@ -83,7 +87,7 @@ export function SavedRunWorkspace({
         <WorkspaceMain>
           <MessageThreadStatic messages={run.messages} />
         </WorkspaceMain>
-        <SavedRunFooter />
+        <SavedRunFooter userPrompt={run.userPrompt} />
       </AppShellFrame>
     </SavedRunMobileSheets>
   );

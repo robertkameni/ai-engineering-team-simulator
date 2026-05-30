@@ -18,6 +18,9 @@ interface PromptComposerMobileSheetProps {
   value?: string;
   onChange?: (value: string) => void;
   onSimulate?: (prompt: string) => void | Promise<void>;
+  title?: string;
+  description?: string;
+  isRerunMode?: boolean;
 }
 
 export function PromptComposerMobileSheet({
@@ -29,6 +32,9 @@ export function PromptComposerMobileSheet({
   value,
   onChange,
   onSimulate,
+  title = "New simulation",
+  description = "Describe what you want the team to build.",
+  isRerunMode = false,
 }: PromptComposerMobileSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -37,10 +43,8 @@ export function PromptComposerMobileSheet({
         className="glass-panel gap-0 border-glass-border px-4 pt-4 pb-6"
       >
         <SheetHeader className="px-0 pb-3 text-left">
-          <SheetTitle>New simulation</SheetTitle>
-          <SheetDescription>
-            Describe what you want the team to build.
-          </SheetDescription>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
         <PromptComposerForm
           disabled={disabled}
@@ -51,6 +55,7 @@ export function PromptComposerMobileSheet({
           onSimulate={onSimulate}
           onSubmitted={() => onOpenChange(false)}
           idPrefix="mobile-workspace"
+          isRerunMode={isRerunMode}
         />
       </SheetContent>
     </Sheet>

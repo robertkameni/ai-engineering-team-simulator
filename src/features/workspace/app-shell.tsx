@@ -12,6 +12,7 @@ import type { TeamRosterPreview } from "@/features/simulation/team-roster-previe
 import { Sidebar } from "@/features/workspace/sidebar";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { WorkspaceMobileContext } from "@/features/workspace/workspace-mobile-context";
+import { WorkspaceRunProvider } from "@/features/workspace/workspace-run-context";
 import { SiteFooter } from "@/components/site-footer";
 import { useMinWidth } from "@/lib/use-media-query";
 
@@ -100,7 +101,8 @@ export function AppShell({
   };
 
   return (
-    <WorkspaceMobileContext.Provider value={mobileContext}>
+    <WorkspaceRunProvider>
+      <WorkspaceMobileContext.Provider value={mobileContext}>
       <div className="@container/app-shell ambient-mesh relative flex h-svh flex-col overflow-hidden">
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden min-[720px]:flex-row">
           <Sidebar initialRecentRuns={initialRecentRuns} />
@@ -130,6 +132,7 @@ export function AppShell({
           {...artifactPanelProps}
         />
       ) : null}
-    </WorkspaceMobileContext.Provider>
+      </WorkspaceMobileContext.Provider>
+    </WorkspaceRunProvider>
   );
 }

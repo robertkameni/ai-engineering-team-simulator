@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SidebarSimulationAction } from "@/features/workspace/sidebar-simulation-action";
 import { SidebarRecentRuns } from "@/features/workspace/sidebar-recent-runs";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 
@@ -42,15 +42,7 @@ export function SidebarContent({
       </header>
 
       <section className="px-3 pb-2">
-        <Button
-          className="w-full justify-start gap-2 transition-transform duration-200 hover:scale-[1.01] active:scale-[0.98]"
-          asChild
-        >
-          <Link href="/workspace" onClick={onNavigate}>
-            <Plus />
-            New simulation
-          </Link>
-        </Button>
+        <SidebarSimulationAction onNavigate={onNavigate} />
       </section>
 
       <div className="mx-3 h-px bg-glass-border" />

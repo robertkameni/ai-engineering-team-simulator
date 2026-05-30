@@ -2,6 +2,7 @@ import { stepCountIs, streamText } from "ai";
 
 import {
   SIMULATION_AGENT_ORDER,
+  TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS,
   getAgentConfig,
   type SimulationAgentRole,
 } from "@/ai/agents/config";
@@ -15,6 +16,16 @@ import {
   getAgentStreamDisplayText,
   normalizeAgentPersistedText,
 } from "@/ai/orchestration/agent-stream-text";
+import {
+  buildArchitectInsufficientReviewerFeedback,
+  isArchitectDeliverableInsufficient,
+} from "@/ai/orchestration/agent-deliverable-quality";
+import {
+  buildTruncationContinuationPrompt,
+  looksLikeTruncatedAgentOutput,
+} from "@/ai/orchestration/looks-like-truncated-agent-output";
+import { recoverReviewerDecisionTag } from "@/ai/orchestration/recover-reviewer-decision-tag";
+import { buildArchitectToollessRetryUserPrompt } from "@/ai/prompts/architect";
 import {
   type DebateExitOutcome,
   MAX_SIMULATION_TURNS,
@@ -182,12 +193,67 @@ export async function runSimulation(
         emitFallbackAgentTurn(role, member.name, member.title, fullText, notify);
       }
 
+      if (
+        role === "reviewer" &&
+        parseReviewerDecision(fullText).decision === "unknown"
+      ) {
+        const recoveredTag = await recoverReviewerDecisionTag(fullText, {
+          usageAccumulator,
+          abortSignal,
+        });
+        if (recoveredTag) {
+          fullText = `${fullText.trimEnd()}\n\n${recoveredTag}`;
+        }
+      }
+
       const contentToPersist =
         role === "reviewer"
           ? stripReviewerDecisionTag(
               normalizeAgentPersistedText(role, fullText),
             )
           : normalizeAgentPersistedText(role, fullText);
+
+      if (
+        role === "architect" &&
+        isArchitectDeliverableInsufficient(
+          contentToPersist,
+          classification.templateId,
+        )
+      ) {
+        console.warn(
+          "Architect deliverable still insufficient — synthetic [REJECT: architect]",
+          { runId: run.id },
+        );
+        const reviewerMember = getTeamMember(roster, "reviewer");
+        const rejectFeedback = buildArchitectInsufficientReviewerFeedback(
+          contentToPersist,
+          classification.templateId,
+        );
+        const rejectRaw = `${rejectFeedback}\n\n[REJECT: architect]`;
+        const rejectPersisted = stripReviewerDecisionTag(
+          normalizeAgentPersistedText("reviewer", rejectRaw),
+        );
+
+        transcript.push({
+          role: "reviewer",
+          agentName: reviewerMember.name,
+          content: rejectPersisted,
+        });
+        await appendMessage(
+          run.id,
+          "reviewer",
+          rejectPersisted,
+          messageOrder,
+          reviewerMember.name,
+        );
+        messageOrder += 1;
+        turnCount += 1;
+
+        lastRejectFeedback = rejectPersisted;
+        lastRejectTarget = "architect";
+        nextRole = "architect";
+        continue;
+      }
 
       transcript.push({
         role,
@@ -356,7 +422,7 @@ async function streamAgentTurn({
       const retryConfig = {
         ...config,
         model: "deepseek-v4-flash" as const,
-        maxOutputTokens: Math.max(config.maxOutputTokens * 1.5, 1500),
+        maxOutputTokens: Math.max(config.maxOutputTokens * 1.5, 2400),
         deepseek: DEEPSEEK_CHAT_OPTIONS,
       };
       fullText = await collectAgentStream({
@@ -372,6 +438,83 @@ async function streamAgentTurn({
         abortSignal,
         send,
       });
+      fullText = await continueAgentStreamIfTruncated({
+        runId,
+        role,
+        productIdea,
+        transcript,
+        roster,
+        templateId,
+        config: retryConfig,
+        debateContext,
+        usageAccumulator,
+        abortSignal,
+        send,
+        fullText,
+      });
+    }
+
+    fullText = await continueAgentStreamIfTruncated({
+      runId,
+      role,
+      productIdea,
+      transcript,
+      roster,
+      templateId,
+      config,
+      debateContext,
+      usageAccumulator,
+      abortSignal,
+      send,
+      fullText,
+    });
+
+    if (role === "architect" && templateId !== "physical") {
+      const normalized = normalizeAgentPersistedText(role, fullText);
+      if (isArchitectDeliverableInsufficient(normalized, templateId)) {
+        assertNotAborted(abortSignal);
+        console.warn(
+          `${role}: insufficient sections after tool turn, retrying without tools`,
+        );
+        const toollessConfig = {
+          ...config,
+          model: "deepseek-v4-flash" as const,
+          maxOutputTokens: Math.max(config.maxOutputTokens, 3200),
+          deepseek: DEEPSEEK_CHAT_OPTIONS,
+        };
+        const toollessText = await collectAgentStream({
+          runId,
+          role,
+          productIdea,
+          transcript,
+          roster,
+          templateId,
+          config: toollessConfig,
+          debateContext,
+          usageAccumulator,
+          abortSignal,
+          send,
+          disableTools: true,
+          supplementalUserPrompt: buildArchitectToollessRetryUserPrompt(),
+        });
+        if (toollessText.trim()) {
+          fullText = toollessText;
+          fullText = await continueAgentStreamIfTruncated({
+            runId,
+            role,
+            productIdea,
+            transcript,
+            roster,
+            templateId,
+            config: toollessConfig,
+            debateContext,
+            usageAccumulator,
+            abortSignal,
+            send,
+            fullText,
+          });
+        }
+      }
     }
   } catch (streamError) {
     send({ type: "agent_end", role });
@@ -420,6 +563,90 @@ async function recordStreamUsage(
   await usageAccumulator.addFromStreamResult(result, modelId);
 }
 
+async function continueAgentStreamIfTruncated({
+  runId,
+  role,
+  productIdea,
+  transcript,
+  roster,
+  templateId,
+  config,
+  debateContext,
+  usageAccumulator,
+  abortSignal,
+  send,
+  fullText,
+}: {
+  runId: string;
+  role: SimulationAgentRole;
+  productIdea: string;
+  transcript: TranscriptEntry[];
+  roster: TeamRoster;
+  templateId: TeamTemplateId;
+  config: ReturnType<typeof getAgentConfig>;
+  debateContext?: DebateTurnContext;
+  usageAccumulator: RunUsageAccumulator;
+  abortSignal?: AbortSignal;
+  send: (event: SimulationStreamEvent) => void;
+  fullText: string;
+}): Promise<string> {
+  let merged = fullText.trim();
+  if (!looksLikeTruncatedAgentOutput(merged, role)) {
+    return merged;
+  }
+
+  assertNotAborted(abortSignal);
+  console.warn(`${role}: output looks truncated, requesting continuation`);
+
+  const continuation = await collectAgentStream({
+    runId,
+    role,
+    productIdea,
+    transcript,
+    roster,
+    templateId,
+    config: {
+      ...config,
+      maxOutputTokens: TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS,
+    },
+    debateContext,
+    usageAccumulator,
+    abortSignal,
+    send,
+    continuationOf: merged,
+  });
+
+  if (continuation.trim()) {
+    merged = `${merged}${continuation.trimStart()}`;
+  }
+
+  if (looksLikeTruncatedAgentOutput(merged, role)) {
+    console.warn(`${role}: still truncated after continuation, second pass`);
+    const second = await collectAgentStream({
+      runId,
+      role,
+      productIdea,
+      transcript,
+      roster,
+      templateId,
+      config: {
+        ...config,
+        maxOutputTokens: TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS,
+      },
+      debateContext,
+      usageAccumulator,
+      abortSignal,
+      send,
+      continuationOf: merged,
+    });
+    if (second.trim()) {
+      merged = `${merged}${second.trimStart()}`;
+    }
+  }
+
+  return merged;
+}
+
 function resolveToolsForTurn(
   role: SimulationAgentRole,
   templateId: TeamTemplateId,
@@ -447,6 +674,9 @@ async function collectAgentStream({
   usageAccumulator,
   abortSignal,
   send,
+  continuationOf,
+  disableTools = false,
+  supplementalUserPrompt,
 }: {
   runId: string;
   role: SimulationAgentRole;
@@ -459,21 +689,50 @@ async function collectAgentStream({
   usageAccumulator: RunUsageAccumulator;
   abortSignal?: AbortSignal;
   send: (event: SimulationStreamEvent) => void;
+  /** Prior partial assistant text when resuming after truncation. */
+  continuationOf?: string;
+  disableTools?: boolean;
+  supplementalUserPrompt?: string;
 }): Promise<string> {
+  const baseMessages = buildAgentMessages(
+    role,
+    productIdea,
+    transcript,
+    roster,
+    debateContext,
+  );
+  let messages = baseMessages;
+
+  if (supplementalUserPrompt?.trim()) {
+    messages = [
+      ...messages,
+      { role: "user" as const, content: supplementalUserPrompt.trim() },
+    ];
+  }
+
+  if (continuationOf != null && continuationOf.trim().length > 0) {
+    messages = [
+      ...messages,
+      { role: "assistant" as const, content: continuationOf },
+      {
+        role: "user" as const,
+        content: buildTruncationContinuationPrompt(continuationOf),
+      },
+    ];
+  }
+
+  const tools = disableTools
+    ? undefined
+    : resolveToolsForTurn(role, templateId, productIdea);
+
   const result = streamText({
     model: getDeepSeekModel(config.model),
     system: getAgentSystemPrompt(role, roster, templateId, productIdea),
-    messages: buildAgentMessages(
-      role,
-      productIdea,
-      transcript,
-      roster,
-      debateContext,
-    ),
+    messages,
     maxOutputTokens: config.maxOutputTokens,
     temperature: config.temperature,
-    tools: resolveToolsForTurn(role, templateId, productIdea),
-    stopWhen: stepCountIs(3),
+    tools,
+    stopWhen: disableTools ? undefined : stepCountIs(3),
     abortSignal,
     providerOptions: {
       deepseek: config.deepseek,

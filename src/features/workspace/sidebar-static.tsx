@@ -4,12 +4,17 @@ import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 interface SidebarStaticProps {
   pathname: string;
   runs: SidebarRunItemData[];
+  rerunPrompt?: string | null;
 }
 
-export function SidebarStatic({ pathname, runs }: SidebarStaticProps) {
+export function SidebarStatic({ pathname, runs, rerunPrompt }: SidebarStaticProps) {
   return (
     <aside className="@container/sidebar glass-panel hidden h-full w-full shrink-0 flex-col border-r-0 min-[720px]:flex min-[720px]:w-64 min-[720px]:border-r">
-      <SidebarContentStatic pathname={pathname} runs={runs} />
+      <SidebarContentStatic
+        pathname={pathname}
+        runs={runs}
+        rerunPrompt={rerunPrompt}
+      />
     </aside>
   );
 }

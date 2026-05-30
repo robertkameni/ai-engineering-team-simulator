@@ -1,8 +1,9 @@
 import type { ArtifactStatus as PrismaArtifactStatus } from "@/generated/prisma/client";
 
-import type { RunStatus as AppRunStatus } from "@/features/agents/types";
-import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
+import { deriveArtifactsPanelStatus } from "@/lib/artifacts-panel-status";
 import { prisma } from "@/lib/prisma";
+
+export { deriveArtifactsPanelStatus };
 
 export type AppArtifactStatus =
   | "none"
@@ -37,29 +38,6 @@ export function toPrismaArtifactStatus(
   status: AppArtifactStatus,
 ): PrismaArtifactStatus {
   return TO_PRISMA[status];
-}
-
-export function deriveArtifactsPanelStatus(
-  runStatus: AppRunStatus,
-  artifactStatus: AppArtifactStatus,
-): ArtifactsPanelStatus {
-  switch (artifactStatus) {
-    case "ready":
-      return "ready";
-    case "generating":
-      return "generating";
-    case "pending":
-      return "generating";
-    case "failed":
-      return "unavailable";
-    case "none":
-      if (runStatus === "running") return "pending";
-      if (runStatus === "failed") return "unavailable";
-      if (runStatus === "complete") return "unavailable";
-      return "idle";
-    default:
-      return "idle";
-  }
 }
 
 export async function updateArtifactStatus(

@@ -7,6 +7,11 @@ import {
   isKeywordHybridProject,
 } from "../ai/orchestration/classify-project.js";
 import {
+  isArchitectDeliverableInsufficient,
+  isSoftwareArchitectDeliverableInsufficient,
+} from "../ai/orchestration/agent-deliverable-quality.js";
+import { looksLikeTruncatedAgentOutput } from "../ai/orchestration/looks-like-truncated-agent-output.js";
+import {
   extractReviewerDecisionTag,
   isDebateComplete,
   isLegacyUntaggedReviewerCompletion,
@@ -163,6 +168,77 @@ describe("parseDebateOutcomeFromRunSummary", () => {
         JSON.stringify({ debateOutcome: "invalid" }),
       ),
       null,
+    );
+  });
+});
+
+describe("looksLikeTruncatedAgentOutput", () => {
+  it("detects mid-sentence cutoff", () => {
+    const text =
+      "## Architecture\n\nWe adopt PostgreSQL with read replicas for analytics, but the migration strategy must account for";
+    assert.equal(looksLikeTruncatedAgentOutput(text, "architect"), true);
+  });
+
+  it("accepts complete sentences", () => {
+    const text =
+      "## Architecture\n\nWe adopt PostgreSQL with read replicas for analytics.";
+    assert.equal(looksLikeTruncatedAgentOutput(text, "architect"), false);
+  });
+
+  it("accepts reviewer with terminal decision tag", () => {
+    const text = "## Review\n\nScope is sound.\n\n[APPROVE]";
+    assert.equal(looksLikeTruncatedAgentOutput(text, "reviewer"), false);
+  });
+
+  it("detects unclosed code fence", () => {
+    const text = "## APIs\n\n```typescript\nexport function handler() {";
+    assert.equal(looksLikeTruncatedAgentOutput(text, "backend"), true);
+  });
+
+  it("detects open inline code and bare HTTP status at end", () => {
+    assert.equal(
+      looksLikeTruncatedAgentOutput(
+        "## Risks\n\nEn cas de circuit ouvert, on renvoie `503",
+        "backend",
+      ),
+      true,
+    );
+    assert.equal(
+      looksLikeTruncatedAgentOutput(
+        "## Risks\n\nCircuit ouvert, on renvoie 503",
+        "backend",
+      ),
+      true,
+    );
+  });
+});
+
+describe("isSoftwareArchitectDeliverableInsufficient", () => {
+  it("flags preamble-only architect output", () => {
+    const text =
+      "Je commence par vérifier la disponibilité et la version de notre framework primaire avant toute décision.";
+    assert.equal(isSoftwareArchitectDeliverableInsufficient(text), true);
+  });
+
+  it("accepts multi-section architecture", () => {
+    const sections = [
+      "## Architecture",
+      "Monolith with API tier.",
+      "## Data Model",
+      "PostgreSQL entities.",
+      "## APIs & Integration",
+      "REST with idempotency keys.",
+      "## Decisions & Risks",
+      "Chose Fastify over Express for throughput.",
+    ];
+    const text = `${sections.join("\n\n")}\n\n${"Detail padding. ".repeat(55)}`;
+    assert.equal(isSoftwareArchitectDeliverableInsufficient(text), false);
+  });
+
+  it("uses template-specific rules", () => {
+    assert.equal(
+      isArchitectDeliverableInsufficient("## A\n\nShort.", "physical"),
+      true,
     );
   });
 });
