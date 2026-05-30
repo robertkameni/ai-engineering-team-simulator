@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
+import { regenerateRunArtifactsWithUsage } from "@/lib/ai/persist-regenerate-usage";
 import type { RegenerateArtifactsActionState } from "@/features/artifacts/regenerate-artifacts-state";
 import {
   getRunOwnershipContext,
@@ -55,7 +55,7 @@ export async function regenerateRunArtifactsAction(
     };
   }
 
-  const result = await regenerateRunArtifacts(runId);
+  const result = await regenerateRunArtifactsWithUsage(runId);
   if (!result.ok) {
     return {
       success: false,

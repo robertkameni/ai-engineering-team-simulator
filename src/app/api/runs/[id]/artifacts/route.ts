@@ -1,4 +1,4 @@
-import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
+import { regenerateRunArtifactsWithUsage } from "@/lib/ai/persist-regenerate-usage";
 import { parseDebateOutcomeFromRunSummary } from "@/ai/orchestration/reviewer-decision";
 import {
   getRunOwnershipContext,
@@ -51,7 +51,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
     return runAccessDeniedResponse(access);
   }
 
-  const result = await regenerateRunArtifacts(id);
+  const result = await regenerateRunArtifactsWithUsage(id);
 
   if (!result.ok) {
     if (result.error === "not_found") {

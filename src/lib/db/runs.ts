@@ -87,6 +87,24 @@ export async function setRunUsageTotals(
   });
 }
 
+export async function getRunUsageTotalsById(
+  runId: string,
+): Promise<RunUsageTotals | null> {
+  const run = await prisma.run.findUnique({
+    where: { id: runId },
+    select: {
+      promptTokens: true,
+      completionTokens: true,
+      totalTokens: true,
+      estimatedCostUsd: true,
+    },
+  });
+  if (!run) {
+    return null;
+  }
+  return mapUsageFromRun(run);
+}
+
 export async function updateRunStatus(runId: string, status: AppRunStatus) {
   return prisma.run.update({
     where: { id: runId },

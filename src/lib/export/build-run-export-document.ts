@@ -9,6 +9,7 @@ import {
 } from "@/features/artifacts/artifact-panel-phase";
 import { getArtifactTabConfig } from "@/features/artifacts/artifact-tab-styles";
 import type { MockRun } from "@/features/agents/types";
+import { hasRecordedRunUsage } from "@/lib/ai/run-usage";
 import {
   parseMessageBlocks,
   type MessageBlock,
@@ -45,7 +46,7 @@ function appendMetadata(lines: string[], ctx: RunExportContext): void {
     "",
   );
 
-  if (run.usage) {
+  if (hasRecordedRunUsage(run.usage)) {
     const cost =
       run.usage.estimatedCostUsd > 0
         ? " · **Est. cost:** $" + run.usage.estimatedCostUsd.toFixed(4)
@@ -90,7 +91,7 @@ function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
       "</p>",
   );
 
-  if (run.usage) {
+  if (hasRecordedRunUsage(run.usage)) {
     const cost =
       run.usage.estimatedCostUsd > 0
         ? " · <strong>Est. cost:</strong> $" +

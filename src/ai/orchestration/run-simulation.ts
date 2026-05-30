@@ -1,4 +1,3 @@
-import type { LanguageModelUsage } from "ai";
 import { stepCountIs, streamText } from "ai";
 
 import {
@@ -27,7 +26,10 @@ import { getAgentSystemPrompt } from "@/ai/prompts";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import { getDeepSeekModel } from "@/ai/providers";
 import { getAgentTools, getComplianceTools } from "@/ai/tools/registry";
-import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
+import {
+  RunUsageAccumulator,
+  type StreamTextUsageSource,
+} from "@/lib/ai/run-usage-accumulator";
 import { updateArtifactStatus } from "@/lib/db/artifact-status";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
 import { saveTeamRoster } from "@/lib/db/team-roster";
@@ -411,7 +413,7 @@ function emitVisibleDelta(
 }
 
 async function recordStreamUsage(
-  result: { usage: PromiseLike<LanguageModelUsage> },
+  result: StreamTextUsageSource,
   modelId: ReturnType<typeof getAgentConfig>["model"],
   usageAccumulator: RunUsageAccumulator,
 ): Promise<void> {

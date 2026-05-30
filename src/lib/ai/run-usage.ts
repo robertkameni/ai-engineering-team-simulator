@@ -20,3 +20,9 @@ export interface UsageDelta {
 export interface RunUsageSnapshot extends RunUsageTotals {
   userId: string | null;
 }
+
+export function hasRecordedRunUsage(
+  usage: RunUsageTotals | undefined,
+): usage is RunUsageTotals {
+  return usage != null && usage.totalTokens > 0;
+}

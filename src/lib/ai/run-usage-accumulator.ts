@@ -4,6 +4,27 @@ import { usageDeltaFromLanguageModelUsage } from "@/ai/pricing";
 import type { DeepSeekModelId } from "@/ai/providers";
 import type { RunUsageTotals, UsageDelta } from "@/lib/ai/run-usage";
 
+/** streamText result: prefer totalUsage (all steps) over usage (last step only). */
+export type StreamTextUsageSource = {
+  usage: PromiseLike<LanguageModelUsage>;
+  totalUsage?: PromiseLike<LanguageModelUsage>;
+};
+
+export function createRunUsageAccumulator(
+  existing?: RunUsageTotals | null,
+): RunUsageAccumulator {
+  const accumulator = new RunUsageAccumulator();
+  if (existing) {
+    accumulator.addDelta({
+      promptTokens: existing.promptTokens,
+      completionTokens: existing.completionTokens,
+      totalTokens: existing.totalTokens,
+      estimatedCostUsd: existing.estimatedCostUsd,
+    });
+  }
+  return accumulator;
+}
+
 export class RunUsageAccumulator {
   private promptTokens = 0;
   private completionTokens = 0;
@@ -25,11 +46,11 @@ export class RunUsageAccumulator {
   }
 
   async addFromStreamResult(
-    result: { usage: PromiseLike<LanguageModelUsage> },
+    result: StreamTextUsageSource,
     modelId: DeepSeekModelId,
   ): Promise<void> {
     try {
-      const usage = await result.usage;
+      const usage = await (result.totalUsage ?? result.usage);
       this.addFromUsage(usage, modelId);
     } catch (error) {
       console.warn("Failed to read stream usage:", error);
