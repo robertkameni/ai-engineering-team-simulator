@@ -21,7 +21,7 @@ In the Vercel project → **Settings → Environment Variables**, configure at l
 | `DATABASE_URL` | ✓ | ✓ | Pooled Postgres URL from Neon (integration sets this). |
 | `DEEPSEEK_API_KEY` | ✓ | ✓ | Simulations and artifact generation. |
 | `AUTH_SECRET` | ✓ | ✓ | **Required in production** — JWT session signing (`src/lib/auth/auth-session.ts`). |
-| `UPSTASH_REDIS_REST_URL` | ✓ | ✓ | Rate limiting for `/api/simulate` and delete. |
+| `UPSTASH_REDIS_REST_URL` | ✓ | ✓ | Rate limiting (simulate, delete, export, regenerate, auth). |
 | `UPSTASH_REDIS_REST_TOKEN` | ✓ | ✓ | Pair with URL above. |
 
 Optional:
@@ -29,9 +29,15 @@ Optional:
 | Variable | Notes |
 |---------|-------|
 | `DIRECT_URL` | Non-pooled Neon URL for `prisma migrate deploy` (advisory locks). Resolved automatically when set; see `scripts/resolve-migrate-database-url.mjs`. |
+| `SIMULATION_MAX_COST_USD` | Per-run USD ceiling for classification + debate + artifacts + regeneration (default `0.75`). |
 | `RATE_LIMIT_SIMULATE_GUEST` | Default `3` simulations per hour per IP (guest). |
 | `RATE_LIMIT_SIMULATE_AUTH` | Default `30` simulations per hour per signed-in user. |
+| `RATE_LIMIT_REGENERATE_GUEST` | Default `3` regenerations per hour (guest). |
+| `RATE_LIMIT_REGENERATE_AUTH` | Default `10` regenerations per hour (signed in). |
+| `RATE_LIMIT_EXPORT_PDF` | Default `5` exports per hour (MD + PDF share bucket). |
 | `RATE_LIMIT_DELETE` | Default `30` deletes per hour. |
+| `RATE_LIMIT_AUTH_LOGIN` | Default `10` login attempts per 15 min per IP + email hash. |
+| `RATE_LIMIT_AUTH_REGISTER` | Default `10` register attempts per 15 min per IP + email hash. |
 | `RATE_LIMIT_DISABLED` | Set `true` to bypass limits (not recommended in production). |
 | `DEEPSEEK_*_USD_PER_M` | Override model pricing for usage/cost estimates — see [.env.example](.env.example). |
 
@@ -93,8 +99,10 @@ After deploy:
 3. Open `/runs/[id]` — thread, artifacts, and token/cost badge appear.
 4. Sidebar lists the run under your guest session (or signed-in account).
 5. **Export** — guests are prompted to sign in; register/login, then export succeeds.
-6. **Delete** — remove a run from the sidebar; foreign runs return `403`.
+6. **Delete** — remove a run from the sidebar; another user's run ID returns **404** (not 403).
 7. **Rate limit** — repeated simulate calls eventually return `429` (if Upstash is configured).
+8. **Auth rate limit** — many rapid login attempts from the same IP/email return `429` with `Retry-After`.
+9. **Regenerate** — use the header regenerate control; spamming returns a rate-limit message in the UI.
 
 If streaming fails with 5xx, check Vercel **Functions** logs and confirm `DEEPSEEK_API_KEY`, `DATABASE_URL`, and `AUTH_SECRET` are set for the deployment environment you are hitting.
 
@@ -105,9 +113,10 @@ If simulate returns `503` with a rate-limit message, confirm Upstash env vars ar
 - **Schema changes:** commit a new Prisma migration under `prisma/migrations/`, then deploy; `migrate deploy` applies pending migrations on the next build.
 - **Do not** commit `.env.local` or real API keys.
 - **Usage costs:** `Run.estimatedCostUsd` uses DeepSeek v4 pricing defaults in `src/ai/pricing.ts`; update env overrides when DeepSeek changes rates.
+- **Security tests:** run `npm test` before releases — includes budget, rate-limit, export authorization, and auth key suites under `src/test/security/`.
 
 ---
 
 *See [MASTERPLAN.md](MASTERPLAN.md) for roadmap context (Phases 7–9).*
 
-*Last updated: 2026-05-25*
+*Last updated: 2026-05-31*

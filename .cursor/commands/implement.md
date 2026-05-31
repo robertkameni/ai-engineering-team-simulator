@@ -129,3 +129,4 @@ In task mode:
 - keep explanations concise
 - explain only important runtime decisions
 - avoid long summaries unless requested
+- always keep up-to-date all documentation files

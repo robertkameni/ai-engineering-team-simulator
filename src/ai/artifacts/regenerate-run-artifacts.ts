@@ -3,6 +3,10 @@ import { isStoredSimulationAgentRole } from "@/ai/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 import { generateRunArtifacts } from "@/ai/artifacts/generate-run-artifacts";
 import type { TranscriptEntry } from "@/ai/context/transcript";
+import {
+  assertSimulationWithinBudget,
+  isSimulationBudgetExceeded,
+} from "@/ai/orchestration/simulation-budget";
 import { isDebateComplete } from "@/ai/orchestration/reviewer-decision";
 import type { AgentRole } from "@/features/agents/types";
 import { getPersona } from "@/features/agents/personas";
@@ -31,7 +35,8 @@ export type RegenerateRunArtifactsError =
   | "no_messages"
   | "run_in_progress"
   | "generation_active"
-  | "generation_failed";
+  | "generation_failed"
+  | "budget_exceeded";
 
 export type RegenerateRunArtifactsResult =
   | { ok: true; artifacts: RunArtifacts }
@@ -138,6 +143,22 @@ export async function regenerateRunArtifacts(
     (await getTeamRoster(runId)) ??
     buildRosterFromMessages(simulationMessages);
 
+  if (options.usageAccumulator) {
+    try {
+      assertSimulationWithinBudget(options.usageAccumulator);
+    } catch (error) {
+      if (isSimulationBudgetExceeded(error)) {
+        console.warn("Regenerate artifacts: budget exceeded before generation", {
+          runId,
+          estimatedCostUsd: error.estimatedCostUsd,
+          maxCostUsd: error.maxCostUsd,
+        });
+        return { ok: false, error: "budget_exceeded" };
+      }
+      throw error;
+    }
+  }
+
   const claimed = await claimArtifactGeneration(runId);
   if (!claimed) {
     return {
@@ -168,6 +189,19 @@ export async function regenerateRunArtifacts(
 
     return { ok: true, artifacts: bundle };
   } catch (error) {
+    if (isSimulationBudgetExceeded(error)) {
+      console.warn("Regenerate artifacts: budget exceeded during generation", {
+        runId,
+        estimatedCostUsd: error.estimatedCostUsd,
+        maxCostUsd: error.maxCostUsd,
+      });
+      await updateArtifactStatus(runId, "failed");
+      if (status === "running") {
+        await updateRunStatus(runId, "complete");
+      }
+      return { ok: false, error: "budget_exceeded" };
+    }
+
     console.error("Regenerate artifacts failed:", error);
     await updateArtifactStatus(runId, "failed");
     if (status === "running") {

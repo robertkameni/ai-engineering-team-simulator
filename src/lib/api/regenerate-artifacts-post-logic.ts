@@ -58,6 +58,15 @@ function mapRegenerateErrorResponse(
       { status: 409 },
     );
   }
+  if (result.error === "budget_exceeded") {
+    return Response.json(
+      {
+        error:
+          "This run reached the simulation cost limit. Debate results are saved; artifacts could not be generated.",
+      },
+      { status: 400 },
+    );
+  }
   return Response.json(
     { error: result.message ?? "Artifact generation failed" },
     { status: 500 },

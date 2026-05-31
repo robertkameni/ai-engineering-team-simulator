@@ -1,4 +1,12 @@
-export type RateLimitAction = "simulate" | "delete" | "export_pdf" | "regenerate";
+export type RateLimitAction =
+  | "simulate"
+  | "delete"
+  | "export_pdf"
+  | "regenerate"
+  | "auth_login"
+  | "auth_register";
+
+export type AuthRateLimitAction = "auth_login" | "auth_register";
 
 export type RateLimitResult =
   | { ok: true }
@@ -12,7 +20,12 @@ export const DEFAULT_RATE_LIMITS: Record<
   delete: { guest: 30, auth: 30 },
   export_pdf: { guest: 5, auth: 5 },
   regenerate: { guest: 3, auth: 10 },
+  auth_login: { guest: 10, auth: 10 },
+  auth_register: { guest: 10, auth: 10 },
 };
+
+export const DEFAULT_AUTH_RATE_LIMIT = 10;
+export const AUTH_RATE_LIMIT_WINDOW = "15 m" as const;
 
 const LIMIT_ENV_KEYS: Record<
   RateLimitAction,
@@ -34,7 +47,20 @@ const LIMIT_ENV_KEYS: Record<
     guest: "RATE_LIMIT_REGENERATE_GUEST",
     auth: "RATE_LIMIT_REGENERATE_AUTH",
   },
+  auth_login: {
+    guest: "RATE_LIMIT_AUTH_LOGIN",
+    auth: "RATE_LIMIT_AUTH_LOGIN",
+  },
+  auth_register: {
+    guest: "RATE_LIMIT_AUTH_REGISTER",
+    auth: "RATE_LIMIT_AUTH_REGISTER",
+  },
 };
+
+export function getAuthRateLimitThreshold(action: AuthRateLimitAction): number {
+  const envKey = LIMIT_ENV_KEYS[action].auth;
+  return parseLimit(envKey, DEFAULT_AUTH_RATE_LIMIT);
+}
 
 function parseLimit(name: string, fallback: number): number {
   const raw = process.env[name];

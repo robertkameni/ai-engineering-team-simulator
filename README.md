@@ -24,7 +24,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-**Optional env** (see [.env.example](./.env.example)): `AUTH_SECRET` (JWT sessions in production), `DIRECT_URL` (Neon migrations), Upstash Redis for rate limits in production.
+**Optional env** (see [.env.example](./.env.example)): `AUTH_SECRET` (JWT sessions in production), `DIRECT_URL` (Neon migrations), Upstash Redis for rate limits, `SIMULATION_MAX_COST_USD` (per-run cost ceiling, default $0.75), `RATE_LIMIT_ENABLED_IN_DEV=true` to test throttling locally.
 
 - **Recommended:** Lighthouse and perf checks on **`npm run build && npm run start`**, not `next dev`.
 
@@ -41,8 +41,18 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Sessions & auth
 
 - **Guest mode (default):** a cookie-scoped session owns your runs; sidebar and delete are scoped to that browser session. A **Public session** badge appears in the header.
-- **Sign in / register:** email + password (JWT session cookie). Guest runs are **claimed** to your account on login/register (`POST /api/auth/claim-guest-runs`).
-- **Rate limits** (production, Upstash Redis): simulate and delete are throttled per IP (guests) or per user (signed in). Disabled in local dev unless `RATE_LIMIT_ENABLED_IN_DEV=true`.
+- **Sign in / register:** email + password (JWT session cookie). Guest runs are **claimed** to your account on login/register (`POST /api/auth/claim-guest-runs`). Duplicate registration returns the same generic error as a failed login (no email enumeration).
+- **Rate limits** (production, Upstash Redis): throttled per IP (guests) or per user (signed in). Disabled in local dev unless `RATE_LIMIT_ENABLED_IN_DEV=true`.
+
+| Action | Default limit (guest / signed-in) |
+|--------|-----------------------------------|
+| Simulate | 3 / 30 per hour |
+| Regenerate artifacts (API + UI action) | 3 / 10 per hour |
+| Export PDF / Markdown | 5 / 5 per hour |
+| Delete run | 30 / 30 per hour |
+| Login / register | 10 per 15 min per IP + email hash |
+
+- **Cost ceiling:** each run shares one budget (`SIMULATION_MAX_COST_USD`, default **$0.75**) across classification, debate, artifact synthesis, and regeneration. If the budget is exhausted during artifacts, debate messages are kept, artifacts may show as failed, and the live stream still completes with `done`.
 
 **Examples**
 
@@ -60,6 +70,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run build` | Generate Prisma client, migrate if `DATABASE_URL` is set, production Next build |
 | `npm run start` | Serve production build |
 | `npm run lint` | ESLint |
+| `npm test` | Security and unit tests (`src/test/**/*.test.ts`) |
 | `npm run db:migrate` | `prisma migrate dev` |
 | `npm run db:migrate:deploy` | `prisma migrate deploy` |
 
@@ -77,4 +88,4 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Vercel + Neon env vars, build/migra
 
 ---
 
-*README last updated: 2026-05-29 — PDF export (server-side, styled, native Save picker); 6-agent pipeline (DevOps), auth + guest sessions, usage/cost pill, rate limiting, landing refresh, language detection.*
+*README last updated: 2026-05-31 — full-lifecycle cost ceiling, regenerate action rate limits, auth brute-force shields, security test suite.*

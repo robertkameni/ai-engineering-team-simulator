@@ -14,9 +14,7 @@ export async function regenerateRunArtifactsWithUsage(
   const usageAccumulator = createRunUsageAccumulator(existing);
   const result = await regenerateRunArtifacts(runId, { usageAccumulator });
 
-  if (result.ok) {
-    await setRunUsageTotals(runId, usageAccumulator.getTotals());
-  }
+  await setRunUsageTotals(runId, usageAccumulator.getTotals());
 
   return result;
 }

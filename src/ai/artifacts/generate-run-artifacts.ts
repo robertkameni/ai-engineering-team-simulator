@@ -7,6 +7,10 @@ import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { buildArtifactLanguageDirective } from "@/ai/context/detect-product-language";
 import {
+  assertSimulationWithinBudget,
+  isSimulationBudgetExceeded,
+} from "@/ai/orchestration/simulation-budget";
+import {
   type DebateExitOutcome,
   parseDebateOutcomeFromRunSummary,
 } from "@/ai/orchestration/reviewer-decision";
@@ -92,6 +96,10 @@ Output rules:
 - Omit sections with no substance from the debate.`;
 
   try {
+    if (usageAccumulator) {
+      assertSimulationWithinBudget(usageAccumulator);
+    }
+
     const structured = await generateText({
       model: getDeepSeekModel(ARTIFACT_MODEL),
       system,
@@ -109,11 +117,22 @@ Output rules:
       ARTIFACT_MODEL,
     );
 
+    if (usageAccumulator) {
+      assertSimulationWithinBudget(usageAccumulator);
+    }
+
     if (structured.output) {
       return structured.output;
     }
   } catch (error) {
+    if (isSimulationBudgetExceeded(error)) {
+      throw error;
+    }
     console.warn(`Structured ${type} artifact failed, trying JSON fallback:`, error);
+  }
+
+  if (usageAccumulator) {
+    assertSimulationWithinBudget(usageAccumulator);
   }
 
   const fallback = await generateText({
@@ -130,6 +149,10 @@ Respond with ONLY a JSON object: { "sections": [{ "title": string, "items": stri
   });
 
   await usageAccumulator?.addFromGenerateTextResult(fallback, ARTIFACT_MODEL);
+
+  if (usageAccumulator) {
+    assertSimulationWithinBudget(usageAccumulator);
+  }
 
   const json = extractJsonObject(fallback.text);
   const parsed = artifactDocumentSchema.safeParse(json);
@@ -184,8 +207,14 @@ export async function generateRunArtifacts({
     roster,
   );
 
-  const entries = await Promise.all(
-    ARTIFACT_TYPES.map(async (type) => {
+  if (usageAccumulator) {
+    assertSimulationWithinBudget(usageAccumulator);
+  }
+
+  const entries: [ArtifactType, ArtifactDocument][] = [];
+
+  if (usageAccumulator) {
+    for (const type of ARTIFACT_TYPES) {
       const document = await generateArtifactDocument(
         type,
         transcriptPrompt,
@@ -195,9 +224,27 @@ export async function generateRunArtifacts({
         debateOutcome,
       );
       await onArtifactComplete?.(type, document);
-      return [type, document] as const;
-    }),
-  );
+      entries.push([type, document]);
+    }
+  } else {
+    const parallelEntries = await Promise.all(
+      ARTIFACT_TYPES.map(async (type) => {
+        const document = await generateArtifactDocument(
+          type,
+          transcriptPrompt,
+          templateId,
+          productIdea,
+          usageAccumulator,
+          debateOutcome,
+        );
+        await onArtifactComplete?.(type, document);
+        return [type, document] as const;
+      }),
+    );
+    for (const entry of parallelEntries) {
+      entries.push([entry[0], entry[1]]);
+    }
+  }
 
   return Object.fromEntries(entries) as RunArtifactsOutput;
 }

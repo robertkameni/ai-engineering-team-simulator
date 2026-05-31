@@ -91,7 +91,17 @@ export async function POST(request: Request) {
           usageAccumulator,
         });
         if (!synthesis.ok) {
-          console.error("Artifact synthesis failed:", synthesis);
+          if (synthesis.error === "budget_exceeded") {
+            console.warn("Artifact synthesis stopped: run cost budget exceeded", {
+              runId,
+            });
+            await reconcileRunFailure(runId, {
+              debateComplete: true,
+              artifactPhaseStarted: true,
+            });
+          } else {
+            console.error("Artifact synthesis failed:", synthesis);
+          }
         }
 
         if (signal.aborted) {

@@ -2,7 +2,9 @@ import { setAuthSessionCookie } from "@/lib/auth/auth-session";
 import { authCredentialsSchema } from "@/lib/auth/auth-schemas";
 import { claimGuestRunsForUser } from "@/lib/auth/claim-guest-runs";
 import { getGuestSessionId } from "@/lib/auth/guest-session";
+import { assertAuthRateLimit } from "@/lib/auth/auth-rate-limit";
 import { verifyPassword } from "@/lib/auth/password";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -37,6 +39,12 @@ export async function POST(request: Request) {
     }
 
     const email = parsed.data.email.toLowerCase();
+
+    const rateLimit = await assertAuthRateLimit(request, "auth_login", email);
+    if (!rateLimit.ok) {
+      return rateLimitResponse(rateLimit);
+    }
+
     const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user || !(await verifyPassword(parsed.data.password, user.passwordHash))) {

@@ -4,7 +4,9 @@ import { setAuthSessionCookie } from "@/lib/auth/auth-session";
 import { authCredentialsSchema } from "@/lib/auth/auth-schemas";
 import { claimGuestRunsForUser } from "@/lib/auth/claim-guest-runs";
 import { getGuestSessionId } from "@/lib/auth/guest-session";
+import { assertAuthRateLimit } from "@/lib/auth/auth-rate-limit";
 import { hashPassword } from "@/lib/auth/password";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -26,6 +28,12 @@ export async function POST(request: Request) {
   }
 
   const email = parsed.data.email.toLowerCase();
+
+  const rateLimit = await assertAuthRateLimit(request, "auth_register", email);
+  if (!rateLimit.ok) {
+    return rateLimitResponse(rateLimit);
+  }
+
   const passwordHash = await hashPassword(parsed.data.password);
 
   try {
@@ -49,9 +57,10 @@ export async function POST(request: Request) {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
+      console.warn("Register rejected: duplicate email", { email });
       return Response.json(
-        { error: "An account with this email already exists" },
-        { status: 409 },
+        { error: "Invalid email or password" },
+        { status: 401 },
       );
     }
 

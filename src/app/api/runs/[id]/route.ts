@@ -23,7 +23,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
   }
 
   if (result === "forbidden") {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
+    return Response.json({ error: "Run not found" }, { status: 404 });
   }
 
   return new Response(null, { status: 204 });
