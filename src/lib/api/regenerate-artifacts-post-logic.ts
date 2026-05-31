@@ -1,24 +1,16 @@
 import type { RegenerateRunArtifactsResult } from "@/ai/artifacts/regenerate-run-artifacts";
-import type {
-  RequireRunAccessResult,
-  RunOwnershipScope,
-} from "@/lib/auth/run-ownership";
+import { runAccessDeniedResponse } from "@/lib/auth/run-access-denied-response";
+import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
 import type { RateLimitResult } from "@/lib/rate-limit-config";
-
-function accessDeniedResponse(
-  access: Extract<RequireRunAccessResult, { ok: false }>,
-): Response {
-  if (access.reason === "not_found") {
-    return Response.json({ error: "Run not found" }, { status: 404 });
-  }
-  return Response.json({ error: "Forbidden" }, { status: 403 });
-}
 
 export interface RegenerateArtifactsPostHooks {
   requireRunAccess: (
     runId: string,
     scope: RunOwnershipScope,
-  ) => Promise<RequireRunAccessResult>;
+  ) => Promise<
+    | { ok: true; run: { id: string; userId: string | null; guestSessionId: string | null } }
+    | { ok: false; reason: "not_found" | "forbidden" }
+  >;
   assertRateLimit: (
     request: Request,
     action: "regenerate",
@@ -26,6 +18,7 @@ export interface RegenerateArtifactsPostHooks {
   ) => Promise<RateLimitResult>;
   regenerateRunArtifactsWithUsage: (
     runId: string,
+    scope: RunOwnershipScope,
   ) => Promise<RegenerateRunArtifactsResult>;
   rateLimitResponse: (result: Extract<RateLimitResult, { ok: false }>) => Response;
 }
@@ -33,7 +26,7 @@ export interface RegenerateArtifactsPostHooks {
 function mapRegenerateErrorResponse(
   result: Extract<RegenerateRunArtifactsResult, { ok: false }>,
 ): Response {
-  if (result.error === "not_found") {
+  if (result.error === "not_found" || result.error === "forbidden") {
     return Response.json({ error: "Run not found" }, { status: 404 });
   }
   if (result.error === "no_messages") {
@@ -81,7 +74,7 @@ export async function executeRegenerateArtifactsPost(
 ): Promise<Response> {
   const access = await hooks.requireRunAccess(runId, scope);
   if (!access.ok) {
-    return accessDeniedResponse(access);
+    return runAccessDeniedResponse(access);
   }
 
   const rateLimit = await hooks.assertRateLimit(request, "regenerate", scope.userId);
@@ -89,7 +82,7 @@ export async function executeRegenerateArtifactsPost(
     return hooks.rateLimitResponse(rateLimit);
   }
 
-  const result = await hooks.regenerateRunArtifactsWithUsage(runId);
+  const result = await hooks.regenerateRunArtifactsWithUsage(runId, scope);
   if (!result.ok) {
     return mapRegenerateErrorResponse(result);
   }

@@ -5,6 +5,8 @@ import { getSessionUser } from "@/lib/auth/session";
 import { canAccessRun } from "@/lib/db/runs";
 import { prisma } from "@/lib/prisma";
 
+export { runAccessDeniedResponse } from "@/lib/auth/run-access-denied-response";
+
 export interface RunOwnershipScope {
   userId: string | null;
   guestSessionId: string | null;
@@ -62,11 +64,3 @@ export async function requireRunAccess(
   return { ok: true, run };
 }
 
-export function runAccessDeniedResponse(
-  access: Extract<RequireRunAccessResult, { ok: false }>,
-): Response {
-  if (access.reason === "not_found") {
-    return Response.json({ error: "Run not found" }, { status: 404 });
-  }
-  return Response.json({ error: "Forbidden" }, { status: 403 });
-}

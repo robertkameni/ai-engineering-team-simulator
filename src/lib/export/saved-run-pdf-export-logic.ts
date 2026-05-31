@@ -3,19 +3,13 @@ import {
   type RunExportContext,
 } from "@/lib/export/build-run-export-document";
 import { buildRunPdfFilename } from "@/lib/export/export-filename";
+import {
+  runAccessDeniedResponse,
+} from "@/lib/auth/run-access-denied-response";
 import type { RequireRunAccessResult } from "@/lib/auth/run-ownership";
 import type { RateLimitResult } from "@/lib/rate-limit-config";
 import type { MockRun } from "@/features/agents/types";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
-
-function accessDeniedResponse(
-  access: Extract<RequireRunAccessResult, { ok: false }>,
-): Response {
-  if (access.reason === "not_found") {
-    return Response.json({ error: "Run not found" }, { status: 404 });
-  }
-  return Response.json({ error: "Forbidden" }, { status: 403 });
-}
 
 export interface SavedRunPdfExportHooks {
   requireRunAccess: (
@@ -56,7 +50,7 @@ export async function executeSavedRunPdfExport(
 
   const access = await hooks.requireRunAccess(runId, scope);
   if (!access.ok) {
-    return accessDeniedResponse(access);
+    return runAccessDeniedResponse(access);
   }
 
   const rateLimit = await hooks.assertRateLimit(request, "export_pdf", userId);

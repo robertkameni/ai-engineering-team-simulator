@@ -21,6 +21,7 @@ export interface RegenerateArtifactsActionHooks {
   ) => Promise<RateLimitResult>;
   regenerateRunArtifactsWithUsage: (
     runId: string,
+    scope: RunOwnershipScope,
   ) => Promise<RegenerateRunArtifactsResult>;
 }
 
@@ -30,6 +31,7 @@ export function mapRegenerateActionError(
 ): string {
   switch (error) {
     case "not_found":
+    case "forbidden":
       return "Run not found.";
     case "no_messages":
       return "No debate messages to synthesize from.";
@@ -63,7 +65,7 @@ export async function executeRegenerateArtifactsAction(
   if (!access.ok) {
     return {
       success: false,
-      error: "Unauthorized access to this workspace.",
+      error: "Run not found.",
     };
   }
 
@@ -79,7 +81,7 @@ export async function executeRegenerateArtifactsAction(
     };
   }
 
-  const result = await hooks.regenerateRunArtifactsWithUsage(runId);
+  const result = await hooks.regenerateRunArtifactsWithUsage(runId, scope);
   if (!result.ok) {
     return {
       success: false,

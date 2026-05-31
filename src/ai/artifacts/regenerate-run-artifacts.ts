@@ -29,9 +29,14 @@ import {
   TEAM_ROSTER_ARTIFACT_TYPE,
 } from "@/lib/db/team-roster";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
+import {
+  requireRunAccess,
+  type RunOwnershipScope,
+} from "@/lib/auth/run-ownership";
 
 export type RegenerateRunArtifactsError =
   | "not_found"
+  | "forbidden"
   | "no_messages"
   | "run_in_progress"
   | "generation_active"
@@ -76,8 +81,19 @@ function mapMessagesToTranscript(
 
 export async function regenerateRunArtifacts(
   runId: string,
-  options: { usageAccumulator?: RunUsageAccumulator } = {},
+  options: {
+    scope: RunOwnershipScope;
+    usageAccumulator?: RunUsageAccumulator;
+  },
 ): Promise<RegenerateRunArtifactsResult> {
+  const access = await requireRunAccess(runId, options.scope);
+  if (!access.ok) {
+    return {
+      ok: false,
+      error: access.reason === "not_found" ? "not_found" : "forbidden",
+    };
+  }
+
   let run = await getRunWithMessages(runId);
   if (!run) {
     return { ok: false, error: "not_found" };

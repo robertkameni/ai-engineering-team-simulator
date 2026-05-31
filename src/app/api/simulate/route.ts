@@ -88,6 +88,7 @@ export async function POST(request: Request) {
 
         synthesisStarted = true;
         const synthesis = await regenerateRunArtifacts(runId, {
+          scope: { userId, guestSessionId },
           usageAccumulator,
         });
         if (!synthesis.ok) {

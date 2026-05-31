@@ -42,7 +42,7 @@ function baseHooks(
 }
 
 describe("executeSavedRunPdfExport authorization", () => {
-  it("returns 403 and skips PDF compilation when access is forbidden", async () => {
+  it("returns 404 and skips PDF compilation when access is forbidden", async () => {
     let compileCalled = false;
 
     const response = await executeSavedRunPdfExport(
@@ -58,9 +58,9 @@ describe("executeSavedRunPdfExport authorization", () => {
       }),
     );
 
-    assert.equal(response.status, 403);
+    assert.equal(response.status, 404);
     const body = (await response.json()) as { error: string };
-    assert.equal(body.error, "Forbidden");
+    assert.equal(body.error, "Run not found");
     assert.equal(compileCalled, false);
   });
 
