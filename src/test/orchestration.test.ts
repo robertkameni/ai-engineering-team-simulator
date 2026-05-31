@@ -15,6 +15,7 @@ import {
   extractReviewerDecisionTag,
   isDebateComplete,
   isLegacyUntaggedReviewerCompletion,
+  MAX_SIMULATION_TURNS,
   parseDebateOutcomeFromRunSummary,
   parseReviewerDecision,
   resolveUnknownReviewerDecision,
@@ -131,7 +132,7 @@ describe("isDebateComplete", () => {
   });
 
   it("returns true for cap-saturated runs", () => {
-    const capped = Array.from({ length: 18 }, (_, index) => ({
+    const capped = Array.from({ length: MAX_SIMULATION_TURNS }, (_, index) => ({
       agentRole: index % 2 === 0 ? "pm" : "architect",
       content: `turn ${index}`,
     }));

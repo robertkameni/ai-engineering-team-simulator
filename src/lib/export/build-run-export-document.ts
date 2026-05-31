@@ -312,7 +312,7 @@ export function buildRunMarkdown(ctx: RunExportContext): string {
 export function buildRunStyledMarkdown(ctx: RunExportContext): string {
   const { run } = ctx;
   const templateId = resolveTemplateId(ctx.templateId);
-  const parts: string[] = ["# " + run.title, ""];
+  const parts: string[] = ["# " + escapeHtml(run.title), ""];
 
   appendMetadataHtml(parts, ctx);
   parts.push("<hr />", "<h2>Team discussion</h2>");

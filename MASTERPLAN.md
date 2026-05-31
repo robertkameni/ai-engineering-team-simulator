@@ -299,13 +299,14 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 - [x] Claim guest runs on login/register — `POST /api/auth/claim-guest-runs`
 - [x] Ownership-scoped sidebar + run creation (`createRun` with `userId` / `guestSessionId`)
 - [x] Ownership-checked delete — `deleteRunIfOwned`, `403` on foreign runs
-- [x] Rate limiting — Upstash Redis on `POST /api/simulate` and `DELETE /api/runs/[id]` (`src/lib/rate-limit.ts`)
-- [x] Export gated to signed-in users — client modal for guests; `GET /api/runs/[id]/export` returns `401` without session
+- [x] Rate limiting — Upstash Redis on `POST /api/simulate`, `DELETE /api/runs/[id]`, PDF export routes, and `POST /api/runs/[id]/artifacts` (`src/lib/rate-limit.ts`)
+- [x] Export gated to signed-in users — client modal for guests; export APIs return `401` without session
+- [x] Ownership on `/runs/[id]`, artifacts GET/POST, and saved-run PDF export — `requireRunAccess` + scoped DB queries
+- [x] Export payload volumetry — live PDF POST caps messages, content size, artifact items (`export-pdf-payload.ts`)
+- [x] Security regression tests — `src/test/security/` (IDOR, volumetry, rate-limit config)
 - [x] UI — `AuthStatusBadge`, sign-out, export auth modal, header actions
 
 **Not yet:**
-
-- [ ] Ownership check on `/runs/[id]` page and `GET/POST /api/runs/[id]/artifacts` (run ID is still guessable if shared)
 - [ ] Third-party auth provider (Clerk / Auth0) — custom JWT chosen instead
 - [ ] Admin role surfaced in UI (`UserRole` migration exists; `scripts/create-admin-user.ts` for bootstrap)
 
@@ -344,11 +345,11 @@ These build on Phase 6; they reduce client JS on **saved-run** replay and tighte
 | `/api/simulate` | POST | Multi-agent SSE stream (ownership + rate limit) |
 | `/api/runs` | GET | Recent runs for sidebar (scoped to guest session or user) |
 | `/api/runs/[id]` | DELETE | Delete run if owned (403 otherwise) |
-| `/api/runs/[id]/artifacts` | GET | Artifact bundle for a run |
-| `/api/runs/[id]/artifacts` | POST | Regenerate artifacts from saved debate |
-| `/api/runs/[id]/export` | GET | Download run as Markdown — **auth required** |
-| `/api/runs/[id]/export/pdf` | GET | Download saved run as PDF — **auth required** |
-| `/api/export/pdf` | POST | Download live run as PDF — **auth required** |
+| `/api/runs/[id]/artifacts` | GET | Artifact bundle for a run (ownership-scoped) |
+| `/api/runs/[id]/artifacts` | POST | Regenerate artifacts — **ownership + rate limit** |
+| `/api/runs/[id]/export` | GET | Download run as Markdown — **auth + ownership required** |
+| `/api/runs/[id]/export/pdf` | GET | Download saved run as PDF — **auth + ownership + rate limit** |
+| `/api/export/pdf` | POST | Download live run as PDF — **auth + rate limit + payload volumetry** |
 | `/api/auth/register` | POST | Create account + session |
 | `/api/auth/login` | POST | Sign in + session |
 | `/api/auth/logout` | POST | Clear session |

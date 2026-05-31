@@ -3,6 +3,14 @@ import { z } from "zod";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import { isTeamTemplateId } from "@/ai/agents/team-templates";
 import type { MockRun } from "@/features/agents/types";
+import {
+  countExportArtifactItems,
+  EXPORT_PDF_MAX_ARTIFACT_ITEMS,
+  EXPORT_PDF_MAX_MESSAGE_CONTENT_CHARS,
+  EXPORT_PDF_MAX_MESSAGES,
+  EXPORT_PDF_MAX_TITLE_CHARS,
+  EXPORT_PDF_MAX_USER_PROMPT_CHARS,
+} from "@/lib/export/export-pdf-limits";
 
 const agentRoleSchema = z.enum([
   "pm",
@@ -39,30 +47,44 @@ const partialArtifactsSchema = z
 const simulationMessageSchema = z.object({
   id: z.string(),
   role: agentRoleSchema,
-  content: z.string(),
+  content: z.string().max(EXPORT_PDF_MAX_MESSAGE_CONTENT_CHARS),
   agentName: z.string().optional(),
   agentTitle: z.string().optional(),
   createdAt: z.string().optional(),
 });
 
-const mockRunSchema = z.object({
-  id: z.string(),
-  title: z.string().min(1),
-  userPrompt: z.string(),
-  status: runStatusSchema,
-  updatedAt: z.string(),
-  messages: z.array(simulationMessageSchema).min(1),
-  artifacts: partialArtifactsSchema,
-  usage: z
-    .object({
-      promptTokens: z.number(),
-      completionTokens: z.number(),
-      totalTokens: z.number(),
-      estimatedCostUsd: z.number(),
-    })
-    .optional(),
-  debateOutcome: debateOutcomeSchema.nullable().optional(),
-});
+const mockRunSchema = z
+  .object({
+    id: z.string(),
+    title: z.string().min(1).max(EXPORT_PDF_MAX_TITLE_CHARS),
+    userPrompt: z.string().max(EXPORT_PDF_MAX_USER_PROMPT_CHARS),
+    status: runStatusSchema,
+    updatedAt: z.string(),
+    messages: z
+      .array(simulationMessageSchema)
+      .min(1)
+      .max(EXPORT_PDF_MAX_MESSAGES),
+    artifacts: partialArtifactsSchema,
+    usage: z
+      .object({
+        promptTokens: z.number(),
+        completionTokens: z.number(),
+        totalTokens: z.number(),
+        estimatedCostUsd: z.number(),
+      })
+      .optional(),
+    debateOutcome: debateOutcomeSchema.nullable().optional(),
+  })
+  .superRefine((run, ctx) => {
+    const itemCount = countExportArtifactItems(run.artifacts);
+    if (itemCount > EXPORT_PDF_MAX_ARTIFACT_ITEMS) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Artifacts exceed maximum of ${EXPORT_PDF_MAX_ARTIFACT_ITEMS} items (got ${itemCount})`,
+        path: ["artifacts"],
+      });
+    }
+  });
 
 export const exportPdfPostBodySchema = z.object({
   run: mockRunSchema,

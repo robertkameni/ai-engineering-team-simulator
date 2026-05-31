@@ -1,13 +1,12 @@
 import { getSessionUser } from "@/lib/auth/session";
-import {
-  buildRunStyledMarkdown,
-} from "@/lib/export/build-run-export-document";
+import { buildRunStyledMarkdown } from "@/lib/export/build-run-export-document";
 import { buildRunPdfFilename } from "@/lib/export/export-filename";
 import {
   exportPdfPostBodySchema,
   toRunExportContext,
 } from "@/lib/export/export-pdf-payload";
 import { compileRunPdfFromMarkdown } from "@/lib/export/run-pdf";
+import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -19,6 +18,11 @@ export async function POST(request: Request) {
       { error: "Authentication required to export" },
       { status: 401 },
     );
+  }
+
+  const rateLimit = await assertRateLimit(request, "export_pdf", userId);
+  if (!rateLimit.ok) {
+    return rateLimitResponse(rateLimit);
   }
 
   let body: unknown;

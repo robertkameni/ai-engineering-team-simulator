@@ -1,10 +1,6 @@
-import { regenerateRunArtifactsWithUsage } from "@/lib/ai/persist-regenerate-usage";
 import { parseDebateOutcomeFromRunSummary } from "@/ai/orchestration/reviewer-decision";
-import {
-  getRunOwnershipContext,
-  requireRunAccess,
-  runAccessDeniedResponse,
-} from "@/lib/auth/run-ownership";
+import { handleRegenerateArtifactsPost } from "@/lib/api/handle-regenerate-artifacts-post";
+import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
 import { mapDbArtifactsToRunArtifacts } from "@/lib/db/artifacts";
 import {
   deriveArtifactsPanelStatus,
@@ -43,50 +39,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
   });
 }
 
-export async function POST(_request: Request, { params }: RouteParams) {
+export async function POST(request: Request, { params }: RouteParams) {
   const { id } = await params;
   const scope = await getRunOwnershipContext();
-  const access = await requireRunAccess(id, scope);
-  if (!access.ok) {
-    return runAccessDeniedResponse(access);
-  }
-
-  const result = await regenerateRunArtifactsWithUsage(id);
-
-  if (!result.ok) {
-    if (result.error === "not_found") {
-      return Response.json({ error: "Run not found" }, { status: 404 });
-    }
-    if (result.error === "no_messages") {
-      return Response.json(
-        { error: "Run has no debate messages to synthesize from" },
-        { status: 400 },
-      );
-    }
-    if (result.error === "run_in_progress") {
-      return Response.json(
-        { error: "Artifacts can only be regenerated after the run finishes" },
-        { status: 409 },
-      );
-    }
-    if (result.error === "generation_active") {
-      return Response.json(
-        {
-          error:
-            result.message ??
-            "A generation process is already active for this workspace.",
-        },
-        { status: 409 },
-      );
-    }
-    return Response.json(
-      { error: result.message ?? "Artifact generation failed" },
-      { status: 500 },
-    );
-  }
-
-  return Response.json({
-    artifacts: result.artifacts,
-    status: "ready" as const,
-  });
+  return handleRegenerateArtifactsPost(request, id, scope);
 }

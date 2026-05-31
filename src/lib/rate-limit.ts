@@ -4,19 +4,14 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
 import { getGuestSessionId } from "@/lib/auth/guest-session";
+import {
+  getRateLimitThreshold,
+  type RateLimitAction,
+  type RateLimitResult,
+} from "@/lib/rate-limit-config";
 
-export type RateLimitAction = "simulate" | "delete";
-
-export type RateLimitResult =
-  | { ok: true }
-  | { ok: false; status: 429 | 503; retryAfterSec: number; error: string };
-
-function parseLimit(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (raw == null || raw.trim() === "") return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
-}
+export type { RateLimitAction, RateLimitResult } from "@/lib/rate-limit-config";
+export { getRateLimitThreshold } from "@/lib/rate-limit-config";
 
 function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
@@ -24,7 +19,6 @@ function isProduction(): boolean {
 
 function isRateLimitDisabled(): boolean {
   if (process.env.RATE_LIMIT_DISABLED === "true") return true;
-  // Local dev: skip unless explicitly testing limits (Upstash may still be configured).
   if (
     process.env.NODE_ENV === "development" &&
     process.env.RATE_LIMIT_ENABLED_IN_DEV !== "true"
@@ -95,18 +89,7 @@ function getLimiter(action: RateLimitAction, authenticated: boolean): Ratelimit 
   const existing = limiterCache.get(cacheKey);
   if (existing) return existing;
 
-  const limits: Record<RateLimitAction, { guest: number; auth: number }> = {
-    simulate: {
-      guest: parseLimit("RATE_LIMIT_SIMULATE_GUEST", 3),
-      auth: parseLimit("RATE_LIMIT_SIMULATE_AUTH", 30),
-    },
-    delete: {
-      guest: parseLimit("RATE_LIMIT_DELETE", 30),
-      auth: parseLimit("RATE_LIMIT_DELETE", 30),
-    },
-  };
-
-  const limit = authenticated ? limits[action].auth : limits[action].guest;
+  const limit = getRateLimitThreshold(action, authenticated);
   const limiter = new Ratelimit({
     redis,
     limiter: Ratelimit.slidingWindow(limit, "1 h"),
