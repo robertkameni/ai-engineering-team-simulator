@@ -2,7 +2,15 @@ import "server-only";
 
 import { mdToPdf } from "md-to-pdf";
 
+import {
+  resolvePdfDocumentTitle,
+} from "@/lib/export/export-pdf-limits";
 import { EXPORT_PRINT_CSS } from "@/lib/export/export-theme";
+
+export {
+  PDF_DOCUMENT_TITLE,
+  resolvePdfDocumentTitle,
+} from "@/lib/export/export-pdf-limits";
 
 export interface CompileRunPdfOptions {
   title: string;
@@ -29,7 +37,7 @@ export async function compileRunPdfFromMarkdown(
 
 async function compileRunPdfFromMarkdownInner(
   markdown: string,
-  options: CompileRunPdfOptions,
+  _options: CompileRunPdfOptions,
 ): Promise<Buffer> {
   const result = await mdToPdf(
     { content: markdown },
@@ -37,7 +45,7 @@ async function compileRunPdfFromMarkdownInner(
       basedir: process.cwd(),
       stylesheet: [],
       css: EXPORT_PRINT_CSS,
-      document_title: options.title,
+      document_title: resolvePdfDocumentTitle(),
       page_media_type: "print",
       pdf_options: {
         format: "a4",

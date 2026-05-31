@@ -5,6 +5,7 @@ import {
   exportPdfPostBodySchema,
   toRunExportContext,
 } from "@/lib/export/export-pdf-payload";
+import { EXPORT_PDF_MAX_BODY_BYTES } from "@/lib/export/export-pdf-limits";
 import { compileRunPdfFromMarkdown } from "@/lib/export/run-pdf";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
@@ -25,9 +26,23 @@ export async function POST(request: Request) {
     return rateLimitResponse(rateLimit);
   }
 
+  let rawBody: string;
+  try {
+    rawBody = await request.text();
+  } catch {
+    return Response.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  if (Buffer.byteLength(rawBody, "utf8") > EXPORT_PDF_MAX_BODY_BYTES) {
+    return Response.json(
+      { error: "Export payload too large" },
+      { status: 413 },
+    );
+  }
+
   let body: unknown;
   try {
-    body = await request.json();
+    body = JSON.parse(rawBody);
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }

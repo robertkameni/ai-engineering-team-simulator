@@ -25,6 +25,10 @@ import {
   looksLikeTruncatedAgentOutput,
 } from "@/ai/orchestration/looks-like-truncated-agent-output";
 import { recoverReviewerDecisionTag } from "@/ai/orchestration/recover-reviewer-decision-tag";
+import {
+  assertSimulationWithinBudget,
+  isSimulationBudgetExceeded,
+} from "@/ai/orchestration/simulation-budget";
 import { buildArchitectToollessRetryUserPrompt } from "@/ai/prompts/architect";
 import {
   type DebateExitOutcome,
@@ -115,6 +119,7 @@ export async function runSimulation(
       productIdea,
       usageAccumulator,
     );
+    assertSimulationWithinBudget(usageAccumulator);
     const roster = createSimulationRoster(classification.templateId);
     await saveTeamRoster(run.id, roster);
     await touchRunActivity(run.id);
@@ -185,13 +190,15 @@ export async function runSimulation(
           send: notify,
         });
       } catch (turnError) {
-        if (isSimulationAborted(turnError)) {
+        if (isSimulationAborted(turnError) || isSimulationBudgetExceeded(turnError)) {
           throw turnError;
         }
         console.error(`Agent turn failed (${role}):`, turnError);
         fullText = AGENT_TURN_FALLBACK;
         emitFallbackAgentTurn(role, member.name, member.title, fullText, notify);
       }
+
+      assertSimulationWithinBudget(usageAccumulator);
 
       if (
         role === "reviewer" &&
@@ -204,6 +211,7 @@ export async function runSimulation(
         if (recoveredTag) {
           fullText = `${fullText.trimEnd()}\n\n${recoveredTag}`;
         }
+        assertSimulationWithinBudget(usageAccumulator);
       }
 
       const contentToPersist =
@@ -343,6 +351,14 @@ export async function runSimulation(
     notify({ type: "artifacts_start" });
     return { runId: run.id, usageAccumulator, debateExitOutcome };
   } catch (error) {
+    if (isSimulationBudgetExceeded(error)) {
+      console.warn("Simulation budget exceeded", {
+        runId: run.id,
+        estimatedCostUsd: error.estimatedCostUsd,
+        maxCostUsd: error.maxCostUsd,
+      });
+    }
+
     await setRunUsageTotals(run.id, usageAccumulator.getTotals());
     await reconcileRunFailure(run.id, {
       debateComplete,

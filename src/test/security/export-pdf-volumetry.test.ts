@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { buildRunStyledMarkdown } from "../../lib/export/build-run-export-document.js";
+import { exportPdfPostBodySchema } from "../../lib/export/export-pdf-payload.js";
 import {
+  EXPORT_PDF_MAX_ARTIFACT_ITEM_CHARS,
   EXPORT_PDF_MAX_ARTIFACT_ITEMS,
   EXPORT_PDF_MAX_MESSAGE_CONTENT_CHARS,
   EXPORT_PDF_MAX_MESSAGES,
+  PDF_DOCUMENT_TITLE,
+  resolvePdfDocumentTitle,
 } from "../../lib/export/export-pdf-limits.js";
-import { exportPdfPostBodySchema } from "../../lib/export/export-pdf-payload.js";
 
 function minimalValidExportBody() {
   return {
@@ -104,6 +107,42 @@ describe("exportPdfPostBodySchema volumetry", () => {
 
     assert.equal(parsed.success, false);
   });
+
+  it("rejects artifact items longer than 2048 characters", () => {
+    const parsed = exportPdfPostBodySchema.safeParse({
+      run: {
+        ...minimalValidExportBody().run,
+        artifacts: {
+          requirements: [
+            {
+              title: "Section",
+              items: ["x".repeat(EXPORT_PDF_MAX_ARTIFACT_ITEM_CHARS + 1)],
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(parsed.success, false);
+  });
+
+  it("accepts artifact items at the maximum length", () => {
+    const parsed = exportPdfPostBodySchema.safeParse({
+      run: {
+        ...minimalValidExportBody().run,
+        artifacts: {
+          requirements: [
+            {
+              title: "Section",
+              items: ["x".repeat(EXPORT_PDF_MAX_ARTIFACT_ITEM_CHARS)],
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(parsed.success, true);
+  });
 });
 
 describe("buildRunStyledMarkdown title sanitization", () => {
@@ -129,5 +168,37 @@ describe("buildRunStyledMarkdown title sanitization", () => {
 
     assert.match(markdown, /# &lt;script&gt;alert\(&quot;x&quot;\)&lt;\/script&gt;/);
     assert.doesNotMatch(markdown, /<script>/);
+  });
+
+  it("uses unknown role class for poisoned agentRole values", () => {
+    const markdown = buildRunStyledMarkdown({
+      run: {
+        id: "run-1",
+        title: "Test",
+        userPrompt: "Prompt",
+        status: "complete",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        messages: [
+          {
+            id: "msg-1",
+            role: 'pm"><script>alert(1)</script><div class="' as "pm",
+            content: "Hello",
+            createdAt:"2026-01-01T00:00:00.000Z",
+          },
+        ],
+        artifacts: null,
+      },
+    });
+
+    assert.match(markdown, /message--unknown/);
+    assert.doesNotMatch(markdown, /message--pm"><script>/);
+  });
+});
+
+describe("resolvePdfDocumentTitle", () => {
+  it("returns a static system title regardless of user input context", () => {
+    assert.equal(resolvePdfDocumentTitle(), PDF_DOCUMENT_TITLE);
+    assert.equal(resolvePdfDocumentTitle(), "Engineering Simulation Report");
+    assert.doesNotMatch(resolvePdfDocumentTitle(), /script/i);
   });
 });

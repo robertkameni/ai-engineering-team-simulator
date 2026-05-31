@@ -7,6 +7,7 @@ import {
   runAccessDeniedResponse,
 } from "@/lib/auth/run-ownership";
 import { getSessionUser } from "@/lib/auth/session";
+import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -14,13 +15,18 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(_request: Request, { params }: RouteParams) {
+export async function GET(request: Request, { params }: RouteParams) {
   const { userId } = await getSessionUser();
   if (!userId) {
     return Response.json(
       { error: "Authentication required to export" },
       { status: 401 },
     );
+  }
+
+  const rateLimit = await assertRateLimit(request, "export_pdf", userId);
+  if (!rateLimit.ok) {
+    return rateLimitResponse(rateLimit);
   }
 
   const { id } = await params;

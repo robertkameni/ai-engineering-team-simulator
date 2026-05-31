@@ -5,6 +5,7 @@ import { isTeamTemplateId } from "@/ai/agents/team-templates";
 import type { MockRun } from "@/features/agents/types";
 import {
   countExportArtifactItems,
+  EXPORT_PDF_MAX_ARTIFACT_ITEM_CHARS,
   EXPORT_PDF_MAX_ARTIFACT_ITEMS,
   EXPORT_PDF_MAX_MESSAGE_CONTENT_CHARS,
   EXPORT_PDF_MAX_MESSAGES,
@@ -30,8 +31,8 @@ const debateOutcomeSchema = z.enum([
 ]);
 
 const artifactSectionSchema = z.object({
-  title: z.string(),
-  items: z.array(z.string()),
+  title: z.string().max(EXPORT_PDF_MAX_TITLE_CHARS),
+  items: z.array(z.string().max(EXPORT_PDF_MAX_ARTIFACT_ITEM_CHARS)),
 });
 
 const partialArtifactsSchema = z

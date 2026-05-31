@@ -123,9 +123,8 @@ export async function POST(request: Request) {
           return;
         }
 
-        const message =
-          error instanceof Error ? error.message : "Simulation failed";
-        send({ type: "error", message });
+        console.error("Simulation failed:", { runId, error });
+        send({ type: "error", message: "Simulation failed" });
       } finally {
         controller.close();
       }

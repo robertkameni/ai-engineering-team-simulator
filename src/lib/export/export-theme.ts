@@ -125,6 +125,7 @@ export const EXPORT_PRINT_CSS = `
   .message--backend { border-left: 4px solid ${exportTheme.agent.backend}; }
   .message--reviewer { border-left: 4px solid ${exportTheme.agent.reviewer}; }
   .message--devops { border-left: 4px solid ${exportTheme.agent.devops}; }
+  .message--unknown { border-left: 4px solid ${exportTheme.mutedForeground}; }
 
   .message--pm .message-heading { color: ${exportTheme.agent.pm}; }
   .message--architect .message-heading { color: ${exportTheme.agent.architect}; }
@@ -132,6 +133,7 @@ export const EXPORT_PRINT_CSS = `
   .message--backend .message-heading { color: ${exportTheme.agent.backend}; }
   .message--reviewer .message-heading { color: ${exportTheme.agent.reviewer}; }
   .message--devops .message-heading { color: ${exportTheme.agent.devops}; }
+  .message--unknown .message-heading { color: ${exportTheme.mutedForeground}; }
 
   .artifact-panel {
     border: 1px solid ${exportTheme.border};

@@ -1,4 +1,6 @@
+import { isSimulationAgent } from "@/ai/agents/config";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
+import type { AgentRole } from "@/features/agents/types";
 import { formatExportDate } from "@/lib/format-time";
 import { ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
 import type { ArtifactType } from "@/features/artifacts/artifact-constants";
@@ -22,6 +24,13 @@ export interface RunExportContext {
 
 function resolveTemplateId(templateId?: TeamTemplateId): TeamTemplateId {
   return templateId ?? "software";
+}
+
+function resolveExportMessageRoleClass(role: string): string {
+  if (isSimulationAgent(role as AgentRole)) {
+    return role;
+  }
+  return "unknown";
 }
 
 function escapeHtml(text: string): string {
@@ -320,11 +329,11 @@ export function buildRunStyledMarkdown(ctx: RunExportContext): string {
   for (const message of run.messages) {
     const name = message.agentName ?? message.role;
     const title = message.agentTitle ?? message.role;
-    const role = message.role;
+    const roleClass = resolveExportMessageRoleClass(message.role);
     const bodyHtml = blocksToHtml(parseMessageBlocks(message.content.trim()));
 
     parts.push(
-      '<div class="message message--' + role + '">',
+      '<div class="message message--' + roleClass + '">',
       '<h3 class="message-heading">' +
         escapeHtml(name) +
         ' <span style="font-weight:400;color:#5c5c6e">(' +
