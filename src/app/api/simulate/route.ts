@@ -135,6 +135,12 @@ export async function POST(request: Request) {
         }
 
         console.error("Simulation failed:", { runId, error });
+        if (runId) {
+          await reconcileRunFailure(runId, {
+            debateComplete: false,
+            artifactPhaseStarted: synthesisStarted,
+          });
+        }
         send({ type: "error", message: "Simulation failed" });
       } finally {
         controller.close();

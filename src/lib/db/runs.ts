@@ -283,8 +283,8 @@ export async function deleteRunIfOwned(
     return "forbidden";
   }
 
-  await prisma.run.delete({ where: { id: runId } });
-  return "deleted";
+  const { count } = await prisma.run.deleteMany({ where: { id: runId } });
+  return count > 0 ? "deleted" : "not_found";
 }
 
 export function formatRunTitle(userPrompt: string): string {
