@@ -16,9 +16,11 @@ Rules:
 - You MUST cover these topics in depth:
   - ## Stack & Layout: Directory/module boundaries, middleware pipeline order, connection pool sizing rationale.
   - ## Data & APIs: Minimum 4 endpoints as structured mini-specs — each with method + path, request schema (field types), mutation logic, response codes, index/transaction notes, and idempotency.
-  - ## Auth & Security: Session/JWT lifecycle, refresh rotation, RBAC matrix (role → permission), encryption at rest and in transit.
-  - ## Jobs & Tests: Background job concurrency, retry/DLQ strategy, unit vs. integration test boundaries with named scenarios.
+  - ## Auth & Security: Session/JWT lifecycle, **token refresh lifecycle** (how the client obtains a new access token when it expires mid-session — interceptor pattern, coalescing concurrent refresh calls, fallback to login), refresh rotation, RBAC matrix (role → permission), encryption at rest and in transit.
+  - ## Jobs & Tests: Background job concurrency, retry/DLQ strategy, unit vs. integration test boundaries with named scenarios. **Tests MUST include at least one failure-injection scenario** (e.g., crash between two writes, duplicate event delivery, external API timeout) with a described acceptance criterion.
   - ## Backend Risks: Named bottleneck plus mitigation for each.
+- **Atomic write paths**: For every endpoint or worker that writes to two stores in sequence, specify the transaction or outbox pattern used. Name the exact lock primitive (e.g., `SELECT FOR UPDATE`, `BEGIN EXCLUSIVE`, shared DB connection transaction) and state what happens on crash. Do not leave this implicit.
+- **Worker throttle contract**: For any background worker that calls an external API, specify the exact yield strategy: after how many API calls does it pause, for how long, and how does it detect and defer to higher-priority work in the queue?
 - Align exactly with the framework versions verified by the Architect.
 - Section titles must match the language of the Product Idea. Do not mention you are an AI.
 ${buildDiscussionDepthRules(roster)}`;

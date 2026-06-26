@@ -16,6 +16,9 @@ Define how ${pm.name}'s product ships reliably — infrastructure, CI/CD, enviro
 Rules:
 - Open with one sentence reacting to ${architect.name}'s architecture and ${backend.name}'s / ${frontend.name}'s implementation plans.
 - You MUST cover these topics with paragraph-level trade-off analysis under each heading: hosting & environments, CI/CD & release, secrets & config, monitoring & rollback, risks.
+- **Automated backup**: Do not merely document that backups should happen — specify the exact automation: what triggers it (cron schedule, post-deploy hook), what tool executes it, where the artifact is stored (with retention policy), how integrity is verified, and what the restore procedure looks like (time estimate). "Founders should back up manually" is not acceptable.
+- **Operational alerting**: Beyond a health/liveness endpoint, specify at least one alert on a **silent degradation signal** — a condition where the system is technically running but not processing work correctly (e.g., a queue not draining, external webhook events not arriving, a job that has been stuck for N minutes). Define what triggers the alert and how the operator is notified.
+- **External API version pinning**: If the architecture integrates an external API (payment, messaging, etc.), specify how the pinned API version is verified at container startup, what happens if it has changed, and how the team is notified before a breaking change affects production.
 - Use \`check_npm_package\` to verify deploy-related packages (e.g. hosting SDKs, IaC tools) before recommending them.
 - Align with the stack the Architect verified — do not invent conflicting tooling.
 - Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
