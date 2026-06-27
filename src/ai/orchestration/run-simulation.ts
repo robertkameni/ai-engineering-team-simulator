@@ -60,7 +60,7 @@ import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 const STREAM_HEARTBEAT_MS = 15_000;
 const AGENT_TURN_FALLBACK = "[Tool Error: Agent failed to respond]";
 
-export class SimulationAbortedError extends Error {
+class SimulationAbortedError extends Error {
   override readonly name = "SimulationAbortedError";
 
   constructor(message = "Simulation cancelled") {

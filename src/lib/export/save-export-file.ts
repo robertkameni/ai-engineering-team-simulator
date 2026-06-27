@@ -43,7 +43,7 @@ export async function openSavePickerForBlob(
 
 export type SavePickerResult = "saved" | "aborted" | "unavailable";
 
-export async function saveBlobWithNativePicker(
+async function saveBlobWithNativePicker(
   blob: Blob,
   filename: string,
   description: string,

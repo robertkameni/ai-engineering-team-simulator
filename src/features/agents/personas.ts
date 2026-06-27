@@ -67,7 +67,7 @@ export function getPersona(role: AgentRole): AgentPersona {
   return AGENT_PERSONAS[role];
 }
 
-export function getPersonaWithName(
+function getPersonaWithName(
   role: AgentRole,
   name: string,
   title?: string,

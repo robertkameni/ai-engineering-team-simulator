@@ -14,7 +14,6 @@ import {
 } from "@/lib/rate-limit-config";
 import { getClientIpFromHeaders } from "@/lib/rate-limit";
 
-export { hashAuthEmail, resolveAuthRateLimitKey } from "@/lib/auth/auth-rate-limit-keys";
 
 function isProduction(): boolean {
   return process.env.NODE_ENV === "production";

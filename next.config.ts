@@ -16,7 +16,6 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-tabs",
       "@radix-ui/react-scroll-area",
       "@radix-ui/react-slot",
-      "@radix-ui/react-separator",
     ],
   },
   productionBrowserSourceMaps: false,

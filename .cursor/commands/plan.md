@@ -1,6 +1,6 @@
-Follow AGENTS.md.
-
 # /plan
+
+Follow AGENTS.mdc
 
 Create a step-by-step implementation plan for {{SCOPE}}.
 

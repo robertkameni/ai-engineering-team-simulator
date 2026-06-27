@@ -1,0 +1,348 @@
+---
+alwaysApply: true
+---
+## D.R.Y.
+
+Eliminate unnecessary duplication.
+
+Prefer:
+
+* shared utilities
+* reusable domain logic
+* centralized schemas
+* composable modules
+
+Avoid:
+
+* duplicated orchestration logic
+* repeated validation logic
+* repeated prompt logic
+* copy-pasted implementations
+
+Abstract only after repetition becomes clear.
+
+---
+
+## K.I.S.S.
+
+Prefer the simplest correct implementation.
+
+Avoid:
+
+* premature abstractions
+* speculative architecture
+* unnecessary indirection
+* overengineered systems
+
+Prefer:
+
+* explicit flows
+* focused modules
+* predictable behavior
+* readable code
+
+---
+
+# DEPENDENCY & DOCUMENTATION VERIFICATION (MANDATORY)
+
+Before generating code that uses any external library, framework, SDK, runtime, or package:
+
+1. Inspect the project's dependency files (package.json, lockfile, workspace configuration, etc.).
+2. If the dependency already exists, target the installed version.
+3. If the dependency does not exist, or its API/version is relevant, query the configured npm MCP server.
+4. Use the npm MCP server to verify:
+
+   * latest stable version
+   * package metadata
+   * current API
+   * official documentation
+5. Generate code only after verification.
+
+The configured npm MCP server is the authoritative source of truth for npm packages.
+
+Never:
+
+* assume package versions
+* rely solely on model memory
+* invent APIs
+* guess method signatures
+* use deprecated APIs without verification
+* recommend alpha, beta, RC, nightly, or canary releases unless explicitly requested
+
+If the npm MCP server is unavailable:
+
+* explicitly state that verification could not be performed
+* avoid guessing APIs
+* use only well-established documented patterns
+
+---
+
+# REQUIRED IMPLEMENTATION WORKFLOW
+
+Before implementing any task:
+
+1. Understand the existing codebase.
+2. Inspect package.json.
+3. Inspect the lockfile.
+4. Determine which external dependencies are involved.
+5. Query the npm MCP server for every dependency whose API or version matters.
+6. Verify the API against the latest documentation.
+7. Only then generate code.
+
+Skipping dependency verification is considered an implementation error.
+
+---
+
+# HALLUCINATION PREVENTION
+
+All outputs must align with:
+
+* official documentation
+* verified APIs
+* latest stable releases
+* observable runtime behavior
+* existing project dependencies
+
+Never:
+
+* invent APIs
+* fabricate SDK methods
+* assume undocumented behavior
+* generate code from outdated examples
+* rely only on pretrained knowledge when documentation can be verified
+
+If uncertain:
+
+* verify first
+* state uncertainty briefly
+* prefer official documented behavior
+* avoid speculative implementations
+
+---
+
+# TECHNOLOGY RULES
+
+Always:
+
+* use latest stable versions for new dependencies
+* respect versions already installed in the project
+* follow official documentation
+* use current best practices
+* prefer actively maintained libraries
+
+Never use:
+
+* deprecated APIs
+* obsolete framework patterns
+* outdated tutorials
+* abandoned packages
+
+---
+
+# NEXT.JS RULES
+
+Use:
+
+* App Router
+* Server Components by default
+* Route Handlers
+* Server Actions where appropriate
+* streaming-first architecture
+* Suspense boundaries intentionally
+
+Prefer:
+
+* server-first data fetching
+* minimal client JavaScript
+* colocated route logic
+
+Avoid:
+
+* unnecessary client components
+* client waterfalls
+* duplicated fetching
+
+---
+
+# TYPESCRIPT RULES
+
+Must use:
+
+* strict mode
+* explicit typing
+* discriminated unions
+* exhaustive checks
+* schema validation
+
+Avoid:
+
+* any
+* unsafe casting
+* implicit runtime assumptions
+
+---
+
+# DATABASE RULES
+
+Use:
+
+* PostgreSQL
+* Prisma
+* optimized queries
+* explicit relations
+* transactional correctness
+
+Avoid:
+
+* N+1 queries
+* hidden query costs
+* unbounded reads
+
+---
+
+# AI SYSTEM RULES
+
+All AI execution must flow through:
+
+UI
+→ application layer
+→ orchestration layer
+→ provider layer
+
+Never call LLM providers directly from UI components.
+
+Agents must:
+
+* maintain structured memory
+* reference prior context
+* produce typed outputs
+* support deterministic orchestration
+
+---
+
+# ARCHITECTURE RULES
+
+Use clean boundaries:
+
+/ui
+/application
+/domain
+/infrastructure
+/ai
+/orchestration
+
+Rules:
+
+* UI never accesses infrastructure directly
+* domain remains framework-agnostic
+* orchestration owns AI coordination
+* infrastructure owns external services
+
+---
+
+# REALTIME RULES
+
+Realtime systems must:
+
+* degrade gracefully
+* reconnect safely
+* avoid duplicate events
+* remain event-driven
+
+Prefer:
+
+* streaming UX
+* optimistic updates
+* isolated realtime state
+
+---
+
+# PERFORMANCE RULES
+
+Prioritize:
+
+* streaming UX
+* low bundle size
+* parallel execution
+* cache-aware architecture
+* server-side computation
+
+Avoid:
+
+* unnecessary hydration
+* sequential waterfalls
+* oversized client state
+
+---
+
+# SECURITY RULES
+
+Always:
+
+* validate external input
+* validate AI output
+* sanitize user content
+* enforce authorization boundaries
+
+Never trust:
+
+* model outputs
+* uploaded content
+* client input
+
+---
+
+# OUTPUT RULES
+
+Never expose:
+
+* chain-of-thought
+* hidden reasoning
+* internal analysis
+* meta commentary
+
+Output only:
+
+* final answers
+* final code
+* concise explanations when necessary
+
+---
+
+# RESPONSE MODES
+
+## Conversation Mode
+
+Default mode for:
+
+* questions
+* discussions
+* architecture analysis
+* planning
+
+Keep responses:
+
+* concise
+* technically accurate
+* natural
+
+---
+
+## Task Mode
+
+Activate only when explicitly asked to:
+
+* implement
+* build
+* fix
+* refactor
+* create code
+
+In Task Mode:
+
+* Begin implementation immediately.
+* Follow the Required Implementation Workflow.
+* Verify every relevant dependency using the configured npm MCP server before generating code.
+* Produce production-quality implementations.
+* Minimize explanations unless requested.
+* Never skip dependency verification.

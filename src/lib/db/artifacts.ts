@@ -13,7 +13,7 @@ import type { RunArtifacts } from "@/features/artifacts/types";
 import { TEAM_ROSTER_ARTIFACT_TYPE } from "@/lib/db/team-roster";
 import { prisma } from "@/lib/prisma";
 
-export async function upsertArtifact(
+async function upsertArtifact(
   runId: string,
   type: string,
   data: Prisma.InputJsonValue,
@@ -27,14 +27,14 @@ export async function upsertArtifact(
   });
 }
 
-export async function getArtifactsForRun(runId: string) {
+async function getArtifactsForRun(runId: string) {
   return prisma.artifact.findMany({
     where: { runId },
     orderBy: { createdAt: "asc" },
   });
 }
 
-export async function saveArtifactBundle(runId: string, artifacts: RunArtifacts) {
+async function saveArtifactBundle(runId: string, artifacts: RunArtifacts) {
   await prisma.$transaction(
     ARTIFACT_TYPES.map((type) => {
       const data: ArtifactDocument = { sections: artifacts[type] };
@@ -51,7 +51,7 @@ export async function saveArtifactBundle(runId: string, artifacts: RunArtifacts)
   );
 }
 
-export async function saveRunArtifacts(
+async function saveRunArtifacts(
   runId: string,
   artifacts: RunArtifacts,
 ) {
@@ -88,7 +88,7 @@ function parseArtifactDocument(data: unknown): ArtifactDocument | null {
   return { sections };
 }
 
-export function isCompleteRunArtifacts(
+function isCompleteRunArtifacts(
   artifacts: Partial<RunArtifacts>,
 ): artifacts is RunArtifacts {
   return ARTIFACT_TYPES.every((type) => artifacts[type] != null);

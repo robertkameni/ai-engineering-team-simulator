@@ -11,7 +11,7 @@ export function isSubmitShortcut(
   );
 }
 
-export function getSubmitShortcutLabel(): string {
+function getSubmitShortcutLabel(): string {
   if (typeof navigator === "undefined") {
     return "Ctrl+Enter";
   }

@@ -162,7 +162,7 @@ export async function getRunWithMessages(runId: string) {
   });
 }
 
-export function buildRunOwnershipWhere(
+function buildRunOwnershipWhere(
   scope: RunOwnershipScope,
 ): Prisma.RunWhereInput | null {
   const conditions: Prisma.RunWhereInput[] = [];
@@ -208,7 +208,7 @@ export function canAccessRun(
   return false;
 }
 
-export async function listRecentRuns(
+async function listRecentRuns(
   scope: RunOwnershipScope,
   limit = 10,
 ) {
@@ -287,11 +287,11 @@ export async function deleteRunIfOwned(
   return count > 0 ? "deleted" : "not_found";
 }
 
-export function formatRunTitle(userPrompt: string): string {
+function formatRunTitle(userPrompt: string): string {
   return userPrompt.trim();
 }
 
-export function mapDbMessagesToSimulation(
+function mapDbMessagesToSimulation(
   messages: Message[],
   roster?: TeamRoster | null,
 ): SimulationMessage[] {

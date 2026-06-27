@@ -1,6 +1,6 @@
-Follow AGENTS.md.
-
 # /analyse
+
+Follow AGENTS.mdc
 
 Analyze {{SCOPE}} with strict focus on observable runtime correctness and reachable execution behavior.
 

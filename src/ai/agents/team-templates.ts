@@ -7,7 +7,7 @@ export interface TeamTemplate {
   slotTitles: Record<SimulationAgentRole, string>;
 }
 
-export const softwareTemplate: TeamTemplate = {
+const softwareTemplate: TeamTemplate = {
   id: "software",
   slotTitles: {
     pm: "Product Manager",
@@ -19,7 +19,7 @@ export const softwareTemplate: TeamTemplate = {
   },
 };
 
-export const physicalTemplate: TeamTemplate = {
+const physicalTemplate: TeamTemplate = {
   id: "physical",
   slotTitles: {
     pm: "Chef de projet travaux",
@@ -31,7 +31,7 @@ export const physicalTemplate: TeamTemplate = {
   },
 };
 
-export const hybridTemplate: TeamTemplate = {
+const hybridTemplate: TeamTemplate = {
   id: "hybrid",
   slotTitles: {
     pm: "Product Manager",
@@ -43,7 +43,7 @@ export const hybridTemplate: TeamTemplate = {
   },
 };
 
-export const TEAM_TEMPLATES: Record<TeamTemplateId, TeamTemplate> = {
+const TEAM_TEMPLATES: Record<TeamTemplateId, TeamTemplate> = {
   software: softwareTemplate,
   physical: physicalTemplate,
   hybrid: hybridTemplate,

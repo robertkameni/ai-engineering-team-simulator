@@ -43,7 +43,7 @@ import {
   buildReviewerTurnPrompt,
 } from "@/ai/prompts/reviewer";
 
-export function buildCorrectionTurnPrompt(
+function buildCorrectionTurnPrompt(
   role: SimulationAgentRole,
   reviewerName: string,
   feedbackExcerpt: string,

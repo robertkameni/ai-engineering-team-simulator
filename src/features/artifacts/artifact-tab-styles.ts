@@ -24,7 +24,7 @@ const ARTIFACT_TAB_LABELS: Record<TeamTemplateId, Record<ArtifactType, string>> 
     },
   };
 
-export const ARTIFACT_TAB_CONFIG: {
+const ARTIFACT_TAB_CONFIG: {
   value: ArtifactType;
   label: string;
   triggerClass: string;

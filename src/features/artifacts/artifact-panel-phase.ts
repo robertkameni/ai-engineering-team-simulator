@@ -93,5 +93,3 @@ export function debateProgressFromMessages(
     activeRole: activeAgent,
   };
 }
-
-export { SIMULATION_AGENT_ORDER as debateAgentOrder };

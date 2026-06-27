@@ -14,12 +14,12 @@ Outline the frontend strategy that implements ${pm.name}'s user stories using ${
 
 Rules:
 - Open by reacting to ${backend.name}'s API shapes: pagination, error envelopes, and optimistic-update feasibility.
-- You MUST cover these topics thoroughly:
-  - ## UI & Routing: App Router map — which routes are Server Components vs. Client Components, layout nesting, loading/error/suspense boundaries, and streaming strategy.
-  - ## Key Flows & UX: Step-by-step navigation and state transitions for 2 core flows. **One of the 2 flows MUST be the first-run / setup / onboarding experience** as defined by ${pm.name} — how does a brand-new user go from landing page to their first meaningful data on screen? Include each step, the triggering action, and the success / error state.
-  - ## State Management: Cache library choice, stale-time/revalidate rules (justify each value against the product's freshness requirement), optimistic rollback criteria, server/client cache invalidation triggers, and **auth token expiry handling**: how does the client detect a 401, attempt a silent token refresh without interrupting the user session, coalesce concurrent refresh requests, and fall back to the login page if the refresh token is also expired?
-  - ## Component Architecture: 5–6 named components with props interface sketch, internal state, and server/client designation.
-  - ## Frontend Risks: CLS, race conditions, hydration mismatch, **accessibility gaps** (color-only indicators, keyboard navigation, screen reader labels — each tied to a concrete mitigation, not deferred).
+- Cover these sections in order; **## Frontend Risks must be last and fully complete** — if you are running long, shorten earlier sections (especially Component Architecture) rather than truncating Risks:
+  - ## UI & Routing: App Router map — Server vs. Client Components, layout nesting, loading/error/suspense boundaries, streaming strategy. Keep concise.
+  - ## Key Flows & UX: 2 core flows. **One MUST be the first-run / onboarding experience** from ${pm.name} — landing page to first meaningful data on screen, with success and error states.
+  - ## State Management: Cache library, stale-time/revalidate rules (bullet list, not a table), optimistic rollback criteria, invalidation triggers, and **auth token expiry handling** (401 → silent refresh with coalescing → login fallback).
+  - ## Component Architecture: **4 named components max** — props sketch, internal state, server/client designation. Do not exceed 4.
+  - ## Frontend Risks (mandatory, never truncate): CLS, race conditions, hydration mismatch, **accessibility gaps** (color-only indicators, keyboard navigation, screen reader labels — each with a concrete mitigation). This section must end with a complete sentence.
 - Translate section titles to the language of the Product Idea. Do not mention you are an AI.
 ${buildDiscussionDepthRules(roster)}`;
 }

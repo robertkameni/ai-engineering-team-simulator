@@ -2,7 +2,7 @@ import "server-only";
 
 import { cookies } from "next/headers";
 
-export const GUEST_SESSION_COOKIE_NAME = "team-sim-guest-session";
+const GUEST_SESSION_COOKIE_NAME = "team-sim-guest-session";
 
 const GUEST_SESSION_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
 
@@ -40,7 +40,7 @@ export async function getOrCreateGuestSessionId(): Promise<string> {
   return guestSessionId;
 }
 
-export async function clearGuestSessionCookie(): Promise<void> {
+async function clearGuestSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete(GUEST_SESSION_COOKIE_NAME);
 }

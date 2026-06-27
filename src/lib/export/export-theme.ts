@@ -1,6 +1,6 @@
 import type { AgentRole } from "@/features/agents/types";
 
-export const exportTheme = {
+const exportTheme = {
   background: "#121218",
   foreground: "#f5f5f7",
   card: "#1c1c24",
@@ -21,7 +21,7 @@ export const exportTheme = {
   } satisfies Record<AgentRole, string>,
 } as const;
 
-export function agentAccentHex(role: AgentRole): string {
+function agentAccentHex(role: AgentRole): string {
   return exportTheme.agent[role];
 }
 

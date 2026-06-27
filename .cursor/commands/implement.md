@@ -1,6 +1,6 @@
-Follow AGENTS.md.
-
 # /implement
+
+Follow AGENTS.mdc
 
 Implement {{SCOPE}} using production-grade code and current best practices.
 

@@ -34,7 +34,7 @@ export function toAppArtifactStatus(
   return TO_APP[status];
 }
 
-export function toPrismaArtifactStatus(
+function toPrismaArtifactStatus(
   status: AppArtifactStatus,
 ): PrismaArtifactStatus {
   return TO_PRISMA[status];

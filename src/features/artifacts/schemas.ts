@@ -6,7 +6,7 @@ export {
   type ArtifactType,
 } from "@/features/artifacts/artifact-constants";
 
-export const artifactSectionSchema = z.object({
+const artifactSectionSchema = z.object({
   title: z.string().describe("Section heading"),
   items: z
     .array(z.string())
@@ -22,7 +22,7 @@ export const artifactDocumentSchema = z.object({
     .describe("Grouped sections for the artifact tab"),
 });
 
-export const runArtifactsOutputSchema = z.object({
+const runArtifactsOutputSchema = z.object({
   requirements: artifactDocumentSchema.describe(
     "PM scope: features, stories, metrics, out of scope",
   ),

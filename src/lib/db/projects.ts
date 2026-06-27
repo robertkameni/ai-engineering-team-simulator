@@ -16,13 +16,13 @@ export async function getOrCreateDefaultProject() {
   });
 }
 
-export async function createProject(title: string) {
+async function createProject(title: string) {
   return prisma.project.create({
     data: { title },
   });
 }
 
-export async function listRecentProjects(limit = 20) {
+async function listRecentProjects(limit = 20) {
   return prisma.project.findMany({
     orderBy: { updatedAt: "desc" },
     take: limit,

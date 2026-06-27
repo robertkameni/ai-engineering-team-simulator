@@ -1,6 +1,6 @@
 # AI Systems Rules
 
-Follow AGENTS.md.
+Follow AGENTS.mdc
 
 This file defines additional rules for:
 - AI orchestration systems

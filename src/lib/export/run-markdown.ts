@@ -10,14 +10,14 @@ import { openSavePickerForBlob } from "@/lib/export/save-export-file";
 import type { MockRun } from "@/features/agents/types";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 
-export { buildRunMarkdown, type RunExportContext };
+export { type RunExportContext };
 
-export function buildRunExportUrl(runId: string, exportId?: number): string {
+function buildRunExportUrl(runId: string, exportId?: number): string {
   const base = `/api/runs/${encodeURIComponent(runId)}/export`;
   return exportId != null ? `${base}?t=${exportId}` : base;
 }
 
-export function buildRunExportPayload(
+function buildRunExportPayload(
   run: MockRun,
   templateId?: TeamTemplateId,
   exportId: number = Date.now(),
@@ -47,6 +47,6 @@ export async function exportRunMarkdown(
   downloadExportBlob(blob, filename, "text/markdown");
 }
 
-export function canExportRunFromServer(run: MockRun): boolean {
+function canExportRunFromServer(run: MockRun): boolean {
   return Boolean(run.id && run.id !== "live");
 }

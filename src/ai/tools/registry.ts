@@ -76,7 +76,7 @@ function lookupTechnicalNorm(query: string): TechnicalNormLookupResult {
   };
 }
 
-export const checkNpmPackageTool = tool({
+const checkNpmPackageTool = tool({
   description:
     "Look up an npm package on the public registry. Returns the latest version and description.",
   inputSchema: z.object({
@@ -137,7 +137,7 @@ export const checkNpmPackageTool = tool({
   },
 });
 
-export const searchTechnicalNormTool = tool({
+const searchTechnicalNormTool = tool({
   description:
     "Search regulatory and technical norms (DTU, ERP, fire safety, RGPD, etc.). Returns status, normReference, requiredAction, and source on success.",
   inputSchema: z.object({
@@ -152,7 +152,7 @@ export const searchTechnicalNormTool = tool({
 });
 
 /** @deprecated Use getAgentTools(role) for per-role tool access. */
-export const agentTools = {
+const agentTools = {
   check_npm_package: checkNpmPackageTool,
   search_technical_norm: searchTechnicalNormTool,
 };

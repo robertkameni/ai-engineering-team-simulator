@@ -1,6 +1,6 @@
-Follow AGENTS.md.
-
 # /review
+
+Follow AGENTS.mdc
 
 Review {{SCOPE}} with focus on:
 - runtime correctness

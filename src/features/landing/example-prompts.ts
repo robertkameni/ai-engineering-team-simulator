@@ -1,5 +1,5 @@
 /** Pool of starter ideas shown as chips on the landing page (3 picked per visit). */
-export const EXAMPLE_PROMPT_POOL = [
+const EXAMPLE_PROMPT_POOL = [
   "Build a food delivery app for students",
   "Build an AI travel planner for Europe",
   "Create a study group matching platform",

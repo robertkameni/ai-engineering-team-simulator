@@ -8,7 +8,7 @@ const PHYSICAL_ARCHITECT_MIN_HEADINGS = 2;
 const ARCHITECT_PREAMBLE_ONLY =
   /(?:vérifier|verifier|verify|check).{0,80}(?:framework|package|npm|version)|(?:before|avant).{0,40}(?:decision|décision)/i;
 
-export function countMarkdownSectionHeadings(text: string): number {
+function countMarkdownSectionHeadings(text: string): number {
   return (text.match(/^##\s+/gm) ?? []).length;
 }
 
@@ -46,7 +46,7 @@ export function isSoftwareArchitectDeliverableInsufficient(text: string): boolea
   return false;
 }
 
-export function isPhysicalArchitectDeliverableInsufficient(text: string): boolean {
+function isPhysicalArchitectDeliverableInsufficient(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed) {
     return true;

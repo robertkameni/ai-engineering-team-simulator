@@ -6,6 +6,14 @@
         "shadcn@latest",
         "mcp"
       ]
+    },
+    "fallow": {
+      "command": "npx",
+      "args": ["fallow-mcp"]
+    },
+    "npm-registry": {
+      "command": "npx",
+      "args": ["mcp-npm-registry"]
     }
   }
 }

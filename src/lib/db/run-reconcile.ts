@@ -13,7 +13,7 @@ import type { RunStatus as AppRunStatus } from "@/features/agents/types";
 import { prisma } from "@/lib/prisma";
 
 /** Simulate route maxDuration (300s) + buffer for stale detection. */
-export const RUN_STALE_MS = 6 * 60 * 1000;
+const RUN_STALE_MS = 6 * 60 * 1000;
 
 export async function reconcileRunFailure(
   runId: string,

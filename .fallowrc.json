@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "entry": [
+    "src/index.{ts,tsx,js,jsx}",
+    "src/main.{ts,tsx,js,jsx}"
+  ],
+  "duplicates": {
+    "minOccurrences": 2
+  },
+  "ignorePatterns": [
+    "**/*.generated.ts",
+    "generated/**",
+    ".cursor/**",
+    ".next/**",
+    "scripts/**",
+    "public/**",
+    "test/**"
+  ],
+  "ignoreDependencies": [
+    "@neondatabase/serverless",
+    "dotenv",
+    "shadcn"
+  ],
+  "rules": {
+    "unused-files": "error",
+    "unused-exports": "warn",
+    "unused-types": "off",
+    "unused-dependencies": "error",
+    "unused-dev-dependencies": "warn",
+    "circular-dependencies": "error"
+  },
+  "ignoreExports": [
+    {
+      "file": "src/ai/orchestration/reviewer-decision.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "src/features/agents/types.ts",
+      "exports": ["*"]
+    }
+  ]
+}

@@ -7,7 +7,7 @@ import {
   openSavePickerForBlob,
 } from "@/lib/export/save-export-file";
 
-export function canExportRunPdfFromServer(run: MockRun): boolean {
+function canExportRunPdfFromServer(run: MockRun): boolean {
   return Boolean(run.id && run.id !== "live");
 }
 

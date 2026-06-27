@@ -12,7 +12,7 @@ export type RateLimitResult =
   | { ok: true }
   | { ok: false; status: 429 | 503; retryAfterSec: number; error: string };
 
-export const DEFAULT_RATE_LIMITS: Record<
+const DEFAULT_RATE_LIMITS: Record<
   RateLimitAction,
   { guest: number; auth: number }
 > = {
@@ -24,7 +24,7 @@ export const DEFAULT_RATE_LIMITS: Record<
   auth_register: { guest: 10, auth: 10 },
 };
 
-export const DEFAULT_AUTH_RATE_LIMIT = 10;
+const DEFAULT_AUTH_RATE_LIMIT = 10;
 export const AUTH_RATE_LIMIT_WINDOW = "15 m" as const;
 
 const LIMIT_ENV_KEYS: Record<

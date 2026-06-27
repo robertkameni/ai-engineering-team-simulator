@@ -7,11 +7,6 @@ import {
 } from "@/lib/export/export-pdf-limits";
 import { EXPORT_PRINT_CSS } from "@/lib/export/export-theme";
 
-export {
-  PDF_DOCUMENT_TITLE,
-  resolvePdfDocumentTitle,
-} from "@/lib/export/export-pdf-limits";
-
 export interface CompileRunPdfOptions {
   title: string;
   author?: string;

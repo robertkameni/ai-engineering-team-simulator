@@ -11,7 +11,6 @@ import {
 } from "@/lib/rate-limit-config";
 
 export type { RateLimitAction, RateLimitResult } from "@/lib/rate-limit-config";
-export { getRateLimitThreshold } from "@/lib/rate-limit-config";
 
 function isProduction(): boolean {
   return process.env.NODE_ENV === "production";

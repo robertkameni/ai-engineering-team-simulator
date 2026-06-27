@@ -67,7 +67,7 @@ export interface NormalizedUsage {
 }
 
 /** Maps AI SDK `LanguageModelUsage` to stable prompt/completion totals. */
-export function normalizeLanguageModelUsage(
+function normalizeLanguageModelUsage(
   usage: LanguageModelUsage | undefined,
 ): NormalizedUsage {
   if (!usage) {
@@ -104,7 +104,7 @@ export function normalizeLanguageModelUsage(
   };
 }
 
-export function estimateCostUsd(
+function estimateCostUsd(
   usage: LanguageModelUsage | undefined,
   modelId: DeepSeekModelId,
 ): number {

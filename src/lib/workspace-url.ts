@@ -1,4 +1,4 @@
-export function workspaceUrlForPrompt(prompt: string): string {
+function workspaceUrlForPrompt(prompt: string): string {
   const trimmed = prompt.trim();
   if (!trimmed) {
     return "/workspace";

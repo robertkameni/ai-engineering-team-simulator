@@ -24,7 +24,7 @@ export const SIMULATION_AGENT_ORDER = [
 
 export type SimulationAgentRole = (typeof SIMULATION_AGENT_ORDER)[number];
 
-export const ACTIVE_AGENTS: AgentModelConfig[] = [
+const ACTIVE_AGENTS: AgentModelConfig[] = [
   {
     role: "pm",
     model: "deepseek-v4-flash",

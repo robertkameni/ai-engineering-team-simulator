@@ -25,7 +25,7 @@ export interface RegenerateArtifactsActionHooks {
   ) => Promise<RegenerateRunArtifactsResult>;
 }
 
-export function mapRegenerateActionError(
+function mapRegenerateActionError(
   error: RegenerateRunArtifactsError,
   message?: string,
 ): string {

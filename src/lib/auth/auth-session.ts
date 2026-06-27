@@ -3,7 +3,7 @@ import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-export const AUTH_SESSION_COOKIE_NAME = "team-sim-auth-session";
+const AUTH_SESSION_COOKIE_NAME = "team-sim-auth-session";
 
 const AUTH_SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
@@ -34,7 +34,7 @@ function authCookieOptions(token: string) {
   };
 }
 
-export async function createAuthSessionToken(
+async function createAuthSessionToken(
   payload: AuthSessionPayload,
 ): Promise<string> {
   return new SignJWT({ email: payload.email })
@@ -45,7 +45,7 @@ export async function createAuthSessionToken(
     .sign(getAuthSecret());
 }
 
-export async function verifyAuthSessionToken(
+async function verifyAuthSessionToken(
   token: string,
 ): Promise<AuthSessionPayload | null> {
   try {

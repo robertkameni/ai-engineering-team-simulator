@@ -16,7 +16,7 @@ function cjkRatio(text: string): number {
  * Heuristic language detection from the product idea text.
  * Latin-script English prompts default to English (avoids DeepSeek Chinese drift).
  */
-export function detectProductLanguage(text: string): ProductLanguage {
+function detectProductLanguage(text: string): ProductLanguage {
   const trimmed = text.trim();
   if (!trimmed) return "english";
 
@@ -31,7 +31,7 @@ export function detectProductLanguage(text: string): ProductLanguage {
   return "english";
 }
 
-export function productLanguageLabel(language: ProductLanguage): string {
+function productLanguageLabel(language: ProductLanguage): string {
   switch (language) {
     case "english":
       return "English";
