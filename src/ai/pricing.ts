@@ -82,10 +82,7 @@ function normalizeLanguageModelUsage(
 
   const inputTokens = usage.inputTokens ?? 0;
   const outputTokens = usage.outputTokens ?? 0;
-  const cacheReadTokens =
-    usage.inputTokenDetails?.cacheReadTokens ??
-    usage.cachedInputTokens ??
-    0;
+  const cacheReadTokens = usage.inputTokenDetails?.cacheReadTokens ?? 0;
   const noCacheTokens =
     usage.inputTokenDetails?.noCacheTokens ??
     Math.max(0, inputTokens - cacheReadTokens);

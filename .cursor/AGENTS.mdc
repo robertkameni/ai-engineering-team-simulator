@@ -218,6 +218,14 @@ Agents must:
 * produce typed outputs
 * support deterministic orchestration
 
+For any code touching the AI SDK (usage, streaming, provider options):
+
+1. Read the installed types in `node_modules/ai/dist/` first — especially after a version bump.
+2. Or query Context7 for current Vercel AI SDK documentation.
+3. Never assume field names or APIs from a prior SDK version (e.g. do not use removed properties such as legacy usage fields when `LanguageModelUsage.inputTokenDetails` is the source of truth).
+
+Skipping AI SDK type verification before implementation is considered an error.
+
 ---
 
 # ARCHITECTURE RULES
