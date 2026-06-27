@@ -17,6 +17,10 @@ const EXAMPLE_PROMPT_POOL = [
   "Build a personal finance tracker for freelancers with multi-currency support",
 ] as const;
 
+export function getDefaultExamplePrompts(count: number): string[] {
+  return EXAMPLE_PROMPT_POOL.slice(0, Math.min(count, EXAMPLE_PROMPT_POOL.length));
+}
+
 export function pickRandomExamplePrompts(count: number): string[] {
   const pool = [...EXAMPLE_PROMPT_POOL];
   for (let i = pool.length - 1; i > 0; i--) {

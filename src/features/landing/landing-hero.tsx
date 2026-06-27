@@ -8,11 +8,7 @@ import { Sparkles } from "lucide-react";
 import { LandingLiveDebate } from "@/features/landing/landing-live-debate";
 import { LandingPromptForm } from "@/features/landing/landing-prompt-form";
 
-interface LandingHeroProps {
-  examplePrompts: string[];
-}
-
-export function LandingHero({ examplePrompts }: LandingHeroProps) {
+export function LandingHero() {
   const pathname = usePathname();
   const previousPathRef = useRef<string | null>(null);
   const [motionKey, setMotionKey] = useState(0);
@@ -54,10 +50,7 @@ export function LandingHero({ examplePrompts }: LandingHeroProps) {
 
       <LandingLiveDebate />
 
-      <LandingPromptForm
-        examplePrompts={examplePrompts}
-        staggerExampleChips
-      />
+      <LandingPromptForm staggerExampleChips />
 
       <Link
         href="/workspace"

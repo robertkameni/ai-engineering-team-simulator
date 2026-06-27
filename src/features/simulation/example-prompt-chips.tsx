@@ -19,7 +19,7 @@ export function ExamplePromptChips({
     <div className={cn("flex flex-wrap justify-center gap-2", className)}>
       {prompts.map((prompt, index) => (
         <button
-          key={`${index}-${prompt}`}
+          key={prompt}
           type="button"
           onClick={() => onSelect(prompt)}
           className={cn(

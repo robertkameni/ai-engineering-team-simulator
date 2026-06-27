@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef } from "react";
 import { ArrowRight } from "lucide-react";
 import { ExamplePromptChips } from "@/features/simulation/example-prompt-chips";
+import { useExamplePromptChips } from "@/features/landing/use-example-prompt-chips";
 import { useRotatingPlaceholder } from "@/features/landing/use-rotating-placeholder";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,18 +14,17 @@ import {
 } from "@/lib/submit-shortcut";
 
 interface LandingPromptFormProps {
-  examplePrompts: string[];
   staggerExampleChips?: boolean;
 }
 
 export function LandingPromptForm({
-  examplePrompts,
   staggerExampleChips = false,
 }: LandingPromptFormProps) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const shortcutLabel = useSubmitShortcutLabel();
   const rotatingPlaceholder = useRotatingPlaceholder();
+  const examplePrompts = useExamplePromptChips();
 
   return (
     <>
