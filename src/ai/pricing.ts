@@ -20,10 +20,6 @@ const DEFAULT_PRICING: Record<DeepSeekModelId, ModelPricing> = {
     outputUsdPerMillion: 0.28,
     cachedInputUsdPerMillion: 0.0028,
   },
-  /**
-   * Pro defaults use the 75% promotional rates (valid until 2026-05-31 15:59 UTC).
-   * Post-promo: input $1.74, cache hit $0.0145, output $3.48 per 1M.
-   */
   "deepseek-v4-pro": {
     inputUsdPerMillion: 0.435,
     outputUsdPerMillion: 0.87,

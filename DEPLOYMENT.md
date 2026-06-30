@@ -28,7 +28,7 @@ Optional:
 
 | Variable | Notes |
 |---------|-------|
-| `DIRECT_URL` | Non-pooled Neon URL for `prisma migrate deploy` (advisory locks). Resolved automatically when set; see `scripts/resolve-migrate-database-url.mjs`. |
+| `DIRECT_DATABASE_URL` | Non-pooled Neon URL for `prisma migrate deploy` (advisory locks). Also accepts `DATABASE_URL_UNPOOLED` or `POSTGRES_URL_NON_POOLING`. Falls back to stripping `-pooler` from `DATABASE_URL`. See `scripts/resolve-migrate-database-url.mjs`. |
 | `SIMULATION_MAX_COST_USD` | Per-run USD ceiling for classification + debate + artifacts + regeneration (default `0.75`). |
 | `RATE_LIMIT_SIMULATE_GUEST` | Default `3` simulations per hour per IP (guest). |
 | `RATE_LIMIT_SIMULATE_AUTH` | Default `30` simulations per hour per signed-in user. |
@@ -54,7 +54,7 @@ See [.env.example](.env.example) for a full local template.
 Default **Build Command** is `npm run build`, which runs:
 
 1. `prisma generate`
-2. `prisma migrate deploy` — **only when `DATABASE_URL` is defined** at build time (uses `DIRECT_URL` when set for Neon advisory locks)
+2. `node scripts/prisma-migrate-deploy-if-url.mjs` — runs `prisma migrate deploy` with up to 3 retries, **only when `DATABASE_URL` is defined** (resolves a non-pooled connection from `DIRECT_DATABASE_URL` / `DATABASE_URL_UNPOOLED` / `POSTGRES_URL_NON_POOLING`, or strips `-pooler` from `DATABASE_URL`)
 3. `next build`
 
 If `DATABASE_URL` is missing during build (e.g. CI), migrations are skipped with a warning; **Vercel production/preview builds must have `DATABASE_URL`** so migrations apply before the app boots.
@@ -76,7 +76,7 @@ Six agents + artifact synthesis can approach the 300s ceiling on long debates �
 
 1. **Import** the repository in Vercel.
 2. **Add Neon** (Marketplace → Neon) and link the project, or paste `DATABASE_URL` manually for Production and Preview.
-3. Add **`DIRECT_URL`** if Neon provides a separate non-pooled connection string (recommended for reliable migrations).
+3. Add **`DIRECT_DATABASE_URL`** if Neon provides a separate non-pooled connection string (recommended for reliable migrations).
 4. Add `DEEPSEEK_API_KEY`, `AUTH_SECRET`, and Upstash Redis vars for both environments.
 5. Deploy. Watch the build log for `prisma migrate deploy` succeeding.
 
@@ -119,4 +119,4 @@ If simulate returns `503` with a rate-limit message, confirm Upstash env vars ar
 
 *See [MASTERPLAN.md](MASTERPLAN.md) for roadmap context (Phases 7–9).*
 
-*Last updated: 2026-05-31*
+*Last updated: 2026-06-30*
