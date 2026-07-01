@@ -77,6 +77,36 @@ If the npm MCP server is unavailable:
 
 ---
 
+# MCP SERVER USAGE (MANDATORY)
+
+The project has multiple configured MCP servers. Always use them when their domain is relevant to the task:
+
+| MCP Server | Purpose |
+|---|---|
+| `project-0-ai-engineering-team-simulator-npm-registry` | npm package verification (versions, metadata, API) |
+| `plugin-prisma-Prisma-Local` / `plugin-prisma-Prisma-Remote` | Prisma ORM schema, queries, migrations, and database operations |
+| `plugin-vercel-vercel` | Vercel deployments, CI/CD, environment variables, domains, AI SDK, storage |
+| `plugin-shadcn-shadcn` / `project-0-ai-engineering-team-simulator-shadcn` | shadcn/ui components and patterns |
+| `user-fallow` | Codebase analysis, health metrics, dependency tracing, dead code detection, duplication, security candidates |
+| `user-next-devtools` | Next.js debugging and performance tooling |
+| `user-angular-cli` | Angular CLI operations |
+| `user-js-mcp` | JavaScript tooling |
+
+Before implementing any feature:
+
+1. Identify which technology domains are involved.
+2. Use the corresponding MCP server(s) to verify current APIs, documentation, and best practices.
+3. For npm packages: use the npm MCP server first.
+4. For framework/library documentation: use WebSearch.
+5. For database schema/query work: use the Prisma MCP server.
+6. For deployment/infrastructure: use the Vercel MCP server.
+7. For UI components: use the shadcn MCP server.
+8. For codebase analysis and health checks: use the fallow MCP server.
+
+Skipping MCP server verification when a relevant server is available is considered an implementation error.
+
+---
+
 # REQUIRED IMPLEMENTATION WORKFLOW
 
 Before implementing any task:
@@ -84,12 +114,14 @@ Before implementing any task:
 1. Understand the existing codebase.
 2. Inspect package.json.
 3. Inspect the lockfile.
-4. Determine which external dependencies are involved.
-5. Query the npm MCP server for every dependency whose API or version matters.
-6. Verify the API against the latest documentation.
-7. Only then generate code.
+4. Determine which external dependencies and technologies are involved.
+5. Query the npm MCP server for every npm dependency whose API or version matters.
+6. Use WebSearch to fetch current documentation for every library, framework, SDK, or cloud service involved.
+7. Use the relevant MCP server(s) for the technology domain (Prisma, Vercel, shadcn, fallow, etc.) when applicable.
+8. Verify the API against the latest documentation.
+9. Only then generate code.
 
-Skipping dependency verification is considered an implementation error.
+Skipping dependency verification or documentation verification is considered an implementation error.
 
 ---
 
@@ -221,7 +253,7 @@ Agents must:
 For any code touching the AI SDK (usage, streaming, provider options):
 
 1. Read the installed types in `node_modules/ai/dist/` first — especially after a version bump.
-2. Or query Context7 for current Vercel AI SDK documentation.
+2. Or use WebSearch for current Vercel AI SDK documentation.
 3. Never assume field names or APIs from a prior SDK version (e.g. do not use removed properties such as legacy usage fields when `LanguageModelUsage.inputTokenDetails` is the source of truth).
 
 Skipping AI SDK type verification before implementation is considered an error.
@@ -351,6 +383,8 @@ In Task Mode:
 * Begin implementation immediately.
 * Follow the Required Implementation Workflow.
 * Verify every relevant dependency using the configured npm MCP server before generating code.
+* Use WebSearch to fetch current documentation for every library, framework, SDK, or cloud service involved.
+* Use the relevant MCP server(s) for the technology domain (Prisma, Vercel, shadcn, fallow, etc.) when applicable.
 * Produce production-quality implementations.
 * Minimize explanations unless requested.
-* Never skip dependency verification.
+* Never skip dependency verification or documentation verification.
