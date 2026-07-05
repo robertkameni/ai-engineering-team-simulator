@@ -22,7 +22,7 @@ npm run db:migrate           # first time / after schema changes
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3100](http://localhost:3100).
 
 **Optional env** (see [.env.example](./.env.example)): `AUTH_SECRET` (JWT sessions in production), `DIRECT_URL` (Neon migrations), Upstash Redis for rate limits, `SIMULATION_MAX_COST_USD` (per-run cost ceiling, default $0.75), `RATE_LIMIT_ENABLED_IN_DEV=true` to test throttling locally.
 
@@ -32,9 +32,9 @@ Open [http://localhost:3000](http://localhost:3000).
 
 1. Enter a product or project idea on `/` (animated landing with rotating examples) → `/workspace?prompt=...`
 2. The server classifies the idea (`software` | `physical` | `hybrid`) and assembles the matching team
-3. **Six agents** debate sequentially (short Slack-style turns, ~80–140 words)
+3. **Six agents** debate sequentially (dense technical prose — roughly 400-700 words, with mandatory cross-critique of prior teammates' designs)
 4. During debate, agents may call tools (npm package lookup, technical norm search) — live activity pills appear on streaming messages
-5. Artifacts synthesize after the debate (requirements/scope, architecture/technical, implementation/execution, review)
+5. Artifacts synthesize after the debate (requirements/scope, architecture/technical, implementation/execution, blueprint/build-ready details, review)
 6. Run persists to Neon with **token usage and estimated cost**; sidebar lists your recent history; `/runs/[id]` replays the saved debate
 7. **Export** as **Markdown or PDF** from the header — **sign in required** (modal for guests); Markdown is generated client-side; PDF is generated server-side (Puppeteer) with agent accent colors and debate outcome summary; Chrome/Edge uses the native Save As dialog, other browsers fall back to a blob download
 
@@ -58,7 +58,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Prompt type | Template | What you get |
 |-------------|----------|--------------|
-| SaaS HR scheduling app | `software` | PM scope, system design, backend/frontend plans, code-oriented review; architect verifies npm packages |
+| SaaS HR scheduling app | `software` | PM scope, system design, backend/frontend plans, blueprint with deps/schema/interfaces, code-oriented review; architect verifies npm packages |
 | School plumbing renovation | `physical` | Work package, technical/conformity planning, budget phasing — no software stack |
 | DTU compliance app + BIM scope | `hybrid` | Software-oriented debate; backend slot uses compliance expert when physical keywords are detected |
 
@@ -82,10 +82,9 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Vercel + Neon env vars, build/migra
 
 | File | Contents |
 |------|----------|
-| [MASTERPLAN.md](./MASTERPLAN.md) | Product roadmap and phase checklist |
 | [DEPLOYMENT.md](./DEPLOYMENT.md) | Vercel deployment |
 | [AGENTS.md](./AGENTS.md) | Stack rules for contributors / AI agents |
 
 ---
 
-*README last updated: 2026-05-31 — full-lifecycle cost ceiling, regenerate action rate limits, auth brute-force shields, security test suite.*
+*README last updated: 2026-07-05 — debate realism overhaul, blueprint artifact, reviewer gate rules, architect challenge PM, Phase 8 complete.*

@@ -117,6 +117,4 @@ If simulate returns `503` with a rate-limit message, confirm Upstash env vars ar
 
 ---
 
-*See [MASTERPLAN.md](MASTERPLAN.md) for roadmap context (Phases 7–9).*
-
 *Last updated: 2026-06-30*
