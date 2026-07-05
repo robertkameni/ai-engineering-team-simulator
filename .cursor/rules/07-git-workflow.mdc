@@ -1,0 +1,44 @@
+---
+description: Git discipline — commits, messages, safety rules, exclusions
+alwaysApply: true
+---
+
+# GIT & COMMIT DISCIPLINE
+
+## When to Commit
+
+Only commit when explicitly asked. Never commit proactively.
+
+When asked:
+
+1. Run `git status` and `git diff` to inventory all changes.
+2. Run `git log -5 --oneline` to match the recent commit style.
+3. Verify no secrets, `.env` files, or build artifacts are staged.
+4. Write a concise commit message.
+
+## Commit Message Format
+
+```
+<type>: <brief description in imperative mood>
+
+<optional body explaining why, not what>
+```
+
+Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `security`.
+
+## Safety Rules
+
+- **Never force push to `main` or `master`.** Warn the user if they request it.
+- **Never amend a pushed commit** unless the user explicitly requests it (requires force push).
+- **Never skip hooks** (`--no-verify`, `--no-gpg-sign`) unless the user explicitly requests it.
+- If a commit fails or is rejected by a hook, never amend — fix the issue and create a **new** commit.
+- If the commit succeeded but a pre-commit hook auto-modified files, add those files and amend (HEAD must be your commit and not pushed).
+- Never run `git config` changes.
+
+## What Never to Commit
+
+- `.env`, `.env.local`, `.env.production` — any file containing secrets.
+- Build output (`dist/`, `.next/`, `node_modules/`).
+- Generated Prisma client (`src/generated/prisma/`) — regenerate on checkout.
+- IDE-specific settings (`.vscode/`, `.idea/`) unless shared by the team.
+- Debug code (`console.log`, `debugger` statements, commented-out blocks).

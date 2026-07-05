@@ -38,11 +38,10 @@ function stripLeadingMetaCommentary(text: string): string {
   return text.replace(LEADING_META_COMMENTARY, "");
 }
 
-function hasCompletedOpeningBlock(fullText: string): boolean {
+export function hasCompletedOpeningBlock(fullText: string): boolean {
   return /\n\n/.test(fullText) || /^##\s/m.test(fullText);
 }
 
-/** Ensure ## section headings start on their own line (e.g. "normatif.## Foo"). */
 function normalizeMarkdownHeadings(text: string): string {
   return text
     .replace(/([.!?…]["'»]?)\s*(##\s+)/g, "$1\n\n$2")
@@ -79,4 +78,22 @@ export function getAgentStreamDisplayText(
     text = reviewerVisibleText(text);
   }
   return text;
+}
+
+/** Incremental normalization for streaming — only processes the suffix delta, not the full accumulated text. */
+export function normalizeAgentSuffix(
+  role: SimulationAgentRole,
+  suffix: string,
+  isFirstChunk: boolean,
+): string {
+  let text = suffix;
+  if (isFirstChunk) {
+    text = stripLeadingMetaCommentary(text);
+  }
+  text = stripInlineToolNarration(text);
+  if (role === "architect" && isFirstChunk) {
+    text = stripToolOnlyOpeningBlock(text);
+  }
+  text = normalizeMarkdownHeadings(text);
+  return isFirstChunk ? text.trimStart() : text;
 }

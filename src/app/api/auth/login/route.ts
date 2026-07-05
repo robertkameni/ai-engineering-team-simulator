@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid email or password" }, { status: 400 });
     }
 
-    const email = parsed.data.email.toLowerCase();
+    const email = parsed.data.email;
 
     const rateLimit = await assertAuthRateLimit(request, "auth_login", email);
     if (!rateLimit.ok) {

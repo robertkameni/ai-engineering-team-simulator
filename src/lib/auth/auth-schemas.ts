@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const authCredentialsSchema = z.object({
-  email: z.pipe(z.string().trim().max(320), z.email()),
+  email: z.pipe(z.string().trim().max(320), z.email()).transform((val) => val.toLowerCase()),
   password: z.string().min(8).max(128),
 });
 

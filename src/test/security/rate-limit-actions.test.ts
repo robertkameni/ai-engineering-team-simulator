@@ -6,32 +6,37 @@ import {
   type RegenerateArtifactsPostHooks,
 } from "../../lib/api/regenerate-artifacts-post-logic.js";
 import { getRateLimitThreshold } from "../../lib/rate-limit-config.js";
-import type { RateLimitResult } from "../../lib/rate-limit-config.js";
-
-function rateLimitResponse(result: Extract<RateLimitResult, { ok: false }>) {
-  return Response.json(
-    { error: result.error, retryAfter: result.retryAfterSec },
-    {
-      status: result.status,
-      headers:
-        result.status === 429
-          ? { "Retry-After": String(result.retryAfterSec) }
-          : undefined,
-    },
-  );
-}
+import { rateLimitResponse } from "../shared/rate-limit-response.js";
 
 describe("getRateLimitThreshold", () => {
-  it("sets export_pdf to 5 per hour for authenticated profiles", () => {
-    assert.equal(getRateLimitThreshold("export_pdf", true), 5);
+  it("sets export_pdf to default 5 when env is unset", () => {
+    const saved = process.env.RATE_LIMIT_EXPORT_PDF_AUTH;
+    delete process.env.RATE_LIMIT_EXPORT_PDF_AUTH;
+    try {
+      assert.equal(getRateLimitThreshold("export_pdf", true), 5);
+    } finally {
+      if (saved !== undefined) process.env.RATE_LIMIT_EXPORT_PDF_AUTH = saved;
+    }
   });
 
-  it("sets regenerate to 10 per hour for authenticated profiles", () => {
-    assert.equal(getRateLimitThreshold("regenerate", true), 10);
+  it("sets regenerate to default 10 for authenticated profiles when env is unset", () => {
+    const saved = process.env.RATE_LIMIT_REGENERATE_AUTH;
+    delete process.env.RATE_LIMIT_REGENERATE_AUTH;
+    try {
+      assert.equal(getRateLimitThreshold("regenerate", true), 10);
+    } finally {
+      if (saved !== undefined) process.env.RATE_LIMIT_REGENERATE_AUTH = saved;
+    }
   });
 
-  it("sets regenerate to 3 per hour for guest sessions", () => {
-    assert.equal(getRateLimitThreshold("regenerate", false), 3);
+  it("sets regenerate to default 3 for guest sessions when env is unset", () => {
+    const saved = process.env.RATE_LIMIT_REGENERATE_GUEST;
+    delete process.env.RATE_LIMIT_REGENERATE_GUEST;
+    try {
+      assert.equal(getRateLimitThreshold("regenerate", false), 3);
+    } finally {
+      if (saved !== undefined) process.env.RATE_LIMIT_REGENERATE_GUEST = saved;
+    }
   });
 });
 

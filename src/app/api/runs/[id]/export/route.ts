@@ -1,11 +1,7 @@
 import { buildRunMarkdown } from "@/lib/export/build-run-export-document";
 import { buildRunMarkdownFilename } from "@/lib/export/export-filename";
-import { getRunForWorkspace } from "@/lib/db/runs";
+import { getRunForWorkspaceIfOwned } from "@/lib/db/runs";
 import { getTeamRoster } from "@/lib/db/team-roster";
-import {
-  requireRunAccess,
-  runAccessDeniedResponse,
-} from "@/lib/auth/run-ownership";
 import { getSessionUser } from "@/lib/auth/session";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
@@ -30,15 +26,9 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 
   const { id } = await params;
-  const access = await requireRunAccess(id, {
-    userId,
-    guestSessionId: null,
-  });
-  if (!access.ok) {
-    return runAccessDeniedResponse(access);
-  }
+  const access = { userId, guestSessionId: null as string | null };
+  const run = await getRunForWorkspaceIfOwned(id, access);
 
-  const run = await getRunForWorkspace(id);
   if (!run) {
     return Response.json({ error: "Run not found" }, { status: 404 });
   }
@@ -48,7 +38,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     run,
     templateId: roster?.templateId,
   });
-  const exportId = Date.now();
+  const exportId = crypto.randomUUID();
   const filename = buildRunMarkdownFilename(run.title, exportId);
 
   return new Response(`${markdown}<!-- export-id: ${exportId} -->\n`, {

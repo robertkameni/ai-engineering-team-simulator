@@ -1,45 +1,22 @@
 ---
 alwaysApply: true
 ---
-## D.R.Y.
 
-Eliminate unnecessary duplication.
+# CURSOR AGENT RULES — GLOBAL ORCHESTRATION
 
-Prefer:
+Technology-specific and domain conventions live in `.cursor/rules/`. Those files take precedence over this document for their domain. This file covers cross-cutting workflow, process, and meta-rules only.
 
-* shared utilities
-* reusable domain logic
-* centralized schemas
-* composable modules
-
-Avoid:
-
-* duplicated orchestration logic
-* repeated validation logic
-* repeated prompt logic
-* copy-pasted implementations
-
-Abstract only after repetition becomes clear.
-
----
-
-## K.I.S.S.
-
-Prefer the simplest correct implementation.
-
-Avoid:
-
-* premature abstractions
-* speculative architecture
-* unnecessary indirection
-* overengineered systems
-
-Prefer:
-
-* explicit flows
-* focused modules
-* predictable behavior
-* readable code
+| Domain | Rule file |
+|---|---|
+| Next.js 16 + React 19 | `01-next-react.mdc` |
+| Tailwind v4 + shadcn + Radix | `02-styling-ui.mdc` |
+| Prisma 7 + Zod v4 + Upstash | `03-database-security.mdc` |
+| AI SDK v7 + DeepSeek | `04-ai-orchestration.mdc` |
+| Security (CORS, CSP, tokens) | `05-security.mdc` |
+| Architecture (features, barrel, shared kernel) | `06-architecture.mdc` |
+| Git & commit discipline | `07-git-workflow.mdc` |
+| Testing standards | `08-testing.mdc` |
+| Clean code standards | `09-clean-code-standards.mdc` |
 
 ---
 
@@ -47,63 +24,42 @@ Prefer:
 
 Before generating code that uses any external library, framework, SDK, runtime, or package:
 
-1. Inspect the project's dependency files (package.json, lockfile, workspace configuration, etc.).
+1. Inspect the project's dependency files (`package.json`, lockfile, workspace configuration).
 2. If the dependency already exists, target the installed version.
-3. If the dependency does not exist, or its API/version is relevant, query the configured npm MCP server.
-4. Use the npm MCP server to verify:
+3. If the dependency does not exist, or its API/version matters, query the configured npm MCP server.
+4. Use the npm MCP server to verify: latest stable version, package metadata, current API, official documentation.
+5. Generate code only after verification. The npm MCP server is the authoritative source of truth.
 
-   * latest stable version
-   * package metadata
-   * current API
-   * official documentation
-5. Generate code only after verification.
+**Never:** assume package versions, rely solely on model memory, invent APIs, guess method signatures, use deprecated APIs without verification, or recommend alpha/beta/RC/nightly/canary releases unless explicitly requested.
 
-The configured npm MCP server is the authoritative source of truth for npm packages.
-
-Never:
-
-* assume package versions
-* rely solely on model memory
-* invent APIs
-* guess method signatures
-* use deprecated APIs without verification
-* recommend alpha, beta, RC, nightly, or canary releases unless explicitly requested
-
-If the npm MCP server is unavailable:
-
-* explicitly state that verification could not be performed
-* avoid guessing APIs
-* use only well-established documented patterns
+If the npm MCP server is unavailable: state that verification could not be performed, avoid guessing APIs, and use only well-established documented patterns.
 
 ---
 
 # MCP SERVER USAGE (MANDATORY)
 
-The project has multiple configured MCP servers. Always use them when their domain is relevant to the task:
+Always use the relevant MCP server when its domain is involved:
 
 | MCP Server | Purpose |
 |---|---|
 | `project-0-ai-engineering-team-simulator-npm-registry` | npm package verification (versions, metadata, API) |
-| `plugin-prisma-Prisma-Local` / `plugin-prisma-Prisma-Remote` | Prisma ORM schema, queries, migrations, and database operations |
-| `plugin-vercel-vercel` | Vercel deployments, CI/CD, environment variables, domains, AI SDK, storage |
+| `plugin-prisma-Prisma-Local` / `plugin-prisma-Prisma-Remote` | Prisma ORM schema, queries, migrations, database ops |
+| `plugin-vercel-vercel` | Vercel deployments, CI/CD, env vars, domains, AI SDK, storage |
 | `plugin-shadcn-shadcn` / `project-0-ai-engineering-team-simulator-shadcn` | shadcn/ui components and patterns |
-| `user-fallow` | Codebase analysis, health metrics, dependency tracing, dead code detection, duplication, security candidates |
+| `user-fallow` | Codebase analysis, health metrics, dependency tracing, dead code, duplication, security candidates |
 | `user-next-devtools` | Next.js debugging and performance tooling |
-| `user-angular-cli` | Angular CLI operations |
 | `user-js-mcp` | JavaScript tooling |
-
-Before implementing any feature:
 
 1. Identify which technology domains are involved.
 2. Use the corresponding MCP server(s) to verify current APIs, documentation, and best practices.
 3. For npm packages: use the npm MCP server first.
 4. For framework/library documentation: use WebSearch.
-5. For database schema/query work: use the Prisma MCP server.
+5. For database/schema work: use the Prisma MCP server.
 6. For deployment/infrastructure: use the Vercel MCP server.
 7. For UI components: use the shadcn MCP server.
-8. For codebase analysis and health checks: use the fallow MCP server.
+8. For codebase analysis: use the fallow MCP server.
 
-Skipping MCP server verification when a relevant server is available is considered an implementation error.
+Skipping MCP server verification when a relevant server is available is an implementation error.
 
 ---
 
@@ -112,279 +68,124 @@ Skipping MCP server verification when a relevant server is available is consider
 Before implementing any task:
 
 1. Understand the existing codebase.
-2. Inspect package.json.
-3. Inspect the lockfile.
-4. Determine which external dependencies and technologies are involved.
-5. Query the npm MCP server for every npm dependency whose API or version matters.
-6. Use WebSearch to fetch current documentation for every library, framework, SDK, or cloud service involved.
-7. Use the relevant MCP server(s) for the technology domain (Prisma, Vercel, shadcn, fallow, etc.) when applicable.
-8. Verify the API against the latest documentation.
-9. Only then generate code.
+2. Inspect `package.json` and the lockfile.
+3. Determine which external dependencies and technologies are involved.
+4. Query the npm MCP server for every npm dependency whose API or version matters.
+5. Use WebSearch to fetch current documentation for every library, framework, SDK, or cloud service involved.
+6. Use the relevant MCP server(s) for the technology domain.
+7. Verify the API against the latest documentation.
+8. Only then generate code.
 
-Skipping dependency verification or documentation verification is considered an implementation error.
+Skipping dependency or documentation verification is an implementation error.
 
 ---
 
 # HALLUCINATION PREVENTION
 
-All outputs must align with:
+All outputs must align with: official documentation, verified APIs, latest stable releases, observable runtime behavior, and existing project dependencies.
 
-* official documentation
-* verified APIs
-* latest stable releases
-* observable runtime behavior
-* existing project dependencies
+**Never:** invent APIs, fabricate SDK methods, assume undocumented behavior, generate code from outdated examples, or rely only on pretrained knowledge when documentation can be verified.
 
-Never:
-
-* invent APIs
-* fabricate SDK methods
-* assume undocumented behavior
-* generate code from outdated examples
-* rely only on pretrained knowledge when documentation can be verified
-
-If uncertain:
-
-* verify first
-* state uncertainty briefly
-* prefer official documented behavior
-* avoid speculative implementations
+If uncertain: verify first, state uncertainty briefly, prefer official documented behavior, and avoid speculative implementations.
 
 ---
 
-# TECHNOLOGY RULES
+# TECHNOLOGY VERSION & BEST PRACTICES (IMPERATIVE)
 
-Always:
+**Every dependency used in generated code must match the exact version range declared in `package.json`.** The `package.json` is the single source of truth — never assume a different major/minor version than what is installed.
 
-* use latest stable versions for new dependencies
-* respect versions already installed in the project
-* follow official documentation
-* use current best practices
-* prefer actively maintained libraries
+For every technology referenced in generated code:
 
-Never use:
+1. **Version anchor:** read the installed version from `package.json` before writing any code. Target that version's API, not an older or newer one.
+2. **Latest best practices:** use the idiomatic patterns, APIs, and conventions recommended by the official documentation for that installed version. Do not apply patterns from prior major versions.
+3. **Latest patterns:** prefer the most current architectural patterns the framework/library advocates at that version (e.g., Server Components over `getServerSideProps` for Next.js 16; `streamText` over legacy `generateText` for AI SDK v7; native Tailwind v4 CSS-first config over `tailwind.config.ts`).
+4. **Documentation first:** when uncertain about the correct API or pattern, consult official docs for the installed version via WebSearch before writing code. Never fall back to pretrained knowledge from older versions.
 
-* deprecated APIs
-* obsolete framework patterns
-* outdated tutorials
-* abandoned packages
-
----
-
-# NEXT.JS RULES
-
-Use:
-
-* App Router
-* Server Components by default
-* Route Handlers
-* Server Actions where appropriate
-* streaming-first architecture
-* Suspense boundaries intentionally
-
-Prefer:
-
-* server-first data fetching
-* minimal client JavaScript
-* colocated route logic
-
-Avoid:
-
-* unnecessary client components
-* client waterfalls
-* duplicated fetching
-
----
-
-# TYPESCRIPT RULES
-
-Must use:
-
-* strict mode
-* explicit typing
-* discriminated unions
-* exhaustive checks
-* schema validation
-
-Avoid:
-
-* any
-* unsafe casting
-* implicit runtime assumptions
-
----
-
-# DATABASE RULES
-
-Use:
-
-* PostgreSQL
-* Prisma
-* optimized queries
-* explicit relations
-* transactional correctness
-
-Avoid:
-
-* N+1 queries
-* hidden query costs
-* unbounded reads
-
----
-
-# AI SYSTEM RULES
-
-All AI execution must flow through:
-
-UI
-→ application layer
-→ orchestration layer
-→ provider layer
-
-Never call LLM providers directly from UI components.
-
-Agents must:
-
-* maintain structured memory
-* reference prior context
-* produce typed outputs
-* support deterministic orchestration
-
-For any code touching the AI SDK (usage, streaming, provider options):
-
-1. Read the installed types in `node_modules/ai/dist/` first — especially after a version bump.
-2. Or use WebSearch for current Vercel AI SDK documentation.
-3. Never assume field names or APIs from a prior SDK version (e.g. do not use removed properties such as legacy usage fields when `LanguageModelUsage.inputTokenDetails` is the source of truth).
-
-Skipping AI SDK type verification before implementation is considered an error.
-
----
-
-# ARCHITECTURE RULES
-
-Use clean boundaries:
-
-/ui
-/application
-/domain
-/infrastructure
-/ai
-/orchestration
-
-Rules:
-
-* UI never accesses infrastructure directly
-* domain remains framework-agnostic
-* orchestration owns AI coordination
-* infrastructure owns external services
-
----
-
-# REALTIME RULES
-
-Realtime systems must:
-
-* degrade gracefully
-* reconnect safely
-* avoid duplicate events
-* remain event-driven
-
-Prefer:
-
-* streaming UX
-* optimistic updates
-* isolated realtime state
+**Never** use deprecated APIs, obsolete patterns, or APIs removed in the installed version — even if a prior version supported them.
 
 ---
 
 # PERFORMANCE RULES
 
-Prioritize:
+Prioritize: streaming UX, low bundle size, parallel execution, cache-aware architecture, and server-side computation.
 
-* streaming UX
-* low bundle size
-* parallel execution
-* cache-aware architecture
-* server-side computation
+Avoid: unnecessary hydration, sequential waterfalls, and oversized client state.
 
-Avoid:
-
-* unnecessary hydration
-* sequential waterfalls
-* oversized client state
-
----
-
-# SECURITY RULES
-
-Always:
-
-* validate external input
-* validate AI output
-* sanitize user content
-* enforce authorization boundaries
-
-Never trust:
-
-* model outputs
-* uploaded content
-* client input
+- Run bundle analysis before major releases (`ANALYZE=true next build`).
+- Use dynamic `import()` with `loading` fallbacks for heavy client components not needed on initial render.
+- Keep First Load JS per route under ~200 KB (uncompressed).
 
 ---
 
 # OUTPUT RULES
 
-Never expose:
+Never expose: chain-of-thought, hidden reasoning, internal analysis, or meta commentary.
 
-* chain-of-thought
-* hidden reasoning
-* internal analysis
-* meta commentary
+Output only: final answers, final code, and concise explanations when necessary.
 
-Output only:
+## File Creation Policy
 
-* final answers
-* final code
-* concise explanations when necessary
+Before creating a file, confirm one of:
+- The task explicitly requires a new route, component, or utility.
+- Existing modules cannot host the new logic without breaking single responsibility.
+- The file is a barrel file re-exporting from an existing directory.
+
+Never create: placeholder `// TODO` files, example files/starter templates/boilerplate unless explicitly requested, alternative implementations for comparison, or duplicate configuration files.
+
+Prefer editing existing files. The smallest diff that solves the problem is the correct one.
+
+## Documentation Discipline
+
+- Never create `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, or any standalone documentation file unless explicitly requested.
+- Inline comments must explain **why**, never **what**.
+- If a complex decision needs documentation, add it as a code comment above the decision point — not in a separate file.
+
+---
+
+# ERROR RECOVERY & DEBUGGING
+
+When something breaks:
+
+1. Read the full error message and stack trace.
+2. Check recent changes first.
+3. Reproduce in isolation.
+4. Fix the root cause, not the symptom.
+
+Every public API route must return a typed error response (never a bare 500), log server-side with correlation context, and never leak stack traces to the client:
+
+```typescript
+catch (error) {
+  console.error({ event: "simulation_failed", runId, reason: error instanceof Error ? error.message : "unknown" });
+  return Response.json({ error: "Simulation failed" }, { status: 500 });
+}
+```
+
+Long-running AI operations must respect `AbortSignal`:
+
+```typescript
+const controller = new AbortController();
+const timeout = setTimeout(() => controller.abort(), maxDuration * 1000);
+
+try {
+  await streamText({ signal: controller.signal, ... });
+} finally {
+  clearTimeout(timeout);
+}
+```
 
 ---
 
 # RESPONSE MODES
 
-## Conversation Mode
+Default mode: questions, discussions, architecture analysis, planning — keep responses concise, technically accurate, and natural.
 
-Default mode for:
+Task Mode (activated when asked to implement, build, fix, or refactor):
 
-* questions
-* discussions
-* architecture analysis
-* planning
-
-Keep responses:
-
-* concise
-* technically accurate
-* natural
-
----
-
-## Task Mode
-
-Activate only when explicitly asked to:
-
-* implement
-* build
-* fix
-* refactor
-* create code
-
-In Task Mode:
-
-* Begin implementation immediately.
-* Follow the Required Implementation Workflow.
-* Verify every relevant dependency using the configured npm MCP server before generating code.
-* Use WebSearch to fetch current documentation for every library, framework, SDK, or cloud service involved.
-* Use the relevant MCP server(s) for the technology domain (Prisma, Vercel, shadcn, fallow, etc.) when applicable.
-* Produce production-quality implementations.
-* Minimize explanations unless requested.
-* Never skip dependency verification or documentation verification.
+- Begin implementation immediately.
+- Follow the Required Implementation Workflow.
+- Verify every relevant dependency using the npm MCP server before generating code.
+- Use WebSearch for current documentation.
+- Use the relevant MCP server(s) for the technology domain.
+- Produce production-quality implementations.
+- Minimize explanations unless requested.
+- Never skip dependency or documentation verification.

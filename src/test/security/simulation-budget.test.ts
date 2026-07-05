@@ -16,9 +16,7 @@ describe("getSimulationMaxCostUsd", () => {
     try {
       assert.equal(getSimulationMaxCostUsd(), 0.75);
     } finally {
-      if (previous === undefined) {
-        delete process.env.SIMULATION_MAX_COST_USD;
-      } else {
+      if (previous !== undefined) {
         process.env.SIMULATION_MAX_COST_USD = previous;
       }
     }

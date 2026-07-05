@@ -33,9 +33,15 @@ async function postAuth(
     body: JSON.stringify({ email, password }),
   });
 
-  let data: { error?: string } = {};
+  let errorMessage: string | undefined;
   try {
-    data = (await response.json()) as { error?: string };
+    const data: unknown = await response.json();
+    if (typeof data === "object" && data !== null && "error" in data) {
+      errorMessage =
+        typeof (data as Record<string, unknown>).error === "string"
+          ? ((data as Record<string, unknown>).error as string)
+          : undefined;
+    }
   } catch {
     return {
       ok: false,
@@ -47,7 +53,7 @@ async function postAuth(
   }
 
   if (!response.ok) {
-    return { ok: false, error: data.error ?? "Authentication failed" };
+    return { ok: false, error: errorMessage ?? "Authentication failed" };
   }
 
   return { ok: true };

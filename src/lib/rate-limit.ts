@@ -1,7 +1,6 @@
 import "server-only";
 
 import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 
 import { getGuestSessionId } from "@/lib/auth/guest-session";
 import {
@@ -9,30 +8,16 @@ import {
   type RateLimitAction,
   type RateLimitResult,
 } from "@/lib/rate-limit-config";
+import {
+  getRedis,
+  hasRedisConfig,
+  isProduction,
+  isRateLimitDisabled,
+} from "@/lib/rate-limit-redis";
+
+export { rateLimitResponse } from "@/lib/rate-limit-response";
 
 export type { RateLimitAction, RateLimitResult } from "@/lib/rate-limit-config";
-
-function isProduction(): boolean {
-  return process.env.NODE_ENV === "production";
-}
-
-function isRateLimitDisabled(): boolean {
-  if (process.env.RATE_LIMIT_DISABLED === "true") return true;
-  if (
-    process.env.NODE_ENV === "development" &&
-    process.env.RATE_LIMIT_ENABLED_IN_DEV !== "true"
-  ) {
-    return true;
-  }
-  return false;
-}
-
-function hasRedisConfig(): boolean {
-  return Boolean(
-    process.env.UPSTASH_REDIS_REST_URL?.trim() &&
-      process.env.UPSTASH_REDIS_REST_TOKEN?.trim(),
-  );
-}
 
 export function getClientIpFromHeaders(headers: Headers): string {
   const forwarded = headers.get("x-forwarded-for");
@@ -68,16 +53,6 @@ async function resolveRateLimitIdentifier(
   }
 
   return "global:unknown";
-}
-
-let redisClient: Redis | null = null;
-
-function getRedis(): Redis | null {
-  if (!hasRedisConfig()) return null;
-  if (!redisClient) {
-    redisClient = Redis.fromEnv();
-  }
-  return redisClient;
 }
 
 const limiterCache = new Map<string, Ratelimit>();
@@ -160,17 +135,4 @@ export async function assertRateLimit(
     }
     return { ok: true };
   }
-}
-
-export function rateLimitResponse(result: Extract<RateLimitResult, { ok: false }>) {
-  return Response.json(
-    { error: result.error, retryAfter: result.retryAfterSec },
-    {
-      status: result.status,
-      headers:
-        result.status === 429
-          ? { "Retry-After": String(result.retryAfterSec) }
-          : undefined,
-    },
-  );
 }

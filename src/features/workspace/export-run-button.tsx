@@ -1,15 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ChevronDown, Download, FileText, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { MockRun } from "@/features/agents/types";
@@ -27,11 +27,17 @@ interface ExportRunButtonProps {
 }
 
 async function claimGuestRuns(): Promise<void> {
-  const response = await fetch("/api/auth/claim-guest-runs", {
-    method: "POST",
-  });
+  let response: Response;
+  try {
+    response = await fetch("/api/auth/claim-guest-runs", {
+      method: "POST",
+    });
+  } catch (error) {
+    console.warn("Network error claiming guest runs:", error);
+    return;
+  }
   if (!response.ok) {
-    throw new Error("Failed to attach guest runs to your account");
+    console.warn("Claim guest runs failed with status", response.status);
   }
 }
 
@@ -50,18 +56,21 @@ export function ExportRunButton({
   );
   const [exportError, setExportError] = useState<string | null>(null);
   const isExporting = exportingFormat != null;
+  const templateIdRef = useRef(templateId);
+  templateIdRef.current = templateId;
 
   const performExport = useCallback(
     async (targetRun: MockRun, format: ExportFormat) => {
+      const currentTemplateId = templateIdRef.current;
       setExportError(null);
       try {
         if (format === "pdf") {
-          await exportRunPdf(targetRun, templateId, () =>
+          await exportRunPdf(targetRun, currentTemplateId, () =>
             setExportingFormat("pdf"),
           );
         } else {
           setExportingFormat(format);
-          await exportRunMarkdown(targetRun, templateId);
+          await exportRunMarkdown(targetRun, currentTemplateId);
         }
       } catch (error) {
         const message =
@@ -72,7 +81,7 @@ export function ExportRunButton({
         setExportingFormat(null);
       }
     },
-    [templateId],
+    [],
   );
 
   const handleFormatSelect = useCallback(

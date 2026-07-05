@@ -14,7 +14,7 @@ import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { WorkspaceMobileContext } from "@/features/workspace/workspace-mobile-context";
 import { WorkspaceRunProvider } from "@/features/workspace/workspace-run-context";
 import { SiteFooter } from "@/components/site-footer";
-import { useMinWidth } from "@/lib/use-media-query";
+import { useMinWidth } from "@/hooks/use-media-query";
 
 const SidebarMobileSheet = dynamic(
   () =>

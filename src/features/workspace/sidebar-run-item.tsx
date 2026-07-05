@@ -26,22 +26,32 @@ export function SidebarRunItem({
 }: SidebarRunItemProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const href = `/runs/${run.id}`;
 
   async function handleDelete(event: React.MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
+
     if (deleting) return;
 
     setDeleting(true);
+    setDeleteError(null);
     try {
       const response = await fetch(`/api/runs/${run.id}`, { method: "DELETE" });
-      if (!response.ok) return;
+
+      if (!response.ok && response.status !== 404) {
+        setDeleteError("Failed to delete run. Please try again.");
+        return;
+      }
 
       onDeleted(run.id);
+
       if (isActive) {
         router.push("/workspace");
       }
+    } catch {
+      setDeleteError("Network error. Please check your connection and try again.");
     } finally {
       setDeleting(false);
     }
@@ -50,7 +60,7 @@ export function SidebarRunItem({
   return (
     <div
       className={cn(
-        "group flex items-stretch gap-0.5 rounded-lg transition-all duration-200",
+        "group relative flex items-stretch gap-0.5 rounded-lg transition-all duration-200",
         isActive ? "glass-card border-l-2 border-l-foreground" : "hover:bg-white/4",
       )}
     >
@@ -95,6 +105,14 @@ export function SidebarRunItem({
       >
         <X className="size-3.5" />
       </Button>
+      {deleteError ? (
+        <p
+          role="alert"
+          className="absolute right-1 top-full z-10 mt-1 max-w-48 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-xs text-destructive"
+        >
+          {deleteError}
+        </p>
+      ) : null}
     </div>
   );
 }

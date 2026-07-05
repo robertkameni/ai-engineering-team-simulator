@@ -9,7 +9,7 @@ import {
 } from "@/ai/orchestration/simulation-budget";
 import { isDebateComplete } from "@/ai/orchestration/reviewer-decision";
 import type { AgentRole } from "@/features/agents/types";
-import { getPersona } from "@/features/agents/personas";
+import { getPersonaBase } from "@/features/agents/personas";
 import { type RunArtifacts } from "@/features/artifacts/types";
 import {
   runArtifactsOutputToBundle,
@@ -54,7 +54,7 @@ function buildRosterFromMessages(
 
   for (const role of SIMULATION_AGENT_ORDER) {
     const message = messages.find((entry) => entry.agentRole === role);
-    const persona = getPersona(role);
+    const persona = getPersonaBase(role);
     roster[role] = {
       role,
       name: message?.agentName ?? persona.name,
@@ -73,7 +73,7 @@ function mapMessagesToTranscript(
     const role = message.agentRole as AgentRole;
     return {
       role,
-      agentName: message.agentName ?? getPersona(role).name,
+      agentName: message.agentName ?? getPersonaBase(role).name,
       content: message.content,
     };
   });

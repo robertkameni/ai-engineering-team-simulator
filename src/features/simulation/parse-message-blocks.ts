@@ -7,7 +7,7 @@ export type MessageBlock =
   | { type: "spacer" };
 
 const CLAIM_PATTERN =
-  /^\*\*Claim from ([^:*]+):\*\*\s*"?(.+?)"?\s*$/i;
+  /^\*\*Claim from ([^:*]+):\*\*\s*"?([\s\S]+?)"?\s*$/i;
 const VERDICT_PATTERN =
   /^\*\*(Agree|Disagree|Refine)\*\*\s*[—–-]?\s*(.*)$/i;
 const BLOCKQUOTE_PATTERN = /^>\s*"?(.+?)"?\s*$/;

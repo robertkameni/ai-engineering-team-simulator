@@ -30,12 +30,17 @@ export function SignOutButton({ email, releaseRunId }: SignOutButtonProps) {
     setIsSigningOut(true);
     try {
       const body = isReleasableRunId(releaseRunId) ? { runId: releaseRunId } : {};
-      await fetch("/api/auth/logout", {
+      const response = await fetch("/api/auth/logout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      if (!response.ok) {
+        console.warn("Sign-out request failed with status", response.status);
+      }
       router.refresh();
+    } catch (error) {
+      console.warn("Sign-out network error:", error);
     } finally {
       setIsSigningOut(false);
     }

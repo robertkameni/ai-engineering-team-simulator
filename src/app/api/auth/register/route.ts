@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const email = parsed.data.email.toLowerCase();
+  const email = parsed.data.email;
 
   const rateLimit = await assertAuthRateLimit(request, "auth_register", email);
   if (!rateLimit.ok) {

@@ -19,17 +19,17 @@ export function useExamplePromptChips(
   );
 
   useEffect(() => {
+    setPrompts(getDefaultExamplePrompts(count));
     const pick = () => setPrompts(pickRandomExamplePrompts(count));
-    const initialTimer = globalThis.setTimeout(pick, 0);
+    queueMicrotask(pick);
 
     if (rotateIntervalMs <= 0) {
-      return () => globalThis.clearTimeout(initialTimer);
+      return;
     }
 
     const rotateTimer = globalThis.setInterval(pick, rotateIntervalMs);
 
     return () => {
-      globalThis.clearTimeout(initialTimer);
       globalThis.clearInterval(rotateTimer);
     };
   }, [count, rotateIntervalMs]);

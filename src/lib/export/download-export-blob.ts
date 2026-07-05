@@ -1,14 +1,3 @@
-function downloadExportUrl(url: string, filename: string): void {
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.rel = "noopener";
-  link.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0";
-  document.body.appendChild(link);
-  link.click();
-  window.setTimeout(() => link.remove(), 2_000);
-}
-
 export function downloadExportBlob(
   blob: Blob,
   filename: string,

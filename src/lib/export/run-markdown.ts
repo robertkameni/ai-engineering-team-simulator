@@ -12,11 +12,6 @@ import type { TeamTemplateId } from "@/ai/agents/team-templates";
 
 export { type RunExportContext };
 
-function buildRunExportUrl(runId: string, exportId?: number): string {
-  const base = `/api/runs/${encodeURIComponent(runId)}/export`;
-  return exportId != null ? `${base}?t=${exportId}` : base;
-}
-
 function buildRunExportPayload(
   run: MockRun,
   templateId?: TeamTemplateId,
@@ -45,8 +40,4 @@ export async function exportRunMarkdown(
   }
 
   downloadExportBlob(blob, filename, "text/markdown");
-}
-
-function canExportRunFromServer(run: MockRun): boolean {
-  return Boolean(run.id && run.id !== "live");
 }

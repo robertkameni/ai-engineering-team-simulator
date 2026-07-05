@@ -9,7 +9,6 @@ import {
   EXPORT_PDF_MAX_MESSAGE_CONTENT_CHARS,
   EXPORT_PDF_MAX_MESSAGES,
   PDF_DOCUMENT_TITLE,
-  resolvePdfDocumentTitle,
 } from "../../lib/export/export-pdf-limits.js";
 
 function minimalValidExportBody() {
@@ -25,6 +24,7 @@ function minimalValidExportBody() {
           id: "msg-1",
           role: "pm" as const,
           content: "Scope overview",
+          createdAt: "2026-01-01T00:00:00.000Z",
         },
       ],
     },
@@ -42,6 +42,7 @@ describe("exportPdfPostBodySchema volumetry", () => {
       id: `msg-${i}`,
       role: "pm" as const,
       content: "line",
+      createdAt: "2026-01-01T00:00:00.000Z",
     }));
 
     const parsed = exportPdfPostBodySchema.safeParse({
@@ -63,6 +64,7 @@ describe("exportPdfPostBodySchema volumetry", () => {
             id: "msg-1",
             role: "pm",
             content: "x".repeat(EXPORT_PDF_MAX_MESSAGE_CONTENT_CHARS + 1),
+            createdAt: "2026-01-01T00:00:00.000Z",
           },
         ],
       },
@@ -159,7 +161,7 @@ describe("buildRunStyledMarkdown title sanitization", () => {
             id: "msg-1",
             role: "pm",
             content: "Hello",
-            createdAt:"2026-01-01T00:00:00.000Z",
+            createdAt: "2026-01-01T00:00:00.000Z",
           },
         ],
         artifacts: null,
@@ -183,7 +185,7 @@ describe("buildRunStyledMarkdown title sanitization", () => {
             id: "msg-1",
             role: 'pm"><script>alert(1)</script><div class="' as "pm",
             content: "Hello",
-            createdAt:"2026-01-01T00:00:00.000Z",
+            createdAt: "2026-01-01T00:00:00.000Z",
           },
         ],
         artifacts: null,
@@ -195,10 +197,9 @@ describe("buildRunStyledMarkdown title sanitization", () => {
   });
 });
 
-describe("resolvePdfDocumentTitle", () => {
-  it("returns a static system title regardless of user input context", () => {
-    assert.equal(resolvePdfDocumentTitle(), PDF_DOCUMENT_TITLE);
-    assert.equal(resolvePdfDocumentTitle(), "Engineering Simulation Report");
-    assert.doesNotMatch(resolvePdfDocumentTitle(), /script/i);
+describe("PDF_DOCUMENT_TITLE", () => {
+  it("is a static system title regardless of user input context", () => {
+    assert.equal(PDF_DOCUMENT_TITLE, "Engineering Simulation Report");
+    assert.doesNotMatch(PDF_DOCUMENT_TITLE, /script/i);
   });
 });

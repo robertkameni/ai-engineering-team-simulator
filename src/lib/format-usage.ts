@@ -1,11 +1,12 @@
 export function formatTokenCount(tokens: number): string {
-  if (tokens >= 1_000_000) {
-    return `${(tokens / 1_000_000).toFixed(1)}M`;
+  const safe = Math.max(0, tokens);
+  if (safe >= 1_000_000) {
+    return `${(safe / 1_000_000).toFixed(1)}M`;
   }
-  if (tokens >= 1_000) {
-    return `${(tokens / 1_000).toFixed(1)}k`;
+  if (safe >= 1_000) {
+    return `${(safe / 1_000).toFixed(1)}k`;
   }
-  return String(tokens);
+  return String(safe);
 }
 
 export function formatUsdCost(amount: number): string {

@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import {
   type TeamTemplateId,
-  isTeamTemplateId,
 } from "@/ai/agents/team-templates";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import { getDeepSeekModel } from "@/ai/providers";
@@ -83,18 +82,51 @@ Rules:
       "deepseek-v4-flash",
     );
 
-    if (result.output && isTeamTemplateId(result.output.templateId)) {
-      const templateId = isKeywordHybridProject(productIdea)
-        ? "hybrid"
-        : result.output.templateId;
+    if (result.output) {
       return {
-        templateId,
+        templateId: result.output.templateId,
         domainHint: result.output.domainHint.trim() || DEFAULT_CLASSIFICATION.domainHint,
       };
     }
-  } catch (error) {
-    console.warn("Project classification failed, defaulting to software:", error);
-  }
 
-  return DEFAULT_CLASSIFICATION;
+    console.warn("Project classification returned no output, defaulting to software");
+    return DEFAULT_CLASSIFICATION;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (
+      message.includes("401") ||
+      message.includes("Unauthorized") ||
+      message.includes("403") ||
+      message.includes("Forbidden") ||
+      message.includes("Invalid API key") ||
+      message.includes("authentication")
+    ) {
+      console.error("Project classification failed due to authentication error:", message);
+      throw new Error(
+        `Project classification failed: authentication error. Verify DEEPSEEK_API_KEY.`,
+        { cause: error },
+      );
+    }
+
+    if (
+      message.includes("ETIMEDOUT") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("ENOTFOUND") ||
+      message.includes("fetch failed") ||
+      message.includes("network")
+    ) {
+      console.error("Project classification failed due to network error:", message);
+      throw new Error(
+        `Project classification failed: network error. Check connectivity to DeepSeek API.`,
+        { cause: error },
+      );
+    }
+
+    console.error("Project classification failed:", message);
+    throw new Error(
+      `Project classification failed: ${message}`,
+      { cause: error },
+    );
+  }
 }

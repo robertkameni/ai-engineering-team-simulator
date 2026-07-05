@@ -3,7 +3,7 @@ import "server-only";
 import { mdToPdf } from "md-to-pdf";
 
 import {
-  resolvePdfDocumentTitle,
+  PDF_DOCUMENT_TITLE,
 } from "@/lib/export/export-pdf-limits";
 import { EXPORT_PRINT_CSS } from "@/lib/export/export-theme";
 
@@ -40,7 +40,7 @@ async function compileRunPdfFromMarkdownInner(
       basedir: process.cwd(),
       stylesheet: [],
       css: EXPORT_PRINT_CSS,
-      document_title: resolvePdfDocumentTitle(),
+      document_title: PDF_DOCUMENT_TITLE,
       page_media_type: "print",
       pdf_options: {
         format: "a4",

@@ -14,12 +14,15 @@ export async function regenerateRunArtifactsWithUsage(
 ): Promise<RegenerateRunArtifactsResult> {
   const existing = await getRunUsageTotalsById(runId);
   const usageAccumulator = createRunUsageAccumulator(existing);
-  const result = await regenerateRunArtifacts(runId, {
-    scope,
-    usageAccumulator,
-  });
 
-  await setRunUsageTotals(runId, usageAccumulator.getTotals());
+  try {
+    const result = await regenerateRunArtifacts(runId, {
+      scope,
+      usageAccumulator,
+    });
 
-  return result;
+    return result;
+  } finally {
+    await setRunUsageTotals(runId, usageAccumulator.getTotals());
+  }
 }

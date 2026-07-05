@@ -1,0 +1,65 @@
+---
+description: Sécurité — secret handling, CORS, CSP, IDOR, auth, sanitization
+globs: "src/**/*.{ts,tsx}"
+alwaysApply: true
+---
+
+# SECURITY RULES
+
+## Guiding Principles
+
+Always: validate external input, validate AI output, sanitize user content, enforce authorization boundaries.
+
+Never trust: model outputs, uploaded content, or client input.
+
+## Server-Only Imports
+
+Modules touching secrets, tokens, database credentials, or server-side APIs must be guarded with `"server-only"` as the very first import:
+
+```typescript
+import "server-only";
+import { prisma } from "@/lib/prisma";
+```
+
+Client components must never import `@/lib/prisma`, `@/lib/auth/jwt`, or any module importing `server-only`. This is enforced at build time.
+
+## Authentication & Tokens
+
+- JWT sessions via `jose` (`^6.2.3`). `AUTH_SECRET` must be cryptographically random (≥32 bytes). Rotate on credential leaks.
+- Password hashing via `bcryptjs` (`^3.0.3`).
+- Guest sessions use a dedicated httpOnly cookie (`guestSessionId`).
+- Store refresh tokens in httpOnly, Secure, SameSite cookies — never `localStorage`.
+- Never log tokens, secrets, or full session payloads. Mask or hash before logging.
+
+## IDOR Prevention (Duplicate with 03 — enforced at DB layer)
+
+- Every data access function must validate ownership. See `03-database-security.mdc` for the full IDOR rules (404 masking, no user enumeration).
+
+## CORS & CSRF
+
+- State-changing routes (`POST`, `PUT`, `PATCH`, `DELETE`) must validate the `Origin` header against an allowlist:
+
+```typescript
+const ALLOWED_ORIGINS = new Set([process.env.NEXT_PUBLIC_APP_URL].filter(Boolean));
+
+function validateOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  return origin !== null && ALLOWED_ORIGINS.has(origin);
+}
+```
+
+- Use `SameSite=Strict` or `SameSite=Lax` cookies for session tokens.
+- Form submissions must carry a CSRF token validated server-side.
+
+## Content Security Policy
+
+- Default to `default-src 'self'`.
+- Scripts: prefer `'strict-dynamic'` with a nonce/hash. Never `'unsafe-inline'` or `'unsafe-eval'` in production.
+- Styles: `'self'` plus hashes for critical inline styles.
+- Images/fonts: limit to `'self'` plus known CDN origins.
+
+## Input & Output Sanitization
+
+- Sanitize user-controlled HTML with a library like `DOMPurify`. Never use `dangerouslySetInnerHTML` with raw user input.
+- All DB queries must use parameterized queries (Prisma does this by default). Never assemble raw SQL with string interpolation.
+- Treat AI model output as **untrusted** — sanitize it identically to user input before display.

@@ -1,0 +1,92 @@
+---
+description: Architecture — feature-based org, barrel files, shared kernel, import discipline
+globs: "src/**/*.{ts,tsx}"
+alwaysApply: true
+---
+
+# ARCHITECTURE RULES
+
+## Feature-Based Organization
+
+Group code by **feature domain**, not technical role. The project's feature folders are:
+
+```
+src/features/
+  landing/           — landing page, example prompts
+  simulation/        — debate stream, message parsing, prompt composer
+  agents/            — personas, agent types, team templates
+  artifacts/         — artifact panel, result display
+  workspace/         — sidebar, runs dashboard, export, auth modals
+```
+
+Each feature folder contains its own components, hooks, actions, and types:
+
+```
+src/features/simulation/
+  components/
+  hooks/
+  actions/
+  types.ts
+```
+
+- Feature folders must not import from other feature folders directly. Use `src/lib/` or `src/shared/` as the integration layer.
+- Shared code spanning multiple features lives in `src/lib/` (auth, db, export, rate-limit, workspace-url, etc.).
+
+## Shared Kernel (`src/lib/`)
+
+The shared kernel is stable — breaking changes cascade to every feature:
+
+```
+src/lib/
+  auth/        — JWT, bcryptjs, guest sessions, auth schemas
+  db/          — Prisma helpers, runs, projects, run-reconcile
+  export/      — markdown, PDF generation, download blob
+  ai/          — pricing, usage accumulation, persist-usage
+  rate-limit.ts / rate-limit-config.ts / rate-limit-redis.ts / rate-limit-response.ts
+  types.ts     — shared domain types
+```
+
+- Never put feature-specific logic in the shared kernel.
+- A module file must not exceed **400 lines**. Split oversized files by responsibility.
+
+## Import Ordering
+
+Order imports in this sequence, separated by blank lines:
+
+```typescript
+// 1. Runtime guards
+import "server-only";
+
+// 2. External libraries
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+// 3. Internal shared modules
+import { requireRunAccess } from "@/lib/db/runs";
+import type { RunOwnershipScope } from "@/lib/db/runs";
+
+// 4. Relative imports (same feature)
+import { parseMessageBlocks } from "./parse-message-blocks";
+```
+
+- Always use `import type` for type-only imports.
+- Never mix type and value imports from the same module — use two `import` statements.
+
+## Barrel File Discipline
+
+Barrel files (`index.ts`) exist only for named re-exports:
+
+```typescript
+// src/features/simulation/index.ts
+export { SimulationPanel } from "./components/simulation-panel";
+export { useSimulationStream } from "./hooks/use-simulation-stream";
+export type { SimulationState } from "./types";
+```
+
+- A barrel file must contain only `export` / `export type` statements. No functions, constants, or logic.
+- Never `export *` — explicitly name every export so dead-code elimination and import tracing work.
+- Circular imports are **forbidden**. Extract shared dependencies into a third module when two modules depend on each other.
+
+## AI Flow Architecture
+
+UI → Application → Orchestration → Provider. Never call LLM providers directly from UI components. See `04-ai-orchestration.mdc` for the full AI pipeline.

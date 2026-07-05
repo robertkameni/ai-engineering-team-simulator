@@ -15,22 +15,3 @@ export async function getOrCreateDefaultProject() {
     data: { title: DEFAULT_PROJECT_TITLE },
   });
 }
-
-async function createProject(title: string) {
-  return prisma.project.create({
-    data: { title },
-  });
-}
-
-async function listRecentProjects(limit = 20) {
-  return prisma.project.findMany({
-    orderBy: { updatedAt: "desc" },
-    take: limit,
-    include: {
-      runs: {
-        orderBy: { updatedAt: "desc" },
-        take: 1,
-      },
-    },
-  });
-}

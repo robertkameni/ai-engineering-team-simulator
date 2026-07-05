@@ -51,7 +51,7 @@ const simulationMessageSchema = z.object({
   content: z.string().max(EXPORT_PDF_MAX_MESSAGE_CONTENT_CHARS),
   agentName: z.string().optional(),
   agentTitle: z.string().optional(),
-  createdAt: z.string().optional(),
+  createdAt: z.string(),
 });
 
 const mockRunSchema = z
@@ -103,8 +103,7 @@ export type ExportPdfPostBody = z.infer<typeof exportPdfPostBodySchema>;
 export function toRunExportContext(
   body: ExportPdfPostBody,
 ): { run: MockRun; templateId?: TeamTemplateId } {
-  return {
-    run: body.run as MockRun,
-    templateId: body.templateId as TeamTemplateId | undefined,
-  };
+  const run: MockRun = body.run;
+  const templateId: TeamTemplateId | undefined = body.templateId;
+  return { run, templateId };
 }

@@ -1,7 +1,6 @@
 import "server-only";
 
 import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 
 import {
   resolveAuthRateLimitKey,
@@ -13,39 +12,12 @@ import {
   type RateLimitResult,
 } from "@/lib/rate-limit-config";
 import { getClientIpFromHeaders } from "@/lib/rate-limit";
-
-
-function isProduction(): boolean {
-  return process.env.NODE_ENV === "production";
-}
-
-function isRateLimitDisabled(): boolean {
-  if (process.env.RATE_LIMIT_DISABLED === "true") return true;
-  if (
-    process.env.NODE_ENV === "development" &&
-    process.env.RATE_LIMIT_ENABLED_IN_DEV !== "true"
-  ) {
-    return true;
-  }
-  return false;
-}
-
-function hasRedisConfig(): boolean {
-  return Boolean(
-    process.env.UPSTASH_REDIS_REST_URL?.trim() &&
-      process.env.UPSTASH_REDIS_REST_TOKEN?.trim(),
-  );
-}
-
-let redisClient: Redis | null = null;
-
-function getRedis(): Redis | null {
-  if (!hasRedisConfig()) return null;
-  if (!redisClient) {
-    redisClient = Redis.fromEnv();
-  }
-  return redisClient;
-}
+import {
+  getRedis,
+  hasRedisConfig,
+  isProduction,
+  isRateLimitDisabled,
+} from "@/lib/rate-limit-redis";
 
 const authLimiterCache = new Map<AuthRateLimitAction, Ratelimit>();
 

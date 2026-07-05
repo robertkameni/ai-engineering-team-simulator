@@ -1,0 +1,64 @@
+---
+description: AI SDK v7, DeepSeek v4, streaming, cost tracking, structured output
+globs: "src/{ai,features/agents,orchestration}/**/*.ts"
+alwaysApply: true
+---
+
+# AI SDK & ORCHESTRATION RULES
+
+## Architecture
+
+AI execution must flow through: **UI → Application → Orchestration → Provider**. Never call LLM providers directly from UI components or feature files.
+
+## AI SDK v7 (`ai@^7.0.3`)
+
+- Use `streamText` for streaming agent responses; `generateText` for non-streaming calls.
+- Use `maxOutputTokens` (not deprecated `maxTokens`).
+- Use `LanguageModelUsage` for token tracking (not legacy usage fields). Inspect types in `node_modules/ai/dist/` when implementing streaming or cost-tracking logic.
+- Use `Output.object()` with Zod schemas for structured outputs.
+- Always respect `AbortSignal` for long-running operations to avoid budget waste:
+
+```typescript
+const controller = new AbortController();
+const timeout = setTimeout(() => controller.abort(), maxDuration * 1000);
+
+try {
+  await streamText({ signal: controller.signal, ... });
+} finally {
+  clearTimeout(timeout);
+}
+```
+
+## DeepSeek v4 Provider (`@ai-sdk/deepseek@^3.0.0`)
+
+The project uses **DeepSeek v4** models with role-specific configuration:
+
+| Role | Model | Config |
+|---|---|---|
+| PM, Frontend, DevOps, Reviewer | `deepseek-v4-flash` | `thinking: disabled` |
+| Architect, Backend | `deepseek-v4-pro` | Architect: `reasoningEffort: "low"` |
+
+Model options are configured in `src/ai/agents/config.ts` via `DEEPSEEK_CHAT_OPTIONS` and `DEEPSEEK_REASONING_OPTIONS`.
+
+## Streaming & SSE Events
+
+Simulation streams emit these SSE events (defined in `src/lib/simulation-stream.ts`):
+
+- `run_started` → `team_ready` → (`agent_start` → `text-delta` / `tool_start` → `tool_end` → `agent_end`)\* → `artifacts_start` → `done` | `error`
+
+Never invent new event types — use the existing contract. The `team_ready` event must fire immediately after classification.
+
+## Cost Tracking
+
+- Every AI call accumulates usage in `RunUsageAccumulator` via `src/ai/pricing.ts`.
+- Per-run cost ceiling (`SIMULATION_MAX_COST_USD`, default `$0.75`) is enforced by `assertSimulationWithinBudget()`.
+- Budget exceeded during debate → run marked `failed`. Budget exceeded during artifacts → `artifactStatus: "failed"`, usage still persisted, SSE still sends `done`.
+
+## Agent Pipeline
+
+The fixed pipeline is: **PM → Architect → Backend → Frontend → DevOps → Reviewer**. Max 24 turns. Truncated output triggers continuation streams (up to 2). Architect insufficient output triggers quality gate retry, then synthetic `[REJECT: architect]`. Reviewer `[REJECT: role]` routes the rejected agent through a correction turn.
+
+## Validation
+
+- Use `zod` (v4, `^4.4.3`) with `Output.object()` for structured agent outputs.
+- Parse reviewer decisions from raw text before tag stripping in `src/ai/orchestration/reviewer-decision.ts`.

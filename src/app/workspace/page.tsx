@@ -20,7 +20,8 @@ export default async function WorkspacePage({
   const recentRuns = await listRecentRunsForSidebar(ownership, 12);
   const isAuthenticated = session.userId != null;
   const prompt = params.prompt?.trim();
-  const prepare = isWorkspacePrepareMode(params.prepare);
+  const prepareRaw = Array.isArray(params.prepare) ? params.prepare[0] : params.prepare;
+  const prepare = isWorkspacePrepareMode(prepareRaw);
 
   if (prompt) {
     return (

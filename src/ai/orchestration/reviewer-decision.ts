@@ -23,7 +23,8 @@ export type ReviewerDecision = "approve" | "reject" | "unknown";
 export type DebateExitOutcome =
   | "approved"
   | "cap_reached"
-  | "unknown_reject_fallback";
+  | "unknown_reject_fallback"
+  | "reviewer_error";
 
 export interface ParsedReviewerDecision {
   displayText: string;
@@ -233,7 +234,8 @@ export function parseDebateOutcomeFromRunSummary(
       if (
         outcome === "approved" ||
         outcome === "cap_reached" ||
-        outcome === "unknown_reject_fallback"
+        outcome === "unknown_reject_fallback" ||
+        outcome === "reviewer_error"
       ) {
         return outcome;
       }

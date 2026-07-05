@@ -2,10 +2,10 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { Message } from "@/generated/prisma/client";
 
 import type { TeamRoster } from "@/ai/agents/roster";
-import type { SimulationAgentRole } from "@/ai/agents/config";
+import { isSimulationAgent, type SimulationAgentRole } from "@/ai/agents/config";
 import { parseDebateOutcomeFromRunSummary } from "@/ai/orchestration/reviewer-decision";
 import type { AgentRole, SimulationMessage } from "@/features/agents/types";
-import { getPersona } from "@/features/agents/personas";
+import { getPersonaBase } from "@/features/agents/personas";
 import { formatMessageTime, formatRelativeTime } from "@/lib/format-time";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import type { RunUsageTotals } from "@/lib/ai/run-usage";
@@ -14,7 +14,7 @@ import {
   deriveArtifactsPanelStatus,
   toAppArtifactStatus,
 } from "@/lib/db/artifact-status";
-import { reconcileStaleRunIfNeeded } from "@/lib/db/run-reconcile";
+import { reconcileStaleRunIfNeeded, reconcileStaleRunsBatch } from "@/lib/db/run-reconcile";
 import { toAppRunStatus, toPrismaRunStatus } from "@/lib/db/run-status";
 import type { RunStatus as AppRunStatus } from "@/features/agents/types";
 import { getOrCreateDefaultProject } from "@/lib/db/projects";
@@ -56,8 +56,8 @@ export async function createRun(
   const project =
     options.projectId != null
       ? await prisma.project.findUniqueOrThrow({
-          where: { id: options.projectId },
-        })
+        where: { id: options.projectId },
+      })
       : await getOrCreateDefaultProject();
 
   return prisma.run.create({
@@ -230,23 +230,24 @@ async function listRecentRuns(
     },
   };
 
-  let runs = await prisma.run.findMany(query);
+  const runs = await prisma.run.findMany(query);
 
-  await Promise.all(
-    runs
-      .filter((run) => run.status === "RUNNING")
-      .map((run) =>
-        reconcileStaleRunIfNeeded({
-          id: run.id,
-          status: run.status,
-          artifactStatus: run.artifactStatus,
-          updatedAt: run.updatedAt,
-          messageCount: run._count.messages,
-        }),
-      ),
-  );
+  const runningRuns = runs.filter((run) => run.status === "RUNNING");
+  if (runningRuns.length > 0) {
+    const reconciledIds = await reconcileStaleRunsBatch(
+      runningRuns.map((run) => ({
+        id: run.id,
+        status: run.status,
+        artifactStatus: run.artifactStatus,
+        updatedAt: run.updatedAt,
+        messageCount: run._count.messages,
+      })),
+    );
 
-  runs = await prisma.run.findMany(query);
+    if (reconciledIds.size > 0) {
+      return prisma.run.findMany(query);
+    }
+  }
 
   return runs;
 }
@@ -295,13 +296,21 @@ function mapDbMessagesToSimulation(
   messages: Message[],
   roster?: TeamRoster | null,
 ): SimulationMessage[] {
-  return messages.map((message) => {
-    const role = message.agentRole as AgentRole;
-    const simulationRole = role as SimulationAgentRole;
+  return messages.flatMap((message) => {
+    const rawRole = message.agentRole;
+    if (!isSimulationAgent(rawRole as AgentRole)) {
+      console.warn("Unknown agentRole in DB, skipping message", {
+        messageId: message.id,
+        rawRole,
+      });
+      return [];
+    }
+    const role = rawRole as AgentRole;
+    const simulationRole = rawRole as SimulationAgentRole;
     const rosterMember = roster
       ? getMemberFromRoster(roster, simulationRole)
       : null;
-    const persona = getPersona(role);
+    const persona = getPersonaBase(role);
     const agentName =
       message.agentName ?? rosterMember?.name ?? persona.name;
     const agentTitle = rosterMember?.title ?? persona.title;
@@ -373,7 +382,7 @@ async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
   };
 }
 
-export async function getRunForWorkspace(runId: string) {
+async function getRunForWorkspace(runId: string) {
   let run = await getRunWithMessages(runId);
   if (!run) return null;
 

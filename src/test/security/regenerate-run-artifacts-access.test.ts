@@ -5,20 +5,7 @@ import {
   executeRegenerateArtifactsPost,
   type RegenerateArtifactsPostHooks,
 } from "../../lib/api/regenerate-artifacts-post-logic.js";
-import type { RateLimitResult } from "../../lib/rate-limit-config.js";
-
-function rateLimitResponse(result: Extract<RateLimitResult, { ok: false }>) {
-  return Response.json(
-    { error: result.error, retryAfter: result.retryAfterSec },
-    {
-      status: result.status,
-      headers:
-        result.status === 429
-          ? { "Retry-After": String(result.retryAfterSec) }
-          : undefined,
-    },
-  );
-}
+import { rateLimitResponse } from "../shared/rate-limit-response.js";
 
 function baseHooks(
   overrides: Partial<RegenerateArtifactsPostHooks>,

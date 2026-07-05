@@ -3,6 +3,9 @@ import type {
   PartialRunArtifacts,
 } from "@/features/artifacts/types";
 import type { RunUsageTotals } from "@/lib/ai/run-usage";
+import type { DebateExitOutcome } from "@/ai/orchestration/reviewer-decision";
+
+export type { DebateExitOutcome };
 
 export type AgentRole =
   | "pm"
@@ -14,16 +17,14 @@ export type AgentRole =
 
 export type RunStatus = "idle" | "running" | "complete" | "failed";
 
-export type DebateExitOutcome =
-  | "approved"
-  | "cap_reached"
-  | "unknown_reject_fallback";
-
-export interface AgentPersona {
+export interface AgentPersonaBase {
   role: AgentRole;
   name: string;
   title: string;
   initials: string;
+}
+
+export interface AgentPersona extends AgentPersonaBase {
   accentClass: string;
   borderClass: string;
   badgeClass: string;

@@ -87,20 +87,20 @@ What is being reviewed.
 Actual execution and data flow.
 
 ## Good Practices
-Exactly 3 concrete strengths tied to implementation quality.
+Exactly 5 concrete strengths tied to implementation quality.
 
 ## Issues
-Maximum 3 issues.
+Maximum 5 issues.
 
 Each issue must include:
 - affected layer/module
 - runtime impact
 - why reachable
 - severity
-- minimal fix
+- best recommended fix
 
 ## Optional Improvement
-Maximum 1 improvement.
+Maximum 3 improvement.
 
 Must directly improve:
 - correctness

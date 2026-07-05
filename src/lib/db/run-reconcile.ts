@@ -1,4 +1,8 @@
-import { isDebateComplete } from "@/ai/orchestration/reviewer-decision";
+import {
+  isLegacyUntaggedReviewerCompletion,
+  MAX_SIMULATION_TURNS,
+  parseReviewerDecision,
+} from "@/ai/orchestration/reviewer-decision";
 import type {
   ArtifactStatus as PrismaArtifactStatus,
   RunStatus as PrismaRunStatus,
@@ -33,6 +37,7 @@ export async function reconcileStaleRunIfNeeded(run: {
   artifactStatus: PrismaArtifactStatus;
   updatedAt: Date;
   messageCount: number;
+  lastMessage?: { agentRole: string; content: string } | null;
 }): Promise<boolean> {
   if (toAppRunStatus(run.status) !== "running") {
     return false;
@@ -42,13 +47,25 @@ export async function reconcileStaleRunIfNeeded(run: {
     return false;
   }
 
-  const messages = await prisma.message.findMany({
-    where: { runId: run.id },
-    orderBy: { order: "asc" },
-    select: { agentRole: true, content: true },
-  });
+  if (run.messageCount === 0) {
+    await setRunStatus(run.id, "failed");
+    return true;
+  }
 
-  const debateComplete = isDebateComplete(messages);
+  const lastMessage =
+    run.lastMessage ??
+    (await prisma.message.findFirst({
+      where: { runId: run.id },
+      orderBy: { order: "desc" },
+      select: { agentRole: true, content: true },
+    }));
+
+  if (!lastMessage) {
+    await setRunStatus(run.id, "failed");
+    return true;
+  }
+
+  const debateComplete = resolveStaleDebateCompletion(run.messageCount, lastMessage);
   const artifactStatus = toAppArtifactStatus(run.artifactStatus);
 
   if (debateComplete) {
@@ -65,6 +82,102 @@ export async function reconcileStaleRunIfNeeded(run: {
   }
 
   return true;
+}
+
+interface StaleRunCandidate {
+  id: string;
+  status: PrismaRunStatus;
+  artifactStatus: PrismaArtifactStatus;
+  updatedAt: Date;
+  messageCount: number;
+}
+
+export async function reconcileStaleRunsBatch(
+  runs: StaleRunCandidate[],
+): Promise<Set<string>> {
+  const staleRuns = runs.filter((run) => {
+    if (toAppRunStatus(run.status) !== "running") return false;
+    return Date.now() - run.updatedAt.getTime() > RUN_STALE_MS;
+  });
+
+  if (staleRuns.length === 0) {
+    return new Set();
+  }
+
+  const staleIds = new Set(staleRuns.map((r) => r.id));
+
+  const zeroMessageRuns = staleRuns.filter((r) => r.messageCount === 0);
+  if (zeroMessageRuns.length > 0) {
+    await prisma.run.updateMany({
+      where: { id: { in: zeroMessageRuns.map((r) => r.id) } },
+      data: { status: "FAILED" },
+    });
+  }
+
+  const runsWithMessages = staleRuns.filter((r) => r.messageCount > 0);
+  if (runsWithMessages.length === 0) {
+    return staleIds;
+  }
+
+  const lastMessages = await prisma.message.findMany({
+    where: { runId: { in: runsWithMessages.map((r) => r.id) } },
+    orderBy: { order: "desc" },
+    select: { runId: true, agentRole: true, content: true },
+  });
+
+  const lastMessageByRun = new Map<string, { agentRole: string; content: string }>();
+  for (const msg of lastMessages) {
+    if (!lastMessageByRun.has(msg.runId)) {
+      lastMessageByRun.set(msg.runId, { agentRole: msg.agentRole, content: msg.content });
+    }
+  }
+
+  for (const run of runsWithMessages) {
+    const lastMessage = lastMessageByRun.get(run.id);
+
+    if (!lastMessage) {
+      await setRunStatus(run.id, "failed");
+      continue;
+    }
+
+    const debateComplete = resolveStaleDebateCompletion(run.messageCount, lastMessage);
+    const artifactStatus = toAppArtifactStatus(run.artifactStatus);
+
+    if (debateComplete) {
+      await setRunStatus(run.id, "complete");
+      if (
+        artifactStatus === "generating" ||
+        artifactStatus === "pending" ||
+        artifactStatus === "none"
+      ) {
+        await updateArtifactStatus(run.id, "failed");
+      }
+    } else {
+      await setRunStatus(run.id, "failed");
+    }
+  }
+
+  return staleIds;
+}
+
+function resolveStaleDebateCompletion(
+  messageCount: number,
+  lastMessage: { agentRole: string; content: string },
+): boolean {
+  if (messageCount >= MAX_SIMULATION_TURNS) {
+    return true;
+  }
+
+  if (lastMessage.agentRole !== "reviewer") {
+    return false;
+  }
+
+  if (isLegacyUntaggedReviewerCompletion(lastMessage)) {
+    return true;
+  }
+
+  const { decision } = parseReviewerDecision(lastMessage.content);
+  return decision === "approve";
 }
 
 async function setRunStatus(runId: string, status: AppRunStatus) {

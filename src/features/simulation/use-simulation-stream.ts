@@ -224,14 +224,23 @@ export function useSimulationStream() {
         if (!isActive()) return;
 
         if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as {
-            error?: string;
-            retryAfter?: number;
-          } | null;
+          const raw: unknown = await response.json().catch(() => null);
+          const payload =
+            typeof raw === "object" && raw !== null && !Array.isArray(raw)
+              ? (raw as Record<string, unknown>)
+              : null;
+          const errorText =
+            payload != null && typeof payload.error === "string"
+              ? payload.error
+              : undefined;
+          const retryAfter =
+            payload != null && typeof payload.retryAfter === "number"
+              ? payload.retryAfter
+              : undefined;
           const base =
-            payload?.error ?? `Request failed (${response.status})`;
-          if (response.status === 429 && payload?.retryAfter) {
-            const minutes = Math.max(1, Math.ceil(payload.retryAfter / 60));
+            errorText ?? `Request failed (${response.status})`;
+          if (response.status === 429 && retryAfter != null) {
+            const minutes = Math.max(1, Math.ceil(retryAfter / 60));
             throw new Error(`${base}. Try again in about ${minutes} min.`);
           }
           throw new Error(base);

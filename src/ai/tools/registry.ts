@@ -91,9 +91,10 @@ const checkNpmPackageTool = tool({
       return { found: false as const, packageName: name };
     }
 
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(
+      timeout = setTimeout(
         () => controller.abort(),
         NPM_REGISTRY_TIMEOUT_MS,
       );
@@ -104,7 +105,7 @@ const checkNpmPackageTool = tool({
           signal: controller.signal,
           headers: { Accept: "application/json" },
         },
-      ).finally(() => clearTimeout(timeout));
+      );
 
       if (response.status === 404) {
         return { found: false as const, packageName: name };
@@ -130,9 +131,19 @@ const checkNpmPackageTool = tool({
         description: data.description ?? "",
       };
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return {
+          error: "npm registry lookup timed out",
+          packageName: name,
+        };
+      }
       const message =
         error instanceof Error ? error.message : "fetch failed";
       return { error: message, packageName: name };
+    } finally {
+      if (timeout != null) {
+        clearTimeout(timeout);
+      }
     }
   },
 });

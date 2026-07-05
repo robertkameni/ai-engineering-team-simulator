@@ -1,0 +1,72 @@
+---
+description: Testing standards — Node.js native test runner, conventions, structure
+globs: "src/test/**/*.test.ts"
+alwaysApply: true
+---
+
+# TESTING RULES
+
+## Test Runner
+
+The project uses the **Node.js native test runner** (`node --test`), executed via:
+
+```bash
+node --import tsx --test src/test/**/*.test.ts
+```
+
+Imports come from `node:test` and `node:assert/strict`:
+
+```typescript
+import { describe, it, before, after } from "node:test";
+import assert from "node:assert/strict";
+```
+
+**Never** import from `vitest`, `jest`, or `@jest/globals` — they are not installed.
+
+## What to Test
+
+- Test public API contracts: route handlers, server actions, exported functions that form the application boundary.
+- Cover happy paths, error paths, edge cases, and authorization gates.
+- Test rate limiting and budget enforcement paths — they are critical security boundaries.
+
+## What Not to Test
+
+- Never test implementation details (internal helper functions, private methods, state shape). Refactoring must not break tests.
+- Never test third-party library behavior (Prisma queries, Next.js rendering, AI SDK streaming). Mock at the module boundary.
+- Never test pure configuration (constants, schema definitions, type exports).
+
+## Test Location
+
+- Colocate tests with the code they exercise: `src/test/lib/db/runs.test.ts` tests `src/lib/db/runs.ts`.
+- Shared test utilities and fixtures live in `src/test/shared/`.
+- Security regression tests are in `src/test/security/`.
+
+## Test Conventions
+
+- Name test files `*.test.ts` (not `*.spec.ts`).
+- Use `describe` for the module under test, `it` for individual behaviors.
+- Follow the AAA pattern: **Arrange**, **Act**, **Assert**. Separate each phase with a blank line.
+- Mock external dependencies via module-level mocks (`node:test` mock API or import interception). Prefer dependency injection over mocking for unit-level testability.
+- A single test must assert a single behavior. Multiple assertions are acceptable only when they verify facets of the same outcome.
+- Name tests as sentences describing expected behavior: `it("returns 404 when the run does not belong to the user", async () => { ... })`.
+
+```typescript
+import { describe, it, mock } from "node:test";
+import assert from "node:assert/strict";
+
+describe("deleteRunAction", () => {
+  it("returns 404 when the run does not belong to the user", async () => {
+    // Arrange
+    const runId = "run_123";
+    mock.method(getRunByIdModule, "getRunById", () =>
+      Promise.resolve({ userId: "other_user" })
+    );
+
+    // Act
+    const result = await deleteRunAction({ runId, userId: "current_user" });
+
+    // Assert
+    assert.strictEqual(result.error, "Run not found");
+  });
+});
+```

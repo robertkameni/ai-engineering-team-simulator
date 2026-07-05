@@ -13,15 +13,9 @@ export function workspaceUrlForRerun(prompt: string): string {
 }
 
 export function isWorkspacePrepareMode(
-  prepare: string | string[] | undefined,
+  prepare: string | undefined,
 ): boolean {
-  if (prepare === "1" || prepare === "true") {
-    return true;
-  }
-  if (Array.isArray(prepare)) {
-    return prepare.some((value) => value === "1" || value === "true");
-  }
-  return false;
+  return prepare === "1" || prepare === "true";
 }
 
 export function hasWorkspacePrompt(prompt: string | null | undefined): boolean {

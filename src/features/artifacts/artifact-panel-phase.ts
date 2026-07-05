@@ -14,8 +14,12 @@ export interface DebateProgress {
 
 export function isUnapprovedDebateOutcome(
   outcome: DebateExitOutcome | null | undefined,
-): outcome is "cap_reached" | "unknown_reject_fallback" {
-  return outcome === "cap_reached" || outcome === "unknown_reject_fallback";
+): outcome is "cap_reached" | "unknown_reject_fallback" | "reviewer_error" {
+  return (
+    outcome === "cap_reached" ||
+    outcome === "unknown_reject_fallback" ||
+    outcome === "reviewer_error"
+  );
 }
 
 export function debateOutcomeWarningMessage(outcome: DebateExitOutcome): string {
@@ -25,6 +29,9 @@ export function debateOutcomeWarningMessage(outcome: DebateExitOutcome): string 
   if (outcome === "unknown_reject_fallback") {
     return "Reviewer did not return a valid decision before turns ended. Deliverables are provisional.";
   }
+  if (outcome === "reviewer_error") {
+    return "Reviewer turn failed unexpectedly. Debate was closed without review. Deliverables are unverified.";
+  }
   return "";
 }
 
@@ -32,6 +39,7 @@ export function debateOutcomeLabel(outcome: DebateExitOutcome): string {
   if (outcome === "approved") return "Approved";
   if (outcome === "cap_reached") return "Turn limit reached";
   if (outcome === "unknown_reject_fallback") return "Reviewer decision unclear";
+  if (outcome === "reviewer_error") return "Reviewer error";
   return outcome;
 }
 

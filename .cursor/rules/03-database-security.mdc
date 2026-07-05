@@ -1,0 +1,66 @@
+---
+description: Prisma 7, Neon Serverless, Zod v4, Upstash, Auth, IDOR
+globs: "src/{lib,actions,app/api}/**/*.ts"
+alwaysApply: true
+---
+
+# DATABASE, VALIDATION, AUTH & SECURITY RULES
+
+## Prisma 7 + Neon Serverless
+
+- The Prisma client is a **singleton** exported from `@/lib/prisma.ts`. Never create a new client per request.
+- Prisma 7 uses `prisma.config.ts` (not `schema.prisma` inline config). The datasource URL is resolved via the config, not the schema.
+- The adapter is `@prisma/adapter-neon` (`^7.8.0`). The generated client lives at `@/generated/prisma/client`:
+
+```typescript
+import "server-only";
+import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaNeon } from "@prisma/adapter-neon";
+```
+
+- **Anti N+1:** never run DB queries inside loops. Use `include`, joins, or batching.
+- Wrap critical multi-step mutations in interactive transactions:
+
+```typescript
+await prisma.$transaction(async (tx) => {
+  const user = await tx.user.update({ where: { id }, data: { credits: { decrement: amount } } });
+  await tx.auditLog.create({ data: { userId: id, action: "credit_debit", amount } });
+  return user;
+});
+```
+
+- Keep transactions short. Never perform I/O or API calls inside a transaction block.
+
+## Migration Discipline
+
+- Use `prisma migrate dev` locally, `prisma migrate deploy` in CI/CD/production.
+- Never edit a migration already applied to production. Always create a new migration.
+- Review generated SQL for destructive operations (`DROP`, `TRUNCATE`, column renames that lose data).
+
+## Zod v4 Validation
+
+- Validate all inputs with **Zod v4** (`zod@^4.4.3`). Zod schemas replace manual assertions for API inputs, Server Actions, and structured AI agent outputs (`Output.object()`).
+- Use `z.output<typeof schema>` and `z.infer<typeof schema>` instead of manually duplicating types.
+
+## TypeScript 6
+
+- TypeScript 6 (`typescript@^6`) in **strict mode**. `any` is forbidden — use `unknown` and narrow with type guards.
+
+## Rate Limiting (Upstash)
+
+- Protect sensitive endpoints with `@upstash/ratelimit` (`^2.0.8`) backed by `@upstash/redis` (`^1.38.0`).
+- Rate limits are configured in `src/lib/rate-limit-config.ts` (hourly buckets for simulate, delete, export_pdf, regenerate) and `src/lib/auth/auth-rate-limit.ts` (15-min auth buckets).
+- Fail closed in production without Redis (`503`). Disabled in dev unless `RATE_LIMIT_ENABLED_IN_DEV=true`.
+
+## Authentication
+
+- JWT sessions via `jose` (`^6.2.3`). `AUTH_SECRET` must be cryptographically random, at least 32 bytes.
+- Password hashing via `bcryptjs` (`^3.0.3`).
+- Guest sessions use a dedicated cookie (`guestSessionId`). Runs can be claimed by authenticated users via `/api/auth/claim-guest-runs`.
+- Store refresh tokens in httpOnly, Secure, SameSite cookies — never in `localStorage`.
+
+## IDOR Prevention
+
+- Every data access function (e.g., `getRunForWorkspace`) must validate ownership via `buildRunOwnershipWhere()` / `canAccessRun()` / `requireRunAccess()`.
+- Forbidden run access returns **404** `{ error: "Run not found" }` on all run-scoped routes — never 403, to prevent IDOR oracle.
+- Register duplicate email → **401** with same message as failed login (no user enumeration).

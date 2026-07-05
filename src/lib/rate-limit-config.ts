@@ -3,6 +3,7 @@ export type RateLimitAction =
   | "delete"
   | "export_pdf"
   | "regenerate"
+  | "claim_guest_runs"
   | "auth_login"
   | "auth_register";
 
@@ -20,6 +21,7 @@ const DEFAULT_RATE_LIMITS: Record<
   delete: { guest: 30, auth: 30 },
   export_pdf: { guest: 5, auth: 5 },
   regenerate: { guest: 3, auth: 10 },
+  claim_guest_runs: { guest: 10, auth: 10 },
   auth_login: { guest: 10, auth: 10 },
   auth_register: { guest: 10, auth: 10 },
 };
@@ -40,12 +42,16 @@ const LIMIT_ENV_KEYS: Record<
     auth: "RATE_LIMIT_DELETE",
   },
   export_pdf: {
-    guest: "RATE_LIMIT_EXPORT_PDF",
-    auth: "RATE_LIMIT_EXPORT_PDF",
+    guest: "RATE_LIMIT_EXPORT_PDF_GUEST",
+    auth: "RATE_LIMIT_EXPORT_PDF_AUTH",
   },
   regenerate: {
     guest: "RATE_LIMIT_REGENERATE_GUEST",
     auth: "RATE_LIMIT_REGENERATE_AUTH",
+  },
+  claim_guest_runs: {
+    guest: "RATE_LIMIT_CLAIM_GUEST_RUNS",
+    auth: "RATE_LIMIT_CLAIM_GUEST_RUNS",
   },
   auth_login: {
     guest: "RATE_LIMIT_AUTH_LOGIN",

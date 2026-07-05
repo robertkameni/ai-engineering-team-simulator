@@ -21,10 +21,6 @@ const exportTheme = {
   } satisfies Record<AgentRole, string>,
 } as const;
 
-function agentAccentHex(role: AgentRole): string {
-  return exportTheme.agent[role];
-}
-
 export const EXPORT_PRINT_CSS = `
   @page {
     size: A4;

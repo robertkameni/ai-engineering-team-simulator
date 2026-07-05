@@ -1,0 +1,77 @@
+---
+description: Règles pour Next.js 16 (App Router) et React 19
+globs: "src/**/*.{ts,tsx}"
+alwaysApply: true
+---
+
+# NEXT.JS 16 & REACT 19 RULES
+
+## Client / Server Boundary
+
+- **Server Components** are the default — no directive needed.
+- Mark files using Node APIs, secrets, or the database with `import "server-only"` as the very first import.
+- Mark interactive files (using `useState`, `useEffect`, event handlers, browser APIs) with `"use client"` as the very first line.
+- **Server Actions** use the `"use server"` directive. Export them from dedicated action files (e.g., `src/features/workspace/delete-run-action.ts`), never from `"use client"` files.
+- Never import a server component into a client component directly. Pass server data as props from a parent server component.
+
+## Route Configuration
+
+Every API route (`route.ts`) must declare its runtime and limits explicitly:
+
+```typescript
+export const runtime = "nodejs";
+export const maxDuration = 300; // multi-agent runs need extended timeout
+export const dynamic = "force-dynamic";
+```
+
+## Dynamic Params
+
+In Next.js 16, `params` is a **Promise** that must be awaited:
+
+```typescript
+// src/app/api/runs/[id]/artifacts/route.ts
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  // ...
+}
+```
+
+## Suspense Boundaries
+
+- Wrap async Server Components that fetch data in `<Suspense>` with a meaningful `fallback`.
+- Use streaming patterns (`Suspense` + `loading.tsx`) to avoid blocking the initial render.
+
+## Metadata & SEO
+
+- Every `page.tsx` must export a `metadata` object or `generateMetadata()` for dynamic routes.
+- Metadata must include at minimum a `title` and `description`.
+- Use `template` on `title` in the root layout for consistent `"Page | Site Name"` format.
+
+## Caching Strategy
+
+- Pages with per-user or per-request data must use `dynamic = "force-dynamic"` or call `cookies()` / `headers()` to opt out of static generation.
+- Never cache authenticated responses in shared caches (CDN, proxy). Use `Cache-Control: private`.
+- Revalidate by path or tag after Server Action mutations:
+
+```typescript
+import { revalidatePath } from "next/cache";
+
+export async function deleteRun(formData: FormData) {
+  "use server";
+  await deleteRunFromDb(formData.get("id") as string);
+  revalidatePath("/workspace");
+}
+```
+
+## Error Handling
+
+- Use `error.tsx` for route-level error boundaries (client component with `"use client"`).
+- API routes must return typed error responses, never bare 500s. Never leak stack traces to the client.
+
+## Image & Font Optimization
+
+- Use `<Image>` from `next/image` with explicit `width`, `height`, and `priority` on above-the-fold images (CLS prevention).
+- Use `next/font/google` with `display: "swap"` for web fonts. Never use raw `<img>` tags except for inline SVGs.

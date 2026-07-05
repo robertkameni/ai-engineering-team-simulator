@@ -40,21 +40,3 @@ export async function openSavePickerForBlob(
     await writable.close();
   };
 }
-
-export type SavePickerResult = "saved" | "aborted" | "unavailable";
-
-async function saveBlobWithNativePicker(
-  blob: Blob,
-  filename: string,
-  description: string,
-  accept: Record<string, string[]>,
-): Promise<SavePickerResult> {
-  const save = await openSavePickerForBlob(filename, description, accept);
-  if (save === null) return "unavailable";
-  try {
-    await save(blob);
-    return "saved";
-  } catch {
-    return "unavailable";
-  }
-}

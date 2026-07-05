@@ -8,10 +8,6 @@ export const EXPORT_PDF_MAX_BODY_BYTES = 2 * 1024 * 1024;
 
 export const PDF_DOCUMENT_TITLE = "Engineering Simulation Report";
 
-export function resolvePdfDocumentTitle(): string {
-  return PDF_DOCUMENT_TITLE;
-}
-
 export type ExportPdfArtifactPanels = {
   requirements?: { title: string; items: string[] }[];
   architecture?: { title: string; items: string[] }[];

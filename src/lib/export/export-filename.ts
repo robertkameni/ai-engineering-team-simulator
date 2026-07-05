@@ -7,12 +7,12 @@ function slugifyRunTitle(title: string): string {
   return slug || "simulation-run";
 }
 
-export function buildRunMarkdownFilename(title: string, exportId?: number): string {
+export function buildRunMarkdownFilename(title: string, exportId?: string | number): string {
   const base = slugifyRunTitle(title);
   return exportId != null ? `${base}-${exportId}.md` : `${base}.md`;
 }
 
-export function buildRunPdfFilename(title: string, exportId?: number): string {
+export function buildRunPdfFilename(title: string, exportId?: string | number): string {
   const base = slugifyRunTitle(title);
   return exportId != null ? `${base}-${exportId}.pdf` : `${base}.pdf`;
 }

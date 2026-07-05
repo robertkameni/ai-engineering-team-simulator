@@ -9,7 +9,7 @@ import { getRunOwnershipContextWithGuestSession } from "@/lib/auth/run-ownership
 import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
-import { setRunUsageTotals } from "@/lib/db/runs";
+import { setRunUsageTotals, updateRunStatus, updateRunSummary } from "@/lib/db/runs";
 import {
   encodeSimulationEvent,
   type SimulationStreamEvent,
@@ -78,6 +78,10 @@ export async function POST(request: Request) {
         runId = simulation.runId;
 
         if (signal.aborted) {
+          await updateRunSummary(
+            runId,
+            JSON.stringify({ debateOutcome: "aborted", turnCount: null }),
+          );
           await reconcileRunFailure(runId, {
             debateComplete: true,
             artifactPhaseStarted: false,
@@ -91,7 +95,10 @@ export async function POST(request: Request) {
           scope: { userId, guestSessionId },
           usageAccumulator,
         });
+
         if (!synthesis.ok) {
+          await setRunUsageTotals(runId, usageAccumulator.getTotals());
+
           if (synthesis.error === "budget_exceeded") {
             console.warn("Artifact synthesis stopped: run cost budget exceeded", {
               runId,
@@ -100,12 +107,25 @@ export async function POST(request: Request) {
               debateComplete: true,
               artifactPhaseStarted: true,
             });
+            await updateRunStatus(runId, "failed");
+            send({ type: "error", message: "Artifact cost budget exceeded" });
           } else {
             console.error("Artifact synthesis failed:", synthesis);
+            await reconcileRunFailure(runId, {
+              debateComplete: true,
+              artifactPhaseStarted: true,
+            });
+            await updateRunStatus(runId, "failed");
+            send({ type: "error", message: "Artifact synthesis failed" });
           }
+          return;
         }
 
         if (signal.aborted) {
+          await updateRunSummary(
+            runId,
+            JSON.stringify({ debateOutcome: "aborted", turnCount: null }),
+          );
           await reconcileRunFailure(runId, {
             debateComplete: true,
             artifactPhaseStarted: synthesisStarted,
@@ -115,6 +135,7 @@ export async function POST(request: Request) {
         }
 
         await setRunUsageTotals(runId, usageAccumulator.getTotals());
+        await updateRunStatus(runId, "complete");
         send({ type: "done", runId });
       } catch (error) {
         if (runId) {
@@ -123,6 +144,10 @@ export async function POST(request: Request) {
 
         if (isSimulationAborted(error) || signal.aborted) {
           if (runId && !isSimulationAborted(error)) {
+            await updateRunSummary(
+              runId,
+              JSON.stringify({ debateOutcome: "aborted", turnCount: null }),
+            );
             await reconcileRunFailure(runId, {
               debateComplete: true,
               artifactPhaseStarted: synthesisStarted,
@@ -145,6 +170,9 @@ export async function POST(request: Request) {
       } finally {
         controller.close();
       }
+    },
+    cancel() {
+      console.log("Client disconnected from simulation stream", { runId });
     },
   });
 

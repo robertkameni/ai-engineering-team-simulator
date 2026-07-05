@@ -7,26 +7,22 @@ import {
 } from "../../lib/auth/auth-rate-limit-keys.js";
 import {
   getAuthRateLimitThreshold,
-  type RateLimitResult,
 } from "../../lib/rate-limit-config.js";
-
-function rateLimitResponse(result: Extract<RateLimitResult, { ok: false }>) {
-  return Response.json(
-    { error: result.error, retryAfter: result.retryAfterSec },
-    {
-      status: result.status,
-      headers:
-        result.status === 429
-          ? { "Retry-After": String(result.retryAfterSec) }
-          : undefined,
-    },
-  );
-}
+import { rateLimitResponse } from "../shared/rate-limit-response.js";
 
 describe("auth rate limit configuration", () => {
-  it("uses 10 attempts per window for login and register", () => {
-    assert.equal(getAuthRateLimitThreshold("auth_login"), 10);
-    assert.equal(getAuthRateLimitThreshold("auth_register"), 10);
+  it("uses default 10 for auth_login threshold when env is unset", () => {
+    const savedLogin = process.env.RATE_LIMIT_AUTH_LOGIN;
+    const savedRegister = process.env.RATE_LIMIT_AUTH_REGISTER;
+    delete process.env.RATE_LIMIT_AUTH_LOGIN;
+    delete process.env.RATE_LIMIT_AUTH_REGISTER;
+    try {
+      assert.equal(getAuthRateLimitThreshold("auth_login"), 10);
+      assert.equal(getAuthRateLimitThreshold("auth_register"), 10);
+    } finally {
+      if (savedLogin !== undefined) process.env.RATE_LIMIT_AUTH_LOGIN = savedLogin;
+      if (savedRegister !== undefined) process.env.RATE_LIMIT_AUTH_REGISTER = savedRegister;
+    }
   });
 });
 

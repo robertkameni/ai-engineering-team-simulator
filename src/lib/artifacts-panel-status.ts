@@ -1,12 +1,6 @@
+import type { AppArtifactStatus } from "@/lib/db/artifact-status";
 import type { RunStatus as AppRunStatus } from "@/features/agents/types";
 import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
-
-type AppArtifactStatus =
-  | "none"
-  | "pending"
-  | "generating"
-  | "ready"
-  | "failed";
 
 export function deriveArtifactsPanelStatus(
   runStatus: AppRunStatus,

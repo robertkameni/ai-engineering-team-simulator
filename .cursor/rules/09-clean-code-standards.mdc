@@ -1,0 +1,173 @@
+---
+alwaysApply: true
+---
+
+# CLEAN CODE STANDARDS
+
+## Self-Documenting Code
+
+Write code that communicates intent through structure and naming without comments.
+
+- Verb-led function names (`fetchUser`, `computeHash`). Noun-led variable names (`activeSession`, `retryCount`).
+- No abbreviations unless universally recognized.
+- Boolean variables carry a truthiness prefix: `is`, `has`, `should`, `can`, `will`.
+- Collection variables use plural nouns or a suffix: `users`, `tagSet`, `errorList`, `configMap`.
+- Event handler props prefixed with `on`: `onSubmit`, `onClose`, `onSelectionChange`.
+
+## Naming Conventions
+
+- **PascalCase** — types, interfaces, enums, React components
+- **camelCase** — variables, functions, methods, properties
+- **UPPER_SNAKE_CASE** — module-level constants and configuration values
+- Type parameters: single uppercase with semantic meaning (`T`, `K`, `V`, `E`)
+
+## Single Responsibility
+
+Every function, class, and module must have exactly one reason to change.
+
+- Functions must fit in a single screen of code. If a function needs a comment to explain what it does, split it.
+- Extract helper functions instead of nesting logic.
+
+## D.R.Y.
+
+Every piece of knowledge must have a single, authoritative representation.
+
+- The trigger for extraction is the **second** occurrence, not the third.
+- Abstract shared logic into a single function, type, constant, or module.
+- Duplication in tests is acceptable when it preserves readability and independence.
+
+## K.I.S.S.
+
+Choose the simplest solution that meets current requirements. Resist building for hypothetical futures.
+
+- Prefer plain functions and data over classes, frameworks, and patterns unless the complexity they abstract is clearly present.
+- A pattern is only justified when it solves a concrete, observable problem.
+- When two solutions produce the same outcome, the one with fewer lines, branches, and abstractions is correct.
+
+## Function Design
+
+- Max 3 parameters. Beyond that, introduce a parameter object.
+- Prefer pure functions. Isolate side effects (I/O, DOM, logging) into dedicated wrappers at module boundaries.
+- Return early from guard clauses to reduce nesting:
+
+```typescript
+function processOrder(order: Order | null, user: User | null): Result {
+  if (!order) return Result.invalid("Order is required");
+  if (!user) return Result.invalid("User is required");
+  if (order.status !== "pending") return Result.invalid("Order is not pending");
+  return fulfillOrder(order, user);
+}
+```
+
+## Type Safety
+
+Leverage TypeScript to make invalid states unrepresentable.
+
+- Mark properties and parameters `readonly` by default. Remove only when mutation is necessary.
+- Use discriminated unions over optional properties for mutually exclusive state.
+- `any` is forbidden — use `unknown` and narrow with type guards.
+- Use `as const` for immutable literal tuples and config objects.
+- Use `satisfies` to validate a value against a type without widening it.
+
+## Immutability
+
+Never mutate arguments passed into a function. Use spread syntax instead of `.push()`, `.splice()`, or indexed assignment:
+
+```typescript
+const updated = [...items, newItem];
+```
+
+## Control Flow
+
+- Replace nested `if`/`else` chains with early returns. Limit nesting to 3 levels.
+- Replace `switch` on discriminated unions with exhaustive match by property access.
+- Prefer ternaries for single-line conditional assignments — but never nest them.
+- Prefer `.map()`, `.filter()`, `.reduce()` over imperative `for` loops.
+
+## State Management
+
+- Never mutate state in place. Produce new copies: `const next = { ...state, items: [...state.items, newItem] }`.
+- Compute derived values from source state — never store them independently.
+- Never capture mutable values in callbacks or effects without a stable reference (stale closures). Use `ref` or include the dependency.
+
+## Error Handling
+
+- Validate inputs at every public API boundary.
+- Return typed error results rather than throwing where the caller must decide.
+- Catch only specific error types; avoid bare `catch` blocks.
+- Log structured diagnostic data (event name, message excerpt) on failure paths.
+- Wrap errors at module boundaries; attach original as `cause`:
+
+```typescript
+class DatabaseError extends Error {
+  constructor(message: string, cause: unknown) {
+    super(message, { cause });
+    this.name = "DatabaseError";
+  }
+}
+```
+
+## Async Patterns
+
+- Prefer `async`/`await` over `.then()` chains. Never mix both in the same function.
+- Use `Promise.all` for independent parallel work; `Promise.allSettled` when partial failure is acceptable.
+- Always handle promise rejection. Unhandled rejections are runtime crashes.
+- Return a cleanup function from any function that starts a side effect.
+
+## Concurrency Safety
+
+- Cancel in-flight work when its result is no longer relevant: use `AbortController` for fetch, return cleanup functions for custom async work.
+- Operations that must not run more than once need an idempotency key or check-before-execute guard.
+
+## No Hardcoded Values
+
+Magic numbers and magic strings are forbidden. Extract literal values into named constants.
+
+## Logging Standards
+
+- Use structured JSON logging. Assign correct levels: `debug`, `info`, `warn`, `error`.
+- Never log secrets, tokens, passwords, or full PII. Redact or hash sensitive fields.
+- Include a correlation ID on every request-scoped log.
+- Log at module boundaries only — internal helpers must not emit logs.
+
+## Environment Configuration
+
+- Validate all environment variables at startup. Fail fast on missing/malformed values.
+- Export a single typed config object. Never access `process.env` directly in business logic.
+- Never commit `.env` files.
+
+## Module Organization
+
+- **Import order:** external libraries → internal modules → relative imports. Separate each group with a blank line.
+- Prefer named exports over default exports.
+- Circular imports are forbidden.
+- Max **400 lines** per file. Split oversized files by responsibility.
+- Barrel files (`index.ts`) must only re-export — never contain implementation.
+
+## Dependency Injection
+
+- Never import a singleton or global state directly in a business-logic function. Accept it as a parameter.
+- Use factory functions or constructor injection for external dependencies.
+- Avoid module-level mutable state. Export functions and constants, not mutable variables.
+
+## Comment Policy
+
+- Add a comment only when the logic requires deep domain context, business rules, or non-obvious constraints.
+- Explain **why**, never **what**.
+- A codebase with zero comments is preferred over one with unnecessary comments.
+
+---
+
+## MARKDOWN FORMATTING
+
+- Use `##` for main sections, `###` for subsections. One top-level `#` per document.
+- Wrap code in triple-backtick fences with the correct language identifier.
+- Use inline backticks for short code references.
+- Use **bold** for key concepts, parameters, or file names.
+- Separate distinct ideas with a blank line.
+
+## EXECUTION ENFORCEMENT
+
+- Before delivering any response, verify the code adheres to these clean code principles.
+- Verify that all Markdown renders cleanly without broken tags, missing fences, or formatting errors.
+- Do not explain that these rules are being followed; execute them automatically.

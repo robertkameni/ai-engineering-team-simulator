@@ -5,9 +5,6 @@ const SOFTWARE_ARCHITECT_MIN_HEADINGS = 3;
 const PHYSICAL_ARCHITECT_MIN_CHARS = 180;
 const PHYSICAL_ARCHITECT_MIN_HEADINGS = 2;
 
-const ARCHITECT_PREAMBLE_ONLY =
-  /(?:vérifier|verifier|verify|check).{0,80}(?:framework|package|npm|version)|(?:before|avant).{0,40}(?:decision|décision)/i;
-
 function countMarkdownSectionHeadings(text: string): number {
   return (text.match(/^##\s+/gm) ?? []).length;
 }
@@ -27,19 +24,11 @@ export function isSoftwareArchitectDeliverableInsufficient(text: string): boolea
     return false;
   }
 
-  if (headings < 2 && trimmed.length < SOFTWARE_ARCHITECT_MIN_CHARS) {
-    return true;
-  }
-
   if (headings < SOFTWARE_ARCHITECT_MIN_HEADINGS) {
     return true;
   }
 
   if (trimmed.length < SOFTWARE_ARCHITECT_MIN_CHARS) {
-    return true;
-  }
-
-  if (headings < SOFTWARE_ARCHITECT_MIN_HEADINGS && ARCHITECT_PREAMBLE_ONLY.test(trimmed)) {
     return true;
   }
 

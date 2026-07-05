@@ -28,6 +28,10 @@ export async function deleteRunAction(formData: FormData) {
   );
 
   if (!result.ok) {
+    if (result.reason === "not_deleted") {
+      revalidatePath("/");
+      revalidatePath("/workspace");
+    }
     return;
   }
 

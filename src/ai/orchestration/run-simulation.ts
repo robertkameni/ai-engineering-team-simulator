@@ -1,35 +1,21 @@
-import { stepCountIs, streamText } from "ai";
-
 import {
   SIMULATION_AGENT_ORDER,
-  TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS,
-  getAgentConfig,
   type SimulationAgentRole,
 } from "@/ai/agents/config";
 import { createSimulationRoster, getTeamMember } from "@/ai/agents/roster";
-import type { TeamRoster } from "@/ai/agents/roster";
-import type { TeamTemplateId } from "@/ai/agents/team-templates";
-import { buildAgentMessages, resolveDebateTurnContext, type DebateTurnContext } from "@/ai/context/build-messages";
+import { resolveDebateTurnContext } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
-import { classifyProjectTeamTemplate, hasPhysicalKeywords } from "@/ai/orchestration/classify-project";
-import {
-  getAgentStreamDisplayText,
-  normalizeAgentPersistedText,
-} from "@/ai/orchestration/agent-stream-text";
+import { classifyProjectTeamTemplate } from "@/ai/orchestration/classify-project";
 import {
   buildArchitectInsufficientReviewerFeedback,
   isArchitectDeliverableInsufficient,
 } from "@/ai/orchestration/agent-deliverable-quality";
-import {
-  buildTruncationContinuationPrompt,
-  looksLikeTruncatedAgentOutput,
-} from "@/ai/orchestration/looks-like-truncated-agent-output";
-import { recoverReviewerDecisionTag } from "@/ai/orchestration/recover-reviewer-decision-tag";
+import { normalizeAgentPersistedText } from "@/ai/orchestration/agent-stream-text";
 import {
   assertSimulationWithinBudget,
   isSimulationBudgetExceeded,
 } from "@/ai/orchestration/simulation-budget";
-import { buildArchitectToollessRetryUserPrompt } from "@/ai/prompts/architect";
+import { recoverReviewerDecisionTag } from "@/ai/orchestration/recover-reviewer-decision-tag";
 import {
   type DebateExitOutcome,
   MAX_SIMULATION_TURNS,
@@ -37,14 +23,7 @@ import {
   resolveUnknownReviewerDecision,
   stripReviewerDecisionTag,
 } from "@/ai/orchestration/reviewer-decision";
-import { getAgentSystemPrompt } from "@/ai/prompts";
-import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
-import { getDeepSeekModel } from "@/ai/providers";
-import { getAgentTools, getComplianceTools } from "@/ai/tools/registry";
-import {
-  RunUsageAccumulator,
-  type StreamTextUsageSource,
-} from "@/lib/ai/run-usage-accumulator";
+import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import { updateArtifactStatus } from "@/lib/db/artifact-status";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
 import { saveTeamRoster } from "@/lib/db/team-roster";
@@ -57,42 +36,20 @@ import {
 } from "@/lib/db/runs";
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
-const STREAM_HEARTBEAT_MS = 15_000;
+import { assertNotAborted, isSimulationAborted } from "./simulation-abort";
+import { streamAgentTurn } from "./stream-agent-turn";
+import type {
+  DebateState,
+  RunSimulationOptions,
+  RunSimulationResult,
+  TurnContext,
+  TurnDirective,
+} from "./run-simulation-types";
+
+export { isSimulationAborted } from "./simulation-abort";
+export type { RunSimulationOptions, RunSimulationResult } from "./run-simulation-types";
+
 const AGENT_TURN_FALLBACK = "[Tool Error: Agent failed to respond]";
-
-class SimulationAbortedError extends Error {
-  override readonly name = "SimulationAbortedError";
-
-  constructor(message = "Simulation cancelled") {
-    super(message);
-  }
-}
-
-export function isSimulationAborted(error: unknown): boolean {
-  if (error instanceof SimulationAbortedError) {
-    return true;
-  }
-  return error instanceof Error && error.name === "AbortError";
-}
-
-function assertNotAborted(signal?: AbortSignal): void {
-  if (signal?.aborted) {
-    throw new SimulationAbortedError();
-  }
-}
-
-export interface RunSimulationOptions {
-  userId?: string | null;
-  guestSessionId?: string | null;
-  usageAccumulator?: RunUsageAccumulator;
-  abortSignal?: AbortSignal;
-}
-
-export interface RunSimulationResult {
-  runId: string;
-  usageAccumulator: RunUsageAccumulator;
-  debateExitOutcome: DebateExitOutcome;
-}
 
 export async function runSimulation(
   productIdea: string,
@@ -107,8 +64,6 @@ export async function runSimulation(
     guestSessionId: options.guestSessionId,
   });
 
-  const transcript: TranscriptEntry[] = [];
-  let messageOrder = 0;
   let debateComplete = false;
   let artifactPhaseStarted = false;
 
@@ -124,17 +79,7 @@ export async function runSimulation(
     await saveTeamRoster(run.id, roster);
     await touchRunActivity(run.id);
 
-    const notify = (event: SimulationStreamEvent) => {
-      try {
-        send(event);
-      } catch (error) {
-        console.warn("Simulation stream: failed to notify client", {
-          eventType: event.type,
-          runId: run.id,
-          error,
-        });
-      }
-    };
+    const notify = buildNotifyHandler(send, run.id);
 
     notify({ type: "run_started", runId: run.id });
     notify({
@@ -142,199 +87,31 @@ export async function runSimulation(
       templateId: classification.templateId,
       members: SIMULATION_AGENT_ORDER.map((role) => {
         const member = getTeamMember(roster, role);
-        return {
-          role,
-          name: member.name,
-          title: member.title,
-        };
+        return { role, name: member.name, title: member.title };
       }),
     });
 
-    let turnCount = 0;
-    let roleIndex = 0;
-    let returnToReviewer = false;
-    let nextRole: SimulationAgentRole = SIMULATION_AGENT_ORDER[0];
-    let debateExitOutcome: DebateExitOutcome | null = null;
-    let lastRejectFeedback: string | null = null;
-    let lastRejectTarget: SimulationAgentRole | null = null;
+    const state: DebateState = {
+      turnCount: 0,
+      roleIndex: 0,
+      returnToReviewer: false,
+      nextRole: SIMULATION_AGENT_ORDER[0],
+      lastRejectFeedback: null,
+      lastRejectTarget: null,
+      transcript: [],
+    };
 
-    while (turnCount < MAX_SIMULATION_TURNS) {
-      assertNotAborted(abortSignal);
+    const ctx: TurnContext = {
+      runId: run.id,
+      productIdea,
+      roster,
+      templateId: classification.templateId,
+      usageAccumulator,
+      abortSignal,
+      notify,
+    };
 
-      const role = nextRole;
-
-      await touchRunActivity(run.id);
-
-      const member = getTeamMember(roster, role);
-      let fullText: string;
-
-      const debateContext = resolveDebateTurnContext(
-        role,
-        transcript,
-        roster,
-        lastRejectTarget,
-        lastRejectFeedback,
-      );
-
-      try {
-        fullText = await streamAgentTurn({
-          runId: run.id,
-          role,
-          productIdea,
-          transcript,
-          roster,
-          templateId: classification.templateId,
-          usageAccumulator,
-          abortSignal,
-          debateContext,
-          send: notify,
-        });
-      } catch (turnError) {
-        if (isSimulationAborted(turnError) || isSimulationBudgetExceeded(turnError)) {
-          throw turnError;
-        }
-        console.error(`Agent turn failed (${role}):`, turnError);
-        fullText = AGENT_TURN_FALLBACK;
-        emitFallbackAgentTurn(role, member.name, member.title, fullText, notify);
-      }
-
-      assertSimulationWithinBudget(usageAccumulator);
-
-      if (
-        role === "reviewer" &&
-        parseReviewerDecision(fullText).decision === "unknown"
-      ) {
-        const recoveredTag = await recoverReviewerDecisionTag(fullText, {
-          usageAccumulator,
-          abortSignal,
-        });
-        if (recoveredTag) {
-          fullText = `${fullText.trimEnd()}\n\n${recoveredTag}`;
-        }
-        assertSimulationWithinBudget(usageAccumulator);
-      }
-
-      const contentToPersist =
-        role === "reviewer"
-          ? stripReviewerDecisionTag(
-              normalizeAgentPersistedText(role, fullText),
-            )
-          : normalizeAgentPersistedText(role, fullText);
-
-      if (
-        role === "architect" &&
-        isArchitectDeliverableInsufficient(
-          contentToPersist,
-          classification.templateId,
-        )
-      ) {
-        console.warn(
-          "Architect deliverable still insufficient — synthetic [REJECT: architect]",
-          { runId: run.id },
-        );
-        const reviewerMember = getTeamMember(roster, "reviewer");
-        const rejectFeedback = buildArchitectInsufficientReviewerFeedback(
-          contentToPersist,
-          classification.templateId,
-        );
-        const rejectRaw = `${rejectFeedback}\n\n[REJECT: architect]`;
-        const rejectPersisted = stripReviewerDecisionTag(
-          normalizeAgentPersistedText("reviewer", rejectRaw),
-        );
-
-        transcript.push({
-          role: "reviewer",
-          agentName: reviewerMember.name,
-          content: rejectPersisted,
-        });
-        await appendMessage(
-          run.id,
-          "reviewer",
-          rejectPersisted,
-          messageOrder,
-          reviewerMember.name,
-        );
-        messageOrder += 1;
-        turnCount += 1;
-
-        lastRejectFeedback = rejectPersisted;
-        lastRejectTarget = "architect";
-        nextRole = "architect";
-        continue;
-      }
-
-      transcript.push({
-        role,
-        agentName: member.name,
-        content: contentToPersist,
-      });
-
-      await appendMessage(
-        run.id,
-        role,
-        contentToPersist,
-        messageOrder,
-        member.name,
-      );
-      messageOrder += 1;
-      turnCount += 1;
-
-      if (role === "reviewer") {
-        const parsed = parseReviewerDecision(fullText);
-
-        if (parsed.decision === "approve") {
-          debateExitOutcome = "approved";
-          lastRejectFeedback = null;
-          lastRejectTarget = null;
-          break;
-        }
-
-        if (parsed.decision === "reject" && parsed.rejectRole) {
-          lastRejectFeedback = parsed.displayText.trim() || null;
-          lastRejectTarget = parsed.rejectRole;
-          nextRole = parsed.rejectRole;
-          returnToReviewer = true;
-          continue;
-        }
-
-        console.warn("Invalid reviewer decision, routing correction", {
-          runId: run.id,
-          decision: parsed.decision,
-          rejectRole: parsed.rejectRole,
-        });
-
-        const fallback = resolveUnknownReviewerDecision();
-        if (turnCount < MAX_SIMULATION_TURNS) {
-          lastRejectFeedback = parsed.displayText.trim() || null;
-          lastRejectTarget = fallback.rejectRole ?? "pm";
-          nextRole = fallback.rejectRole ?? "pm";
-          returnToReviewer = true;
-          continue;
-        }
-
-        debateExitOutcome = "unknown_reject_fallback";
-        break;
-      }
-
-      if (returnToReviewer) {
-        nextRole = "reviewer";
-        returnToReviewer = false;
-      } else {
-        roleIndex += 1;
-        if (roleIndex >= SIMULATION_AGENT_ORDER.length) {
-          break;
-        }
-        nextRole = SIMULATION_AGENT_ORDER[roleIndex];
-      }
-    }
-
-    if (turnCount >= MAX_SIMULATION_TURNS) {
-      console.warn("Simulation reached MAX_SIMULATION_TURNS", { runId: run.id });
-    }
-
-    if (debateExitOutcome === null) {
-      debateExitOutcome = "cap_reached";
-    }
+    const debateExitOutcome = await runDebateLoop(state, ctx);
 
     assertNotAborted(abortSignal);
 
@@ -342,7 +119,7 @@ export async function runSimulation(
 
     await updateRunSummary(
       run.id,
-      JSON.stringify({ debateOutcome: debateExitOutcome, turnCount }),
+      JSON.stringify({ debateOutcome: debateExitOutcome, turnCount: state.turnCount }),
     );
 
     await updateArtifactStatus(run.id, "pending");
@@ -368,7 +145,288 @@ export async function runSimulation(
   }
 }
 
-/** Re-emit a complete turn so the client receives fallback text after a failed stream. */
+async function runDebateLoop(
+  state: DebateState,
+  ctx: TurnContext,
+): Promise<DebateExitOutcome> {
+  while (state.turnCount < MAX_SIMULATION_TURNS) {
+    assertNotAborted(ctx.abortSignal);
+
+    const directive = await runDebateTurn(state, ctx);
+
+    if (directive.kind === "break") {
+      if (state.turnCount >= MAX_SIMULATION_TURNS) {
+        console.warn("Simulation reached MAX_SIMULATION_TURNS", { runId: ctx.runId });
+      }
+      return directive.outcome;
+    }
+
+    if (directive.kind === "reroute") {
+      state.nextRole = directive.targetRole;
+      state.returnToReviewer = true;
+      continue;
+    }
+
+    if (!applyLinearProgression(state)) {
+      return "cap_reached";
+    }
+  }
+
+  console.warn("Simulation reached MAX_SIMULATION_TURNS", { runId: ctx.runId });
+  return "cap_reached";
+}
+
+function applyLinearProgression(state: DebateState): boolean {
+  if (state.returnToReviewer) {
+    state.nextRole = "reviewer";
+    state.returnToReviewer = false;
+    return true;
+  }
+
+  state.roleIndex += 1;
+  if (state.roleIndex >= SIMULATION_AGENT_ORDER.length) {
+    return false;
+  }
+  state.nextRole = SIMULATION_AGENT_ORDER[state.roleIndex];
+  return true;
+}
+
+async function runDebateTurn(
+  state: DebateState,
+  ctx: TurnContext,
+): Promise<TurnDirective> {
+  const role = state.nextRole;
+
+  await touchRunActivity(ctx.runId);
+
+  const member = getTeamMember(ctx.roster, role);
+
+  const debateContext = resolveDebateTurnContext(
+    role,
+    state.transcript,
+    ctx.roster,
+    state.lastRejectTarget,
+    state.lastRejectFeedback,
+  );
+
+  const turnResult = await executeDebateTurn(role, member.name, member.title, debateContext, state.transcript, ctx);
+  if (turnResult.kind === "break") {
+    return turnResult;
+  }
+
+  let fullText = turnResult.fullText;
+
+  assertSimulationWithinBudget(ctx.usageAccumulator);
+
+  fullText = await recoverUnknownReviewerTag(role, fullText, ctx);
+
+  const contentToPersist = normalizeTurnContent(role, fullText);
+
+  const gateDirective = await handleArchitectQualityGate(role, contentToPersist, ctx, state);
+  if (gateDirective) {
+    return gateDirective;
+  }
+
+  await persistTurn(role, contentToPersist, member.name, ctx, state);
+
+  return resolveReviewerOutcome(role, fullText, state);
+}
+
+async function executeDebateTurn(
+  role: SimulationAgentRole,
+  name: string,
+  title: string,
+  debateContext: ReturnType<typeof resolveDebateTurnContext>,
+  transcript: TranscriptEntry[],
+  ctx: TurnContext,
+): Promise<
+  | { kind: "break"; outcome: DebateExitOutcome }
+  | { kind: "text"; fullText: string }
+> {
+  try {
+    const fullText = await streamAgentTurn({
+      runId: ctx.runId,
+      role,
+      productIdea: ctx.productIdea,
+      transcript,
+      roster: ctx.roster,
+      templateId: ctx.templateId,
+      usageAccumulator: ctx.usageAccumulator,
+      abortSignal: ctx.abortSignal,
+      debateContext,
+      send: ctx.notify,
+    });
+    return { kind: "text", fullText };
+  } catch (turnError) {
+    if (isSimulationAborted(turnError) || isSimulationBudgetExceeded(turnError)) {
+      throw turnError;
+    }
+
+    if (role === "reviewer") {
+      console.error("Reviewer turn failed, closing debate:", turnError);
+      return { kind: "break", outcome: "reviewer_error" };
+    }
+
+    console.error(`Agent turn failed (${role}):`, turnError);
+    emitFallbackAgentTurn(role, name, title, AGENT_TURN_FALLBACK, ctx.notify);
+    return { kind: "text", fullText: AGENT_TURN_FALLBACK };
+  }
+}
+
+async function recoverUnknownReviewerTag(
+  role: SimulationAgentRole,
+  fullText: string,
+  ctx: TurnContext,
+): Promise<string> {
+  if (role !== "reviewer" || parseReviewerDecision(fullText).decision !== "unknown") {
+    return fullText;
+  }
+
+  const recoveredTag = await recoverReviewerDecisionTag(fullText, {
+    usageAccumulator: ctx.usageAccumulator,
+    abortSignal: ctx.abortSignal,
+  });
+
+  if (recoveredTag) {
+    fullText = `${fullText.trimEnd()}\n\n${recoveredTag}`;
+  }
+
+  assertSimulationWithinBudget(ctx.usageAccumulator);
+  return fullText;
+}
+
+function normalizeTurnContent(
+  role: SimulationAgentRole,
+  fullText: string,
+): string {
+  return role === "reviewer"
+    ? stripReviewerDecisionTag(normalizeAgentPersistedText(role, fullText))
+    : normalizeAgentPersistedText(role, fullText);
+}
+
+async function handleArchitectQualityGate(
+  role: SimulationAgentRole,
+  contentToPersist: string,
+  ctx: TurnContext,
+  state: DebateState,
+): Promise<TurnDirective | null> {
+  if (role !== "architect") {
+    return null;
+  }
+
+  if (!isArchitectDeliverableInsufficient(contentToPersist, ctx.templateId)) {
+    return null;
+  }
+
+  console.warn(
+    "Architect deliverable still insufficient — synthetic [REJECT: architect]",
+    { runId: ctx.runId },
+  );
+
+  const reviewerMember = getTeamMember(ctx.roster, "reviewer");
+  const rejectFeedback = buildArchitectInsufficientReviewerFeedback(
+    contentToPersist,
+    ctx.templateId,
+  );
+  const rejectRaw = `${rejectFeedback}\n\n[REJECT: architect]`;
+  const rejectPersisted = stripReviewerDecisionTag(
+    normalizeAgentPersistedText("reviewer", rejectRaw),
+  );
+
+  state.transcript.push({
+    role: "reviewer",
+    agentName: reviewerMember.name,
+    content: rejectPersisted,
+  });
+  await appendMessage(
+    ctx.runId,
+    "reviewer",
+    rejectPersisted,
+    state.transcript.length - 1,
+    reviewerMember.name,
+  );
+
+  state.turnCount += 1;
+
+  state.lastRejectFeedback = rejectPersisted;
+  state.lastRejectTarget = "architect";
+
+  return { kind: "reroute", targetRole: "architect" };
+}
+
+async function persistTurn(
+  role: SimulationAgentRole,
+  contentToPersist: string,
+  agentName: string,
+  ctx: TurnContext,
+  state: DebateState,
+): Promise<void> {
+  state.transcript.push({ role, agentName, content: contentToPersist });
+
+  await appendMessage(
+    ctx.runId,
+    role,
+    contentToPersist,
+    state.transcript.length - 1,
+    agentName,
+  );
+
+  state.turnCount += 1;
+}
+
+function resolveReviewerOutcome(
+  role: SimulationAgentRole,
+  fullText: string,
+  state: DebateState,
+): TurnDirective {
+  if (role !== "reviewer") {
+    return { kind: "progress" };
+  }
+
+  const parsed = parseReviewerDecision(fullText);
+
+  if (parsed.decision === "approve") {
+    state.lastRejectFeedback = null;
+    state.lastRejectTarget = null;
+    return { kind: "break", outcome: "approved" };
+  }
+
+  if (parsed.decision === "reject" && parsed.rejectRole) {
+    state.lastRejectFeedback = parsed.displayText.trim() || null;
+    state.lastRejectTarget = parsed.rejectRole;
+    return { kind: "reroute", targetRole: parsed.rejectRole };
+  }
+
+  console.warn("Invalid reviewer decision, routing correction");
+
+  const fallback = resolveUnknownReviewerDecision();
+
+  if (state.turnCount < MAX_SIMULATION_TURNS) {
+    state.lastRejectFeedback = parsed.displayText.trim() || null;
+    state.lastRejectTarget = fallback.rejectRole ?? "pm";
+    return { kind: "reroute", targetRole: fallback.rejectRole ?? "pm" };
+  }
+
+  return { kind: "break", outcome: "unknown_reject_fallback" };
+}
+
+function buildNotifyHandler(
+  send: (event: SimulationStreamEvent) => void,
+  runId: string,
+): (event: SimulationStreamEvent) => void {
+  return (event: SimulationStreamEvent) => {
+    try {
+      send(event);
+    } catch (error) {
+      console.warn("Simulation stream: failed to notify client", {
+        eventType: event.type,
+        runId,
+        error,
+      });
+    }
+  };
+}
+
 function emitFallbackAgentTurn(
   role: SimulationAgentRole,
   name: string,
@@ -379,440 +437,4 @@ function emitFallbackAgentTurn(
   send({ type: "agent_start", role, name, title });
   send({ type: "text-delta", role, delta: content });
   send({ type: "agent_end", role });
-}
-
-async function streamAgentTurn({
-  runId,
-  role,
-  productIdea,
-  transcript,
-  roster,
-  templateId,
-  usageAccumulator,
-  abortSignal,
-  debateContext,
-  send,
-}: {
-  runId: string;
-  role: SimulationAgentRole;
-  productIdea: string;
-  transcript: TranscriptEntry[];
-  roster: TeamRoster;
-  templateId: TeamTemplateId;
-  usageAccumulator: RunUsageAccumulator;
-  abortSignal?: AbortSignal;
-  debateContext?: DebateTurnContext;
-  send: (event: SimulationStreamEvent) => void;
-}): Promise<string> {
-  const config = getAgentConfig(role);
-  const member = getTeamMember(roster, role);
-
-  send({
-    type: "agent_start",
-    role,
-    name: member.name,
-    title: member.title,
-  });
-
-  let fullText: string;
-  try {
-    fullText = await collectAgentStream({
-      runId,
-      role,
-      productIdea,
-      transcript,
-      roster,
-      templateId,
-      config,
-      debateContext,
-      usageAccumulator,
-      abortSignal,
-      send,
-    });
-
-    if (!fullText.trim()) {
-      assertNotAborted(abortSignal);
-      console.warn(
-        `${role}: empty stream, retrying with chat model (no reasoning)`,
-      );
-      const retryConfig = {
-        ...config,
-        model: "deepseek-v4-flash" as const,
-        maxOutputTokens: Math.max(config.maxOutputTokens * 1.5, 2400),
-        deepseek: DEEPSEEK_CHAT_OPTIONS,
-      };
-      fullText = await collectAgentStream({
-        runId,
-        role,
-        productIdea,
-        transcript,
-        roster,
-        templateId,
-        config: retryConfig,
-        debateContext,
-        usageAccumulator,
-        abortSignal,
-        send,
-      });
-      fullText = await continueAgentStreamIfTruncated({
-        runId,
-        role,
-        productIdea,
-        transcript,
-        roster,
-        templateId,
-        config: retryConfig,
-        debateContext,
-        usageAccumulator,
-        abortSignal,
-        send,
-        fullText,
-      });
-    }
-
-    fullText = await continueAgentStreamIfTruncated({
-      runId,
-      role,
-      productIdea,
-      transcript,
-      roster,
-      templateId,
-      config,
-      debateContext,
-      usageAccumulator,
-      abortSignal,
-      send,
-      fullText,
-    });
-
-    if (role === "architect" && templateId !== "physical") {
-      const normalized = normalizeAgentPersistedText(role, fullText);
-      if (isArchitectDeliverableInsufficient(normalized, templateId)) {
-        assertNotAborted(abortSignal);
-        console.warn(
-          `${role}: insufficient sections after tool turn, retrying without tools`,
-        );
-        const toollessConfig = {
-          ...config,
-          model: "deepseek-v4-flash" as const,
-          maxOutputTokens: Math.max(config.maxOutputTokens, 3200),
-          deepseek: DEEPSEEK_CHAT_OPTIONS,
-        };
-        const toollessText = await collectAgentStream({
-          runId,
-          role,
-          productIdea,
-          transcript,
-          roster,
-          templateId,
-          config: toollessConfig,
-          debateContext,
-          usageAccumulator,
-          abortSignal,
-          send,
-          disableTools: true,
-          supplementalUserPrompt: buildArchitectToollessRetryUserPrompt(),
-        });
-        if (toollessText.trim()) {
-          fullText = toollessText;
-          fullText = await continueAgentStreamIfTruncated({
-            runId,
-            role,
-            productIdea,
-            transcript,
-            roster,
-            templateId,
-            config: toollessConfig,
-            debateContext,
-            usageAccumulator,
-            abortSignal,
-            send,
-            fullText,
-          });
-        }
-      }
-    }
-  } catch (streamError) {
-    send({ type: "agent_end", role });
-    throw streamError;
-  }
-
-  if (!fullText.trim()) {
-    send({ type: "agent_end", role });
-    throw new Error(
-      `${member.name} (${role}) returned no output — check API limits or retry.`,
-    );
-  }
-
-  const persisted = normalizeAgentPersistedText(role, fullText);
-  if (!persisted.trim()) {
-    send({ type: "agent_end", role });
-    throw new Error(
-      `${member.name} (${role}) returned no visible output after normalization.`,
-    );
-  }
-
-  send({ type: "agent_end", role });
-  return fullText.trim();
-}
-
-function emitVisibleDelta(
-  role: SimulationAgentRole,
-  fullText: string,
-  emittedLength: number,
-  send: (event: SimulationStreamEvent) => void,
-): number {
-  const visible = getAgentStreamDisplayText(role, fullText);
-  const delta = visible.slice(emittedLength);
-  if (delta) {
-    send({ type: "text-delta", role, delta });
-    return emittedLength + delta.length;
-  }
-  return emittedLength;
-}
-
-async function recordStreamUsage(
-  result: StreamTextUsageSource,
-  modelId: ReturnType<typeof getAgentConfig>["model"],
-  usageAccumulator: RunUsageAccumulator,
-): Promise<void> {
-  await usageAccumulator.addFromStreamResult(result, modelId);
-}
-
-async function continueAgentStreamIfTruncated({
-  runId,
-  role,
-  productIdea,
-  transcript,
-  roster,
-  templateId,
-  config,
-  debateContext,
-  usageAccumulator,
-  abortSignal,
-  send,
-  fullText,
-}: {
-  runId: string;
-  role: SimulationAgentRole;
-  productIdea: string;
-  transcript: TranscriptEntry[];
-  roster: TeamRoster;
-  templateId: TeamTemplateId;
-  config: ReturnType<typeof getAgentConfig>;
-  debateContext?: DebateTurnContext;
-  usageAccumulator: RunUsageAccumulator;
-  abortSignal?: AbortSignal;
-  send: (event: SimulationStreamEvent) => void;
-  fullText: string;
-}): Promise<string> {
-  let merged = fullText.trim();
-  if (!looksLikeTruncatedAgentOutput(merged, role)) {
-    return merged;
-  }
-
-  assertNotAborted(abortSignal);
-  console.warn(`${role}: output looks truncated, requesting continuation`);
-
-  const continuation = await collectAgentStream({
-    runId,
-    role,
-    productIdea,
-    transcript,
-    roster,
-    templateId,
-    config: {
-      ...config,
-      maxOutputTokens: TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS,
-    },
-    debateContext,
-    usageAccumulator,
-    abortSignal,
-    send,
-    continuationOf: merged,
-  });
-
-  if (continuation.trim()) {
-    merged = `${merged}${continuation.trimStart()}`;
-  }
-
-  if (looksLikeTruncatedAgentOutput(merged, role)) {
-    console.warn(`${role}: still truncated after continuation, second pass`);
-    const second = await collectAgentStream({
-      runId,
-      role,
-      productIdea,
-      transcript,
-      roster,
-      templateId,
-      config: {
-        ...config,
-        maxOutputTokens: TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS,
-      },
-      debateContext,
-      usageAccumulator,
-      abortSignal,
-      send,
-      continuationOf: merged,
-    });
-    if (second.trim()) {
-      merged = `${merged}${second.trimStart()}`;
-    }
-  }
-
-  return merged;
-}
-
-function resolveToolsForTurn(
-  role: SimulationAgentRole,
-  templateId: TeamTemplateId,
-  productIdea: string,
-) {
-  if (
-    role === "backend" &&
-    templateId === "hybrid" &&
-    hasPhysicalKeywords(productIdea)
-  ) {
-    return getComplianceTools();
-  }
-  return getAgentTools(role);
-}
-
-async function collectAgentStream({
-  runId,
-  role,
-  productIdea,
-  transcript,
-  roster,
-  templateId,
-  config,
-  debateContext,
-  usageAccumulator,
-  abortSignal,
-  send,
-  continuationOf,
-  disableTools = false,
-  supplementalUserPrompt,
-}: {
-  runId: string;
-  role: SimulationAgentRole;
-  productIdea: string;
-  transcript: TranscriptEntry[];
-  roster: TeamRoster;
-  templateId: TeamTemplateId;
-  config: ReturnType<typeof getAgentConfig>;
-  debateContext?: DebateTurnContext;
-  usageAccumulator: RunUsageAccumulator;
-  abortSignal?: AbortSignal;
-  send: (event: SimulationStreamEvent) => void;
-  /** Prior partial assistant text when resuming after truncation. */
-  continuationOf?: string;
-  disableTools?: boolean;
-  supplementalUserPrompt?: string;
-}): Promise<string> {
-  const baseMessages = buildAgentMessages(
-    role,
-    productIdea,
-    transcript,
-    roster,
-    debateContext,
-  );
-  let messages = baseMessages;
-
-  if (supplementalUserPrompt?.trim()) {
-    messages = [
-      ...messages,
-      { role: "user" as const, content: supplementalUserPrompt.trim() },
-    ];
-  }
-
-  if (continuationOf != null && continuationOf.trim().length > 0) {
-    messages = [
-      ...messages,
-      { role: "assistant" as const, content: continuationOf },
-      {
-        role: "user" as const,
-        content: buildTruncationContinuationPrompt(continuationOf),
-      },
-    ];
-  }
-
-  const tools = disableTools
-    ? undefined
-    : resolveToolsForTurn(role, templateId, productIdea);
-
-  const result = streamText({
-    model: getDeepSeekModel(config.model),
-    system: getAgentSystemPrompt(role, roster, templateId, productIdea),
-    messages,
-    maxOutputTokens: config.maxOutputTokens,
-    temperature: config.temperature,
-    tools,
-    stopWhen: disableTools ? undefined : stepCountIs(3),
-    abortSignal,
-    providerOptions: {
-      deepseek: config.deepseek,
-    },
-    onError({ error }) {
-      console.error(`Stream error for ${role}:`, error);
-    },
-  });
-
-  let fullText = "";
-  let emittedLength = 0;
-  let lastHeartbeatAt = Date.now();
-  try {
-    for await (const part of result.fullStream) {
-      assertNotAborted(abortSignal);
-
-      if (part.type === "text-delta") {
-        fullText += part.text;
-        emittedLength = emitVisibleDelta(role, fullText, emittedLength, send);
-      } else if (part.type === "tool-call") {
-        const toolPart = part as {
-          toolName: string;
-          input?: unknown;
-          args?: unknown;
-        };
-        send({
-          type: "tool_start",
-          role,
-          toolName: toolPart.toolName,
-          args: toolPart.input ?? toolPart.args,
-        });
-      } else if (part.type === "tool-result") {
-        send({
-          type: "tool_end",
-          role,
-          toolName: part.toolName,
-        });
-      }
-
-      const now = Date.now();
-      if (now - lastHeartbeatAt >= STREAM_HEARTBEAT_MS) {
-        await touchRunActivity(runId);
-        lastHeartbeatAt = now;
-      }
-    }
-
-    if (!fullText.trim()) {
-      const resolved = await result.text;
-      if (resolved.trim()) {
-        fullText = resolved;
-        emitVisibleDelta(role, fullText, emittedLength, send);
-      }
-    }
-
-    await recordStreamUsage(result, config.model, usageAccumulator);
-  } catch (error) {
-    await recordStreamUsage(result, config.model, usageAccumulator);
-    if (isSimulationAborted(error)) {
-      throw error;
-    }
-    if (fullText.trim()) {
-      return fullText.trim();
-    }
-    throw error;
-  }
-  return fullText.trim();
 }
