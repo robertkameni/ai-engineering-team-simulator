@@ -62,6 +62,7 @@ describe("executeRegenerateArtifactsPost rate limiting", () => {
           artifacts: {
             requirements: [],
             architecture: [],
+            blueprint: [],
             implementation: [],
             review: [],
           },

@@ -77,6 +77,7 @@ export function runArtifactsOutputToBundle(
     requirements: output.requirements.sections,
     architecture: output.architecture.sections,
     implementation: output.implementation.sections,
+    blueprint: output.blueprint.sections,
     review: output.review.sections,
   };
 }

@@ -32,6 +32,9 @@ const runArtifactsOutputSchema = z.object({
   implementation: artifactDocumentSchema.describe(
     "Backend + frontend delivery: stack, modules, testing, rollout",
   ),
+  blueprint: artifactDocumentSchema.describe(
+    "Concrete build details: dependency versions, directory tree, API endpoints, DB schema, env config, key interfaces",
+  ),
   review: artifactDocumentSchema.describe(
     "Reviewer: quoted concerns, risks, recommendations",
   ),

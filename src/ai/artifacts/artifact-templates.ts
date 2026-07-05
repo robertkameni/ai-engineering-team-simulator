@@ -8,6 +8,8 @@ const SOFTWARE_ARTIFACT_SECTION_GUIDELINES: Record<ArtifactType, string> = {
     "Overview, system design, data model, APIs & integrations, decisions & risks",
   implementation:
     "Stack, backend, frontend, testing & rollout, delivery risks",
+  blueprint:
+    "Dependencies (with versions), Directory Structure, API Endpoints, Database Schema, Environment Config, Key Interfaces",
   review: "Summary, agreements & disputes, risks, recommendations",
 };
 
@@ -18,6 +20,8 @@ const PHYSICAL_ARTIFACT_SECTION_GUIDELINES: Record<ArtifactType, string> = {
     "Technical overview, site/system design, materials & equipment, regulatory compliance, decisions & risks",
   implementation:
     "Execution plan, phasing & schedule, budget scenarios, resources & contractors, delivery risks",
+  blueprint:
+    "Materials & Vendors (with specifications), Site Layout, Equipment List, Compliance Checklist, Budget Line Items, Key Specs",
   review: "Summary, agreements & disputes, risks, recommendations",
 };
 

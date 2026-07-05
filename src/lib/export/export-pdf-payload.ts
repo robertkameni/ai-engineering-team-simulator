@@ -40,6 +40,7 @@ const partialArtifactsSchema = z
     requirements: z.array(artifactSectionSchema).optional(),
     architecture: z.array(artifactSectionSchema).optional(),
     implementation: z.array(artifactSectionSchema).optional(),
+    blueprint: z.array(artifactSectionSchema).optional(),
     review: z.array(artifactSectionSchema).optional(),
   })
   .nullable()

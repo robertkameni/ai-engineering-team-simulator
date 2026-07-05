@@ -32,6 +32,7 @@ export interface DebateState {
   lastRejectFeedback: string | null;
   lastRejectTarget: SimulationAgentRole | null;
   transcript: TranscriptEntry[];
+  isArchitectRevision: boolean;
 }
 
 export interface TurnContext {

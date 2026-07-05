@@ -33,6 +33,7 @@ describe("executeRegenerateArtifactsAction rate limiting", () => {
             artifacts: {
               requirements: [],
               architecture: [],
+              blueprint: [],
               implementation: [],
               review: [],
             },
@@ -69,6 +70,7 @@ describe("executeRegenerateArtifactsAction rate limiting", () => {
             artifacts: {
               requirements: [],
               architecture: [],
+              blueprint: [],
               implementation: [],
               review: [],
             },

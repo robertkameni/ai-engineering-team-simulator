@@ -21,6 +21,7 @@ function baseHooks(
       artifacts: {
         requirements: [],
         architecture: [],
+        blueprint: [],
         implementation: [],
         review: [],
       },
@@ -47,6 +48,7 @@ describe("regenerateRunArtifacts tenant enclosure", () => {
             artifacts: {
               requirements: [],
               architecture: [],
+              blueprint: [],
               implementation: [],
               review: [],
             },
@@ -98,6 +100,7 @@ describe("regenerateRunArtifacts tenant enclosure", () => {
             artifacts: {
               requirements: [],
               architecture: [],
+              blueprint: [],
               implementation: [],
               review: [],
             },

@@ -31,6 +31,7 @@ export async function streamAgentTurn({
   abortSignal,
   debateContext,
   send,
+  disableTools,
 }: {
   runId: string;
   role: SimulationAgentRole;
@@ -42,6 +43,7 @@ export async function streamAgentTurn({
   abortSignal?: AbortSignal;
   debateContext?: DebateTurnContext;
   send: (event: SimulationStreamEvent) => void;
+  disableTools?: boolean;
 }): Promise<string> {
   const config = getAgentConfig(role);
   const member = getTeamMember(roster, role);
@@ -67,6 +69,7 @@ export async function streamAgentTurn({
       usageAccumulator,
       abortSignal,
       send,
+      disableTools,
     });
 
     if (!fullText.trim()) {

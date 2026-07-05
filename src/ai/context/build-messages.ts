@@ -14,6 +14,8 @@ export interface DebateTurnContext {
     targetRole: SimulationAgentRole;
   };
   isReReview?: boolean;
+  hasTeamDisagreement?: boolean;
+  architectRevisionCritiques?: string[];
 }
 
 function formatProductIdeaBlock(productIdea: string): string {

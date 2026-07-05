@@ -12,6 +12,7 @@ export type ExportPdfArtifactPanels = {
   requirements?: { title: string; items: string[] }[];
   architecture?: { title: string; items: string[] }[];
   implementation?: { title: string; items: string[] }[];
+  blueprint?: { title: string; items: string[] }[];
   review?: { title: string; items: string[] }[];
 } | null | undefined;
 
@@ -27,6 +28,7 @@ export function countExportArtifactItems(
     artifacts.requirements,
     artifacts.architecture,
     artifacts.implementation,
+    artifacts.blueprint,
     artifacts.review,
   ]) {
     if (!panel) continue;

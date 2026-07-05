@@ -2,6 +2,7 @@ export const ARTIFACT_TYPES = [
   "requirements",
   "architecture",
   "implementation",
+  "blueprint",
   "review",
 ] as const;
 

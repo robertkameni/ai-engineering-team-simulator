@@ -11,7 +11,7 @@ export function buildArchitectSystemPrompt(roster: TeamRoster): string {
 Propose a detailed, production-grade v1 technical architecture that structurally supports ${pm.name}'s product scope.
 
 Rules:
-- Open by evaluating ${pm.name}'s scope through a systems lens: latency, consistency, operability, and delivery constraints.
+- Open by evaluating ${pm.name}'s scope through a systems lens: latency, consistency, operability, and delivery constraints. **You MUST identify at least one scope assumption or technology choice in ${pm.name}'s plan that creates a delivery risk, and propose a concrete refinement.** Accepting the PM's scope wholesale without friction is not architecture — it's transcription. Name the specific assumption or choice you are challenging, why it's a risk, and what you would change.
 - You MUST cover these topics using dense multi-paragraph prose or structured bullets:
   - ## Architecture: System topology (tiers, sync/async boundaries, failure domains, deployment units). Justify topology vs. alternatives (monolith vs. services, BFF vs. direct client, etc.).
   - ## Data Model: Entity-relationship narrative with cardinality, indexing rationale, migration/versioning strategy, and hot-path read/write patterns.
@@ -34,4 +34,29 @@ export function buildArchitectToollessRetryUserPrompt(): string {
   return `CRITICAL — Your previous reply did not include the required ## sections (Architecture, Data Model, APIs & Integration, Decisions & Risks) with sufficient depth.
 
 Post the FULL architectural design now in the team channel. Cite npm package versions from your prior tool results or well-known stable releases if needed, but do NOT call any tools — output only complete markdown sections.`;
+}
+
+/**
+ * Turn prompt for the architect revision turn.
+ * The architect sees their teammates' substantive critiques and must
+ * accept or defend each one point-by-point before the reviewer evaluates.
+ */
+export function buildArchitectRevisionTurnPrompt(
+  critiqueExcerpts: string[],
+): string {
+  const excerpts = critiqueExcerpts
+    .map((excerpt, index) => `${index + 1}. ${excerpt}`)
+    .join("\n\n");
+
+  return `REVISION TURN — Your teammates raised substantive concerns about your architecture. Address each critique below point-by-point.
+
+Teammate critiques:
+${excerpts}
+
+For each critique:
+- Reference the teammate by name.
+- Either **accept** the change (explain how it improves the architecture and integrate it), or **defend** your original choice with concrete technical reasoning.
+- If you accept a change, state explicitly what changed in your architecture.
+- Do not rewrite your entire architecture — address only the critiques and the resulting delta.
+- If a critique is based on a misunderstanding of your design, clarify without dismissing the concern.`;
 }

@@ -41,6 +41,8 @@ const SOFTWARE_ARTIFACT_FOCUS: Record<ArtifactType, string> = {
     "Components, data entities, APIs/events, auth, background jobs, and technical risks.",
   implementation:
     "Backend and frontend stacks, CI/CD, environments, observability, key modules, testing approach, and rollout plan.",
+  blueprint:
+    "Concrete build-ready details extracted from the debate: exact dependency names and versions, project directory tree, every API endpoint with method and path, database tables with columns and types, environment variables with descriptions, and key TypeScript interfaces or component signatures.",
   review:
     "Where the team agreed, key disagreements, top risks, and prioritized recommendations.",
 };
@@ -52,6 +54,8 @@ const PHYSICAL_ARTIFACT_FOCUS: Record<ArtifactType, string> = {
     "Technical design, materials, site constraints, regulatory compliance, and technical risks.",
   implementation:
     "Execution plan, phasing, budget scenarios, resources, contractors, and delivery risks.",
+  blueprint:
+    "Concrete build-ready details extracted from the debate: materials with specifications and vendors, site layout dimensions, equipment list with models, compliance requirements with standards, budget line items with costs, and key technical specs.",
   review:
     "Where the team agreed, key disagreements, top risks, and prioritized recommendations.",
 };
@@ -82,14 +86,18 @@ async function generateArtifactDocument(
       ? `${UNAPPROVED_DEBATE_NOTICE}\n\n`
       : "";
 
+  const isBlueprint = type === "blueprint";
+  const sectionRules = isBlueprint
+    ? `- The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}\n- 3–6 bullets per section; each bullet is a concrete, copy-paste-ready detail: exact version numbers, full file paths, SQL column types, API method+path pairs, environment variable names with descriptions, TypeScript interface signatures, or component prop types.\n- Prefer verbatim extraction over summarization. If a teammate specified an exact SQL query, include it. If they named a package version, include it.\n- Each bullet should be a self-contained technical specification item — not a narrative sentence.`
+    : `- The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}\n- 4–6 bullets per section; each bullet is 1–2 complete sentences with concrete detail (up to ~50 words per bullet).`;
+
   const system = `${unapprovedNotice}You are a technical writer producing the "${type}" deliverable from a team debate.
 
 Focus: ${focus}
 
 Output rules:
-- The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}
+${sectionRules}
 - ${languageDirective}
-- 4–6 bullets per section; each bullet is 1–2 complete sentences with concrete detail (up to ~50 words per bullet).
 - Write as a polished internal document — NOT meeting notes.
 - Do NOT append speaker names to bullets (no "(Name)" suffixes).
 - Synthesize consensus; note disagreement only in the review artifact.

@@ -142,6 +142,7 @@ export const EXPORT_PRINT_CSS = `
   .artifact-panel--requirements { border-top: 3px solid ${exportTheme.agent.pm}; }
   .artifact-panel--architecture { border-top: 3px solid ${exportTheme.agent.architect}; }
   .artifact-panel--implementation { border-top: 3px solid ${exportTheme.agent.backend}; }
+  .artifact-panel--blueprint { border-top: 3px solid ${exportTheme.agent.devops}; }
   .artifact-panel--review { border-top: 3px solid ${exportTheme.agent.reviewer}; }
 
   .export-quote {

@@ -184,6 +184,7 @@
     opacity: 0;
     transform: translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -195,6 +196,7 @@
     opacity: 0;
     transform: translateY(12px) scale(0.98);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -205,17 +207,20 @@
   from {
     background-position: 200% 0;
   }
+
   to {
     background-position: -200% 0;
   }
 }
 
 @keyframes pulse-glow {
+
   0%,
   100% {
     opacity: 0.45;
     transform: scale(1);
   }
+
   50% {
     opacity: 1;
     transform: scale(1.15);
@@ -231,12 +236,10 @@
 }
 
 .skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    oklch(0.18 0.012 285) 0%,
-    oklch(0.24 0.014 285) 50%,
-    oklch(0.18 0.012 285) 100%
-  );
+  background: linear-gradient(90deg,
+      oklch(0.18 0.012 285) 0%,
+      oklch(0.24 0.014 285) 50%,
+      oklch(0.18 0.012 285) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
 }
@@ -251,6 +254,7 @@
     transform: translateY(28px) scale(0.96);
     filter: blur(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -259,11 +263,13 @@
 }
 
 @keyframes landing-orb-drift {
+
   0%,
   100% {
     transform: translate(0, 0) scale(1);
     opacity: 0.55;
   }
+
   50% {
     transform: translate(4%, 3%) scale(1.08);
     opacity: 0.85;
@@ -271,11 +277,13 @@
 }
 
 @keyframes landing-orb-drift-alt {
+
   0%,
   100% {
     transform: translate(0, 0) scale(1);
     opacity: 0.45;
   }
+
   50% {
     transform: translate(-3%, 5%) scale(1.05);
     opacity: 0.75;
@@ -358,20 +366,19 @@
   from {
     background-position: 0% center;
   }
+
   to {
     background-position: 200% center;
   }
 }
 
 .landing-shimmer-text {
-  background: linear-gradient(
-    90deg,
-    oklch(0.62 0.02 285) 0%,
-    oklch(0.78 0.14 65) 30%,
-    oklch(0.72 0.17 255) 55%,
-    oklch(0.75 0.16 305) 75%,
-    oklch(0.62 0.02 285) 100%
-  );
+  background: linear-gradient(90deg,
+      oklch(0.62 0.02 285) 0%,
+      oklch(0.78 0.14 65) 30%,
+      oklch(0.72 0.17 255) 55%,
+      oklch(0.75 0.16 305) 75%,
+      oklch(0.62 0.02 285) 100%);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -412,11 +419,13 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   10%,
   85% {
     opacity: 1;
     transform: translateY(0);
   }
+
   100% {
     opacity: 0;
     transform: translateY(-6px);
@@ -428,13 +437,16 @@
 }
 
 @keyframes landing-agent-float {
+
   0%,
   100% {
     transform: translate(0, 0) rotate(0deg);
   }
+
   33% {
     transform: translate(6px, -10px) rotate(2deg);
   }
+
   66% {
     transform: translate(-4px, 8px) rotate(-2deg);
   }
@@ -470,6 +482,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .landing-rise,
   .landing-ambient::before,
   .landing-ambient::after,
@@ -521,18 +534,11 @@
   color: var(--foreground);
 }
 
-.artifact-static-tabs:has(input[name="artifact-tab"][value="requirements"]:checked)
-  .artifact-static-labels
-  label[for="artifact-tab-requirements"]:hover,
-.artifact-static-tabs:has(input[name="artifact-tab"][value="architecture"]:checked)
-  .artifact-static-labels
-  label[for="artifact-tab-architecture"]:hover,
-.artifact-static-tabs:has(input[name="artifact-tab"][value="implementation"]:checked)
-  .artifact-static-labels
-  label[for="artifact-tab-implementation"]:hover,
-.artifact-static-tabs:has(input[name="artifact-tab"][value="review"]:checked)
-  .artifact-static-labels
-  label[for="artifact-tab-review"]:hover {
+.artifact-static-tabs:has(input[name="artifact-tab"][value="requirements"]:checked) .artifact-static-labels label[for="artifact-tab-requirements"]:hover,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="architecture"]:checked) .artifact-static-labels label[for="artifact-tab-architecture"]:hover,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="implementation"]:checked) .artifact-static-labels label[for="artifact-tab-implementation"]:hover,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="review"]:checked) .artifact-static-labels label[for="artifact-tab-review"]:hover,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="blueprint"]:checked) .artifact-static-labels label[for="artifact-tab-blueprint"]:hover {
   filter: brightness(1.08);
 }
 
@@ -551,25 +557,16 @@
     opacity 200ms ease-out;
 }
 
-.artifact-static-tabs:has(input[name="artifact-tab"][value="requirements"]:checked)
-  .artifact-static-panels
-  [data-artifact-panel="requirements"],
-.artifact-static-tabs:has(input[name="artifact-tab"][value="architecture"]:checked)
-  .artifact-static-panels
-  [data-artifact-panel="architecture"],
-.artifact-static-tabs:has(input[name="artifact-tab"][value="implementation"]:checked)
-  .artifact-static-panels
-  [data-artifact-panel="implementation"],
-.artifact-static-tabs:has(input[name="artifact-tab"][value="review"]:checked)
-  .artifact-static-panels
-  [data-artifact-panel="review"] {
+.artifact-static-tabs:has(input[name="artifact-tab"][value="requirements"]:checked) .artifact-static-panels [data-artifact-panel="requirements"],
+.artifact-static-tabs:has(input[name="artifact-tab"][value="architecture"]:checked) .artifact-static-panels [data-artifact-panel="architecture"],
+.artifact-static-tabs:has(input[name="artifact-tab"][value="implementation"]:checked) .artifact-static-panels [data-artifact-panel="implementation"],
+.artifact-static-tabs:has(input[name="artifact-tab"][value="review"]:checked) .artifact-static-panels [data-artifact-panel="review"],
+.artifact-static-tabs:has(input[name="artifact-tab"][value="blueprint"]:checked) .artifact-static-panels [data-artifact-panel="blueprint"] {
   display: flex;
   animation: artifact-panel-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.artifact-static-tabs:has(input[name="artifact-tab"][value="requirements"]:checked)
-  .artifact-static-labels
-  label[for="artifact-tab-requirements"] {
+.artifact-static-tabs:has(input[name="artifact-tab"][value="requirements"]:checked) .artifact-static-labels label[for="artifact-tab-requirements"] {
   border-color: color-mix(in oklch, var(--agent-pm) 40%, transparent);
   background: color-mix(in oklch, var(--agent-pm) 12%, transparent);
   color: var(--agent-pm);
@@ -577,9 +574,7 @@
   font-weight: 600;
 }
 
-.artifact-static-tabs:has(input[name="artifact-tab"][value="architecture"]:checked)
-  .artifact-static-labels
-  label[for="artifact-tab-architecture"] {
+.artifact-static-tabs:has(input[name="artifact-tab"][value="architecture"]:checked) .artifact-static-labels label[for="artifact-tab-architecture"] {
   border-color: color-mix(in oklch, var(--agent-architect) 40%, transparent);
   background: color-mix(in oklch, var(--agent-architect) 12%, transparent);
   color: var(--agent-architect);
@@ -587,9 +582,7 @@
   font-weight: 600;
 }
 
-.artifact-static-tabs:has(input[name="artifact-tab"][value="implementation"]:checked)
-  .artifact-static-labels
-  label[for="artifact-tab-implementation"] {
+.artifact-static-tabs:has(input[name="artifact-tab"][value="implementation"]:checked) .artifact-static-labels label[for="artifact-tab-implementation"] {
   border-color: color-mix(in oklch, var(--agent-backend) 40%, transparent);
   background: color-mix(in oklch, var(--agent-backend) 12%, transparent);
   color: var(--agent-backend);
@@ -597,9 +590,7 @@
   font-weight: 600;
 }
 
-.artifact-static-tabs:has(input[name="artifact-tab"][value="review"]:checked)
-  .artifact-static-labels
-  label[for="artifact-tab-review"] {
+.artifact-static-tabs:has(input[name="artifact-tab"][value="review"]:checked) .artifact-static-labels label[for="artifact-tab-review"] {
   border-color: color-mix(in oklch, var(--agent-reviewer) 40%, transparent);
   background: color-mix(in oklch, var(--agent-reviewer) 12%, transparent);
   color: var(--agent-reviewer);
@@ -607,18 +598,19 @@
   font-weight: 600;
 }
 
-.artifact-static-tabs:has(input[name="artifact-tab"][value="requirements"]:checked)
-  .artifact-static-labels
-  label[for="artifact-tab-requirements"]::after,
-.artifact-static-tabs:has(input[name="artifact-tab"][value="architecture"]:checked)
-  .artifact-static-labels
-  label[for="artifact-tab-architecture"]::after,
-.artifact-static-tabs:has(input[name="artifact-tab"][value="implementation"]:checked)
-  .artifact-static-labels
-  label[for="artifact-tab-implementation"]::after,
-.artifact-static-tabs:has(input[name="artifact-tab"][value="review"]:checked)
-  .artifact-static-labels
-  label[for="artifact-tab-review"]::after {
+.artifact-static-tabs:has(input[name="artifact-tab"][value="blueprint"]:checked) .artifact-static-labels label[for="artifact-tab-blueprint"] {
+  border-color: color-mix(in oklch, var(--agent-devops) 40%, transparent);
+  background: color-mix(in oklch, var(--agent-devops) 12%, transparent);
+  color: var(--agent-devops);
+  box-shadow: 0 0 14px -4px color-mix(in oklch, var(--agent-devops) 50%, transparent);
+  font-weight: 600;
+}
+
+.artifact-static-tabs:has(input[name="artifact-tab"][value="requirements"]:checked) .artifact-static-labels label[for="artifact-tab-requirements"]::after,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="architecture"]:checked) .artifact-static-labels label[for="artifact-tab-architecture"]::after,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="implementation"]:checked) .artifact-static-labels label[for="artifact-tab-implementation"]::after,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="review"]:checked) .artifact-static-labels label[for="artifact-tab-review"]::after,
+.artifact-static-tabs:has(input[name="artifact-tab"][value="blueprint"]:checked) .artifact-static-labels label[for="artifact-tab-blueprint"]::after {
   transform: scaleX(1);
   opacity: 1;
 }

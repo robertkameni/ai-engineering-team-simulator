@@ -8,6 +8,7 @@ import { truncateFeedbackExcerpt } from "@/ai/prompts/shared";
 
 import {
   buildArchitectSystemPrompt,
+  buildArchitectRevisionTurnPrompt,
   buildArchitectTurnPrompt,
 } from "@/ai/prompts/architect";
 import {
@@ -138,57 +139,59 @@ export function getAgentTurnPrompt(
   if (shouldRouteHybridComplianceBackend(role, templateId, productIdea)) {
     turnPrompt = buildPhysicalComplianceExpertTurnPrompt();
   } else {
-  const resolved = resolvePromptTemplateId(templateId);
+    const resolved = resolvePromptTemplateId(templateId);
 
-  if (resolved === "physical") {
-    switch (role) {
-      case "pm":
-        turnPrompt = buildPhysicalPmUserPrompt(productIdea);
-        break;
-      case "architect":
-        turnPrompt = buildPhysicalTechnicalEngineerTurnPrompt();
-        break;
-      case "backend":
-        turnPrompt = buildPhysicalComplianceExpertTurnPrompt();
-        break;
-      case "frontend":
-        turnPrompt = buildPhysicalPlanningBudgetTurnPrompt();
-        break;
-      case "devops":
-        turnPrompt = buildPhysicalDevOpsTurnPrompt();
-        break;
-      case "reviewer":
-        turnPrompt = buildPhysicalReviewerTurnPrompt(roster);
-        break;
-      default:
-        throw new Error(`No turn prompt for role: ${role}`);
+    if (resolved === "physical") {
+      switch (role) {
+        case "pm":
+          turnPrompt = buildPhysicalPmUserPrompt(productIdea);
+          break;
+        case "architect":
+          turnPrompt = buildPhysicalTechnicalEngineerTurnPrompt();
+          break;
+        case "backend":
+          turnPrompt = buildPhysicalComplianceExpertTurnPrompt();
+          break;
+        case "frontend":
+          turnPrompt = buildPhysicalPlanningBudgetTurnPrompt();
+          break;
+        case "devops":
+          turnPrompt = buildPhysicalDevOpsTurnPrompt();
+          break;
+        case "reviewer":
+          turnPrompt = buildPhysicalReviewerTurnPrompt(roster);
+          break;
+        default:
+          throw new Error(`No turn prompt for role: ${role}`);
+      }
+    } else {
+      switch (role) {
+        case "pm":
+          turnPrompt = buildPmUserPrompt(productIdea);
+          break;
+        case "architect":
+          turnPrompt = debateContext.architectRevisionCritiques
+            ? buildArchitectRevisionTurnPrompt(debateContext.architectRevisionCritiques)
+            : buildArchitectTurnPrompt();
+          break;
+        case "backend":
+          turnPrompt = buildDeveloperTurnPrompt();
+          break;
+        case "frontend":
+          turnPrompt = buildFrontendDeveloperTurnPrompt();
+          break;
+        case "devops":
+          turnPrompt = buildDevOpsTurnPrompt();
+          break;
+        case "reviewer":
+          turnPrompt = buildReviewerTurnPrompt(roster, {
+            isReReview: debateContext.isReReview,
+          });
+          break;
+        default:
+          throw new Error(`No turn prompt for role: ${role}`);
+      }
     }
-  } else {
-    switch (role) {
-      case "pm":
-        turnPrompt = buildPmUserPrompt(productIdea);
-        break;
-      case "architect":
-        turnPrompt = buildArchitectTurnPrompt();
-        break;
-      case "backend":
-        turnPrompt = buildDeveloperTurnPrompt();
-        break;
-      case "frontend":
-        turnPrompt = buildFrontendDeveloperTurnPrompt();
-        break;
-      case "devops":
-        turnPrompt = buildDevOpsTurnPrompt();
-        break;
-      case "reviewer":
-        turnPrompt = buildReviewerTurnPrompt(roster, {
-          isReReview: debateContext.isReReview,
-        });
-        break;
-      default:
-        throw new Error(`No turn prompt for role: ${role}`);
-    }
-  }
   }
 
   const correction = debateContext.correction;

@@ -17,6 +17,10 @@ import {
 } from "@/ai/orchestration/simulation-budget";
 import { recoverReviewerDecisionTag } from "@/ai/orchestration/recover-reviewer-decision-tag";
 import {
+  detectPeerCriticism,
+  hasAnySubstantiveDisagreement,
+} from "@/ai/orchestration/peer-criticism-detector";
+import {
   type DebateExitOutcome,
   MAX_SIMULATION_TURNS,
   parseReviewerDecision,
@@ -99,6 +103,7 @@ export async function runSimulation(
       lastRejectFeedback: null,
       lastRejectTarget: null,
       transcript: [],
+      isArchitectRevision: false,
     };
 
     const ctx: TurnContext = {
@@ -167,6 +172,13 @@ async function runDebateLoop(
       continue;
     }
 
+    if (shouldTriggerArchitectRevision(state)) {
+      state.isArchitectRevision = true;
+      state.nextRole = "architect";
+      state.returnToReviewer = true;
+      continue;
+    }
+
     if (!applyLinearProgression(state)) {
       return "cap_reached";
     }
@@ -174,6 +186,24 @@ async function runDebateLoop(
 
   console.warn("Simulation reached MAX_SIMULATION_TURNS", { runId: ctx.runId });
   return "cap_reached";
+}
+
+function shouldTriggerArchitectRevision(state: DebateState): boolean {
+  if (state.nextRole !== "devops") return false;
+  if (state.isArchitectRevision) return false;
+
+  const architectEntry = state.transcript.find(
+    (e) => e.role === "architect",
+  );
+  if (!architectEntry) return false;
+
+  const criticisms = state.transcript.filter(
+    (e) =>
+      (e.role === "backend" || e.role === "frontend" || e.role === "devops") &&
+      e.content.includes(architectEntry.agentName),
+  );
+
+  return criticisms.length > 0;
 }
 
 function applyLinearProgression(state: DebateState): boolean {
@@ -189,6 +219,35 @@ function applyLinearProgression(state: DebateState): boolean {
   }
   state.nextRole = SIMULATION_AGENT_ORDER[state.roleIndex];
   return true;
+}
+
+function enrichDebateContext(
+  role: SimulationAgentRole,
+  state: DebateState,
+  ctx: TurnContext,
+  debateContext: ReturnType<typeof resolveDebateTurnContext>,
+): void {
+  if (role === "reviewer") {
+    const agentNames = SIMULATION_AGENT_ORDER.map(
+      (r) => getTeamMember(ctx.roster, r).name,
+    );
+    debateContext.hasTeamDisagreement = hasAnySubstantiveDisagreement(
+      state.transcript,
+      agentNames,
+    );
+    return;
+  }
+
+  if (role === "architect" && state.isArchitectRevision) {
+    const architect = getTeamMember(ctx.roster, "architect");
+    const critics: SimulationAgentRole[] = ["backend", "frontend", "devops"];
+    const criticism = detectPeerCriticism(
+      state.transcript,
+      architect.name,
+      critics,
+    );
+    debateContext.architectRevisionCritiques = criticism.excerpts;
+  }
 }
 
 async function runDebateTurn(
@@ -209,7 +268,17 @@ async function runDebateTurn(
     state.lastRejectFeedback,
   );
 
-  const turnResult = await executeDebateTurn(role, member.name, member.title, debateContext, state.transcript, ctx);
+  enrichDebateContext(role, state, ctx, debateContext);
+
+  const turnResult = await executeDebateTurn(
+    role,
+    member.name,
+    member.title,
+    debateContext,
+    state.transcript,
+    ctx,
+    { disableTools: state.isArchitectRevision },
+  );
   if (turnResult.kind === "break") {
     return turnResult;
   }
@@ -229,6 +298,10 @@ async function runDebateTurn(
 
   await persistTurn(role, contentToPersist, member.name, ctx, state);
 
+  if (state.isArchitectRevision) {
+    state.isArchitectRevision = false;
+  }
+
   return resolveReviewerOutcome(role, fullText, state);
 }
 
@@ -239,6 +312,7 @@ async function executeDebateTurn(
   debateContext: ReturnType<typeof resolveDebateTurnContext>,
   transcript: TranscriptEntry[],
   ctx: TurnContext,
+  options?: { disableTools?: boolean },
 ): Promise<
   | { kind: "break"; outcome: DebateExitOutcome }
   | { kind: "text"; fullText: string }
@@ -255,6 +329,7 @@ async function executeDebateTurn(
       abortSignal: ctx.abortSignal,
       debateContext,
       send: ctx.notify,
+      disableTools: options?.disableTools,
     });
     return { kind: "text", fullText };
   } catch (turnError) {
