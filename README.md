@@ -11,7 +11,7 @@ The simulator **auto-detects** whether your idea is a **software product**, a **
 
 ## Production
 
-**Live app:** [https://ai-engineering-team-simulator.vercel.app](https://ai-engineering-team-simulator.vercel.app)
+**Live app on Railway** — see [DEPLOYMENT.md](./DEPLOYMENT.md) for deployment instructions.
 
 ## Local setup
 
@@ -76,13 +76,13 @@ Open [http://localhost:3100](http://localhost:3100).
 
 ## Deploy
 
-See **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Vercel + Neon env vars, build/migrations, smoke test checklist.
+See **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Railway + Neon env vars, build/migrations, smoke test checklist.
 
 ## Docs
 
 | File | Contents |
 |------|----------|
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | Vercel deployment |
+| [DEPLOYMENT.md](./DEPLOYMENT.md) | Railway deployment |
 | [AGENTS.md](./AGENTS.md) | Stack rules for contributors / AI agents |
 
 ---

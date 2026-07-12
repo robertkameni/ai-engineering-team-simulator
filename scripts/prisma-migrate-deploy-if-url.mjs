@@ -17,7 +17,7 @@ const migrateUrl = resolveMigrateDatabaseUrl();
 if (!migrateUrl) {
   console.warn(
     "[build] DATABASE_URL not set — skipping prisma migrate deploy. " +
-      "Vercel + Neon: set DATABASE_URL on the project so migrations run on deploy.",
+      "Set DATABASE_URL on the project so migrations run on deploy.",
   );
   process.exit(0);
 }
