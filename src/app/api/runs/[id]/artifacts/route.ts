@@ -10,10 +10,10 @@ import { getRunForArtifactsIfOwned } from "@/lib/db/runs";
 import { toAppRunStatus } from "@/lib/db/run-status";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 600;
 
 interface RouteParams {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; }>;
 }
 
 export async function GET(_request: Request, { params }: RouteParams) {

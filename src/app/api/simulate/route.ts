@@ -16,7 +16,7 @@ import {
 } from "@/lib/simulation-stream";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 600;
 
 const requestSchema = z.object({
   prompt: z.string().trim().min(1).max(4000),

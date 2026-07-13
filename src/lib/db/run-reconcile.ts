@@ -16,12 +16,12 @@ import { toAppRunStatus, toPrismaRunStatus } from "@/lib/db/run-status";
 import type { RunStatus as AppRunStatus } from "@/features/agents/types";
 import { prisma } from "@/lib/prisma";
 
-/** Simulate route maxDuration (300s) + buffer for stale detection. */
-const RUN_STALE_MS = 6 * 60 * 1000;
+/** Simulate route maxDuration (600s) + buffer for stale detection. */
+const RUN_STALE_MS = 12 * 60 * 1000;
 
 export async function reconcileRunFailure(
   runId: string,
-  options: { debateComplete: boolean; artifactPhaseStarted: boolean },
+  options: { debateComplete: boolean; artifactPhaseStarted: boolean; },
 ) {
   if (options.debateComplete && options.artifactPhaseStarted) {
     await updateArtifactStatus(runId, "failed");
@@ -37,7 +37,7 @@ export async function reconcileStaleRunIfNeeded(run: {
   artifactStatus: PrismaArtifactStatus;
   updatedAt: Date;
   messageCount: number;
-  lastMessage?: { agentRole: string; content: string } | null;
+  lastMessage?: { agentRole: string; content: string; } | null;
 }): Promise<boolean> {
   if (toAppRunStatus(run.status) !== "running") {
     return false;
@@ -125,7 +125,7 @@ export async function reconcileStaleRunsBatch(
     select: { runId: true, agentRole: true, content: true },
   });
 
-  const lastMessageByRun = new Map<string, { agentRole: string; content: string }>();
+  const lastMessageByRun = new Map<string, { agentRole: string; content: string; }>();
   for (const msg of lastMessages) {
     if (!lastMessageByRun.has(msg.runId)) {
       lastMessageByRun.set(msg.runId, { agentRole: msg.agentRole, content: msg.content });
@@ -162,7 +162,7 @@ export async function reconcileStaleRunsBatch(
 
 function resolveStaleDebateCompletion(
   messageCount: number,
-  lastMessage: { agentRole: string; content: string },
+  lastMessage: { agentRole: string; content: string; },
 ): boolean {
   if (messageCount >= MAX_SIMULATION_TURNS) {
     return true;

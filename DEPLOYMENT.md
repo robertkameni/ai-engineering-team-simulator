@@ -73,7 +73,16 @@ This ensures Railway waits for the health check and restarts only on failure.
 1. **Connect** the repository in Railway.
 2. **Add environment variables** under Variables — at minimum `DATABASE_URL`, `DEEPSEEK_API_KEY`, `AUTH_SECRET`, and Upstash Redis vars.
 3. **Ensure `.nvmrc`** exists at repo root with `22` to pin Node.js version.
-4. Deploy. Watch the build log for `prisma migrate deploy` succeeding.
+4. **Ensure `nixpacks.toml`** includes `unzip` (required by `md-to-pdf` / Puppeteer for Chrome browser extraction during `npm i`).
+5. Deploy. Watch the build log for `prisma migrate deploy` succeeding.
+
+After deploy, Railway enables **Public Networking** automatically when configured. The production URL follows the pattern:
+
+```
+https://<service-name>.up.railway.app
+```
+
+Example: [ai-engineering-team-simulator.up.railway.app](https://ai-engineering-team-simulator.up.railway.app)
 
 ### Bootstrap admin user (optional)
 
@@ -112,4 +121,4 @@ If simulate returns `503` with a rate-limit message, confirm Upstash env vars ar
 
 ---
 
-*Last updated: 2026-07-12 — migrated from Vercel to Railway.*
+*Last updated: 2026-07-13 — Railway production deploy live.*

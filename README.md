@@ -11,7 +11,7 @@ The simulator **auto-detects** whether your idea is a **software product**, a **
 
 ## Production
 
-**Live app on Railway** — see [DEPLOYMENT.md](./DEPLOYMENT.md) for deployment instructions.
+**Live:** [ai-engineering-team-simulator.up.railway.app](https://ai-engineering-team-simulator.up.railway.app) — see [DEPLOYMENT.md](./DEPLOYMENT.md) for deployment instructions.
 
 ## Local setup
 
@@ -87,4 +87,4 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Railway + Neon env vars, build/migr
 
 ---
 
-*README last updated: 2026-07-05 — debate realism overhaul, blueprint artifact, reviewer gate rules, architect challenge PM, Phase 8 complete.*
+*README last updated: 2026-07-13 — Railway production deploy live.*
