@@ -16,12 +16,12 @@ import {
 } from "@/ai/orchestration/reviewer-decision";
 import { getDeepSeekModel } from "@/ai/providers";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
+import { CORE_ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
 import {
-  CORE_ARTIFACT_TYPES,
   type ArtifactDocument,
   type ArtifactType,
   artifactDocumentSchema,
-  type RunArtifactsOutput
+  type RunArtifactsOutput,
 } from "@/features/artifacts/schemas";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 
