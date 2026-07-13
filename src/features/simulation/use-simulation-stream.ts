@@ -41,15 +41,71 @@ function formatSimulationStreamError(error: unknown): string {
 const POLL_ARTIFACT_INTERVAL_MS = 800;
 /** Match artifacts route synthesis budget (approx). */
 const POLL_ARTIFACT_MAX_MS = 320_000;
+const POLL_RUN_PROGRESS_INTERVAL_MS = 2_000;
+/** Railway SSE cap is 15 minutes; allow polling slightly longer. */
+const POLL_RUN_PROGRESS_MAX_MS = 16 * 60 * 1000;
+
+type RunProgressResponse = {
+  id: string;
+  status: RunStatus;
+  messages: SimulationMessage[];
+  artifacts: PartialRunArtifacts | null;
+  artifactsStatus: ArtifactsPanelStatus;
+  debateOutcome: DebateExitOutcome | null;
+  teamRoster: TeamRosterPreview | null;
+};
+
+async function fetchRunProgress(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<RunProgressResponse | null> {
+  try {
+    const response = await fetch(`/api/runs/${runId}`, { signal });
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as RunProgressResponse;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return null;
+    }
+    return null;
+  }
+}
+
+function waitForRunProgressPoll(
+  signal?: AbortSignal,
+  intervalMs = POLL_RUN_PROGRESS_INTERVAL_MS,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = globalThis.setTimeout(resolve, intervalMs);
+    if (!signal) {
+      return;
+    }
+    if (signal.aborted) {
+      globalThis.clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    signal.addEventListener(
+      "abort",
+      () => {
+        globalThis.clearTimeout(timer);
+        reject(new DOMException("Aborted", "AbortError"));
+      },
+      { once: true },
+    );
+  });
+}
 
 type ArtifactsFetchResult =
   | {
-      ok: true;
-      artifacts: PartialRunArtifacts | null;
-      status: ArtifactsPanelStatus;
-      debateOutcome: DebateExitOutcome | null;
-    }
-  | { ok: false; retryable: boolean };
+    ok: true;
+    artifacts: PartialRunArtifacts | null;
+    status: ArtifactsPanelStatus;
+    debateOutcome: DebateExitOutcome | null;
+  }
+  | { ok: false; retryable: boolean; };
 
 function isRetryableArtifactsHttpStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
@@ -203,6 +259,73 @@ export function useSimulationStream() {
     [],
   );
 
+  const recoverRunAfterStreamDrop = useCallback(
+    async (id: string, signal?: AbortSignal) => {
+      const isActive = () => signal == null || !signal.aborted;
+
+      setStatus("running");
+      setError(null);
+      setActiveAgent(null);
+      activeMessageIdRef.current = null;
+
+      const deadline = Date.now() + POLL_RUN_PROGRESS_MAX_MS;
+      while (Date.now() < deadline) {
+        if (!isActive()) {
+          return;
+        }
+
+        const progress = await fetchRunProgress(id, signal);
+        if (!isActive()) {
+          return;
+        }
+
+        if (progress) {
+          setRunId(progress.id);
+          setMessages(progress.messages);
+          if (progress.teamRoster) {
+            setTeamRoster(progress.teamRoster);
+          }
+          setArtifacts(progress.artifacts);
+          setArtifactsStatus(progress.artifactsStatus);
+          setDebateOutcome(progress.debateOutcome);
+
+          if (progress.status === "complete") {
+            setStatus("complete");
+            setError(
+              progress.artifactsStatus === "unavailable"
+                ? "Artifact synthesis failed"
+                : null,
+            );
+            router.replace(`/runs/${id}`);
+            return;
+          }
+
+          if (progress.status === "failed") {
+            setStatus("failed");
+            setError("Simulation failed");
+            return;
+          }
+        }
+
+        try {
+          await waitForRunProgressPoll(signal);
+        } catch {
+          return;
+        }
+      }
+
+      if (!isActive()) {
+        return;
+      }
+
+      setStatus("failed");
+      setError(
+        "Connection lost and the simulation did not finish in time. Check your run history — it may still complete in the background.",
+      );
+    },
+    [router],
+  );
+
   const start = useCallback(
     async (prompt: string, options: StartSimulationOptions = {}) => {
       abortRef.current?.abort();
@@ -310,12 +433,12 @@ export function useSimulationStream() {
               prev.map((message) =>
                 message.id === activeId
                   ? {
-                      ...message,
-                      activeTools: [
-                        ...(message.activeTools ?? []),
-                        { name: event.toolName, args: event.args },
-                      ],
-                    }
+                    ...message,
+                    activeTools: [
+                      ...(message.activeTools ?? []),
+                      { name: event.toolName, args: event.args },
+                    ],
+                  }
                   : message,
               ),
             );
@@ -361,6 +484,8 @@ export function useSimulationStream() {
             setActiveAgent(null);
           } else if (event.type === "artifacts_start") {
             setArtifactsStatus("generating");
+          } else if (event.type === "heartbeat") {
+            return;
           } else if (event.type === "error") {
             streamSettled = true;
             setError(event.message);
@@ -473,11 +598,11 @@ export function useSimulationStream() {
         if (!isActive()) return;
 
         if (!streamSettled) {
-          setStatus("failed");
-          setError("Simulation interrupted before completion");
           if (currentRunId) {
-            await pollArtifactsUntilSettled(currentRunId, signal);
+            await recoverRunAfterStreamDrop(currentRunId, signal);
           } else {
+            setStatus("failed");
+            setError("Simulation interrupted before completion");
             setArtifactsStatus("unavailable");
           }
         }
@@ -489,13 +614,18 @@ export function useSimulationStream() {
         }
         if (!isActive()) return;
 
+        if (currentRunId) {
+          await recoverRunAfterStreamDrop(currentRunId, signal);
+          return;
+        }
+
         setStatus("failed");
         setActiveAgent(null);
         setArtifactsStatus("unavailable");
         setError(formatSimulationStreamError(err));
       }
     },
-    [pollArtifactsUntilSettled, router],
+    [pollArtifactsUntilSettled, recoverRunAfterStreamDrop, router],
   );
 
   const cancel = useCallback(() => {

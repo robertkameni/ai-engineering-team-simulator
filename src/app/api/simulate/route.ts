@@ -18,7 +18,7 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 600;
 
-const SSE_KEEPALIVE_INTERVAL_MS = 25_000;
+const SSE_KEEPALIVE_INTERVAL_MS = 15_000;
 
 const requestSchema = z.object({
   prompt: z.string().trim().min(1).max(4000),
@@ -58,11 +58,7 @@ export async function POST(request: Request) {
         if (signal.aborted) {
           return;
         }
-        try {
-          controller.enqueue(new TextEncoder().encode(": keepalive\n\n"));
-        } catch {
-          clearInterval(keepaliveTimer);
-        }
+        send({ type: "heartbeat" });
       }, SSE_KEEPALIVE_INTERVAL_MS);
 
       const send = (event: SimulationStreamEvent) => {
@@ -86,22 +82,8 @@ export async function POST(request: Request) {
           userId,
           guestSessionId,
           usageAccumulator,
-          abortSignal: signal,
         });
         runId = simulation.runId;
-
-        if (signal.aborted) {
-          await updateRunSummary(
-            runId,
-            JSON.stringify({ debateOutcome: "aborted", turnCount: null }),
-          );
-          await reconcileRunFailure(runId, {
-            debateComplete: true,
-            artifactPhaseStarted: false,
-          });
-          await setRunUsageTotals(runId, usageAccumulator.getTotals());
-          return;
-        }
 
         synthesisStarted = true;
         const synthesis = await regenerateRunArtifacts(runId, {
@@ -135,14 +117,6 @@ export async function POST(request: Request) {
         }
 
         if (signal.aborted) {
-          await updateRunSummary(
-            runId,
-            JSON.stringify({ debateOutcome: "aborted", turnCount: null }),
-          );
-          await reconcileRunFailure(runId, {
-            debateComplete: true,
-            artifactPhaseStarted: synthesisStarted,
-          });
           await setRunUsageTotals(runId, usageAccumulator.getTotals());
           return;
         }
@@ -155,8 +129,8 @@ export async function POST(request: Request) {
           await setRunUsageTotals(runId, usageAccumulator.getTotals());
         }
 
-        if (isSimulationAborted(error) || signal.aborted) {
-          if (runId && !isSimulationAborted(error)) {
+        if (isSimulationAborted(error)) {
+          if (runId) {
             await updateRunSummary(
               runId,
               JSON.stringify({ debateOutcome: "aborted", turnCount: null }),
@@ -195,6 +169,7 @@ export async function POST(request: Request) {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     },
   });
 }

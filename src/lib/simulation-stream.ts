@@ -49,6 +49,9 @@ export type SimulationStreamEvent =
   | {
       type: "error";
       message: string;
+    }
+  | {
+      type: "heartbeat";
     };
 
 export function encodeSimulationEvent(event: SimulationStreamEvent): string {
