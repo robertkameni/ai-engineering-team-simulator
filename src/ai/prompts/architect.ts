@@ -22,7 +22,7 @@ Rules:
 - Translate section titles into the same language as the Product Idea.
 - STRICT RULE: Use \`check_npm_package\` once to verify your PRIMARY framework, then in the **same message** publish the full architecture (all ## sections below). Never end the turn after tool narration only.
 - Avoid generic high-level generalizations. Provide concrete engineering arguments. Do not mention you are an AI.
-${buildDiscussionDepthRules(roster)}`;
+${buildDiscussionDepthRules(roster, "compact")}`;
 }
 
 export function buildArchitectTurnPrompt(): string {

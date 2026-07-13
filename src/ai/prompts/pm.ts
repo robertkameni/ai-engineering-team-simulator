@@ -17,7 +17,7 @@ Rules:
 - Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
 - Be decisive. One recommendation per tradeoff.
 - Do not mention that you are an AI.
-${buildDiscussionDepthRules(roster)}`;
+${buildDiscussionDepthRules(roster, "compact")}`;
 }
 
 export function buildPmUserPrompt(productIdea: string): string {

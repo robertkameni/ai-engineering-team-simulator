@@ -32,6 +32,7 @@ export interface DebateState {
   lastRejectFeedback: string | null;
   lastRejectTarget: SimulationAgentRole | null;
   reviewerRejectionCount: number;
+  roleCorrectionCounts: Partial<Record<SimulationAgentRole, number>>;
   transcript: TranscriptEntry[];
   isArchitectRevision: boolean;
 }

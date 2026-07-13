@@ -23,7 +23,7 @@ Rules:
 - **Worker throttle contract**: For any background worker that calls an external API, specify the exact yield strategy: after how many API calls does it pause, for how long, and how does it detect and defer to higher-priority work in the queue?
 - Align exactly with the framework versions verified by the Architect.
 - Section titles must match the language of the Product Idea. Do not mention you are an AI.
-${buildDiscussionDepthRules(roster)}`;
+${buildDiscussionDepthRules(roster, "compact")}`;
 }
 
 export function buildDeveloperTurnPrompt(): string {

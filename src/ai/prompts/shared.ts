@@ -1,13 +1,19 @@
 import type { TeamRoster } from "@/ai/agents/roster";
 import { formatTeammateNames } from "@/ai/agents/roster";
 
-export function buildDiscussionDepthRules(roster: TeamRoster): string {
+export type DiscussionDepthStyle = "standard" | "compact";
+
+export function buildDiscussionDepthRules(
+  roster: TeamRoster,
+  style: DiscussionDepthStyle = "standard",
+): string {
   const names = formatTeammateNames(roster);
+  const wordRange = style === "compact" ? "180–280" : "250–400";
   return `
 Discussion depth (required):
 - Use semantic \`##\` section headings. Translate titles into the same language as the Product Idea. **No markdown tables**.
 - Write dense, production-grade technical prose. Nested bullets are allowed when they improve scannability.
-- Target roughly **250–400 words** on a standard turn (shorter only when answering a [REJECT] correction). Include concrete metrics, library names, interfaces, failure modes, and acceptance criteria — not high-level platitudes.
+- Target roughly **${wordRange} words** on a standard turn (shorter only when answering a [REJECT] correction). Include concrete metrics, library names, interfaces, failure modes, and acceptance criteria — not high-level platitudes.
 - Complete every \`##\` section you open; never stop mid-sentence or mid-list. If a section would exceed your output budget, reduce the number of sections rather than truncating the last one.
 - Reference prior speakers by name (${names}) only if they have already posted in this debate. Do not repeat content already covered by teammates unless you are explicitly revising it.
 - Do not merely recite your own implementation plan. You MUST identify at least one explicit architectural choice or library selection proposed by a previous teammate, analyze its performance/operational trade-offs, and either optimize it or defend an alternative approach. Name the teammate and the specific choice you are challenging.

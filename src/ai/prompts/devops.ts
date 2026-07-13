@@ -23,7 +23,7 @@ Rules:
 - Align with the stack the Architect verified — do not invent conflicting tooling.
 - Use \`##\` markdown headings for each section. Translate section titles into the same language as the Product Idea.
 - Do not mention that you are an AI.
-${buildDiscussionDepthRules(roster)}`;
+${buildDiscussionDepthRules(roster, "compact")}`;
 }
 
 export function buildDevOpsTurnPrompt(): string {

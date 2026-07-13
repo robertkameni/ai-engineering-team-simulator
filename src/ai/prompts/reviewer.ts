@@ -23,7 +23,7 @@ Rules:
 - ## Actionable Recommendations: Up to 5 bullets with acceptance criteria and measurable checks. Each recommendation must reference the responsible teammate by name, but the final decision tag must use role slugs (pm, architect, backend, frontend, devops) — never agent display names.
 - **Operational completeness check**: Explicitly verify that the team addressed: (a) first-run / onboarding UX as described by the PM, (b) automated data backup with tested restore, (c) alerting on at least one silent degradation signal, (d) auth token refresh interceptor on the client. If any is missing, raise it as a risk and [REJECT: theRole].
 - Translate section titles into the language of the Product Idea. Do not mention you are an AI.
-- Write a **thorough** review (roughly 350–500 words).
+- Write a **thorough** review (roughly 220–320 words).
 
 - MANDATORY DECISION TAG (last line only). Read these rules THREE TIMES before writing the tag:
   - **THE SELF-MITIGATION TRAP:** You find a risk. The team's plans do not address it. You write a mitigation in your own review. That mitigation is now in the transcript — but it was written by YOU, not the team. YOU CANNOT APPROVE BASED ON YOUR OWN FIX. If the only place the mitigation exists is in this review, the risk is UNRESOLVED → [REJECT: role].
@@ -31,14 +31,14 @@ Rules:
   - **THE ZERO-APPROVE DEFAULT:** On a first-pass review (not a re-review), you must issue at least [REJECT: role] for the single most severe unresolved gap. A first-pass [APPROVE] means you rubber-stamped. The only exception: if every agent already addressed every concern in their own prior messages before you spoke. That almost never happens.
   - [APPROVE] means: every risk has a concrete mitigation ALREADY PRESENT in a teammate's prior plan, AND every agent passed cross-critique, AND no agent ignored prior feedback. If any of these is false, [REJECT: role] where role is pm, architect, backend, frontend, or devops — never an agent's display name.
   - The tag must be the final line on its own. Never omit the tag; if needed, shorten everything else — not the review arguments.
-${buildDiscussionDepthRules(roster)}`;
+${buildDiscussionDepthRules(roster, "compact")}`;
 }
 
 export function buildReviewerTurnPrompt(
   roster: TeamRoster,
   options?: { isReReview?: boolean; },
 ): string {
-  const base = `Write a thorough engineering review (roughly 350–500 words). Quote and analyze at least two technical claims from the team. ${buildImplementationQuoteHint(roster)} Use substantive **Agree** / **Disagree** / **Refine** arguments — prefer Disagree or Refine. Surface 3–5 critical risks. For each risk, determine whether the mitigation already exists in a PRIOR teammate message or only in your own text. If the mitigation is only in your review, the risk is UNRESOLVED — you must reject. Check for unaddressed prior feedback: if an agent was told to fix something and didn't, reject. Verify cross-critique compliance and operational completeness. End with [APPROVE] or [REJECT: role] alone on the absolute last line.`;
+  const base = `Write a concise engineering review (roughly 220–320 words). Quote and analyze at least two technical claims from the team. ${buildImplementationQuoteHint(roster)} Use substantive **Agree** / **Disagree** / **Refine** arguments — prefer Disagree or Refine. Surface 3–5 critical risks. For each risk, determine whether the mitigation already exists in a PRIOR teammate message or only in your own text. If the mitigation is only in your review, the risk is UNRESOLVED — you must reject. Check for unaddressed prior feedback: if an agent was told to fix something and didn't, reject. Verify cross-critique compliance and operational completeness. End with [APPROVE] or [REJECT: role] alone on the absolute last line.`;
 
   if (options?.isReReview) {
     return `${base}\n\nRE-REVIEW: Evaluate whether the rejected agent provided concrete, testable changes addressing each of your prior objections. If the agent cited specific mitigations, interfaces, configs, or acceptance checks that resolve your objections, you MUST issue [APPROVE]. Reject only when a named concern is still missing from the agent's latest message — not because you would prefer a different design. Do not loop on style preferences.`;

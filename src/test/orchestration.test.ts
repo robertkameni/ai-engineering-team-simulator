@@ -17,6 +17,12 @@ import {
   windowTranscriptForTurn,
 } from "@/ai/context/window-transcript";
 import {
+  canCorrectRole,
+  incrementRoleCorrectionCount,
+  MAX_CORRECTIONS_PER_ROLE,
+} from "../ai/orchestration/debate-correction-caps.js";
+import { buildReviewerPreflightChecklist } from "../ai/orchestration/reviewer-preflight.js";
+import {
   extractReviewerDecisionTag,
   hasExceededReviewerRejectionCap,
   isDebateComplete,
@@ -337,5 +343,34 @@ describe("windowTranscriptForTurn", () => {
     assert.ok(windowed.omittedSummary?.includes("Earlier debate summary"));
     assert.equal(windowed.entries.length, TRANSCRIPT_WINDOW_RECENT_COUNT);
     assert.equal(windowed.entries[0]?.content, "Message 5 with enough detail to matter.");
+  });
+});
+
+describe("debate correction caps", () => {
+  it("allows one correction per role", () => {
+    assert.equal(canCorrectRole({}, "pm"), true);
+    const afterFirst = incrementRoleCorrectionCount({}, "pm");
+    assert.equal(canCorrectRole(afterFirst, "pm"), false);
+    assert.equal(MAX_CORRECTIONS_PER_ROLE, 1);
+  });
+});
+
+describe("buildReviewerPreflightChecklist", () => {
+  it("flags missing pipeline roles and operational signals", () => {
+    const roster = createSimulationRoster("software");
+    const checklist = buildReviewerPreflightChecklist(
+      [
+        {
+          role: "pm",
+          agentName: roster.pm.name,
+          content: "## Scope\n\nOnboarding flow for new users.",
+        },
+      ],
+      roster,
+    );
+
+    assert.ok(checklist.includes("Missing roles"));
+    assert.ok(checklist.includes("backup"));
+    assert.ok(checklist.includes("onboarding"));
   });
 });

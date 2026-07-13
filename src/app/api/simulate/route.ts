@@ -6,7 +6,7 @@ import {
 } from "@/ai/orchestration/run-simulation";
 import { getRunOwnershipContextWithGuestSession } from "@/lib/auth/run-ownership";
 import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
-import { scheduleCoreArtifactSynthesis } from "@/lib/ai/schedule-artifact-synthesis";
+import { dispatchCoreArtifactSynthesisWorker } from "@/lib/ai/schedule-artifact-synthesis";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
 import { setRunUsageTotals, updateRunSummary } from "@/lib/db/runs";
@@ -89,13 +89,7 @@ export async function POST(request: Request) {
 
         await setRunUsageTotals(runId, usageAccumulator.getTotals());
 
-        void scheduleCoreArtifactSynthesis({
-          runId,
-          scope: ownershipScope,
-          usageAccumulator,
-        }).catch((error) => {
-          console.error("Background artifact synthesis crashed", { runId, error });
-        });
+        dispatchCoreArtifactSynthesisWorker(request, runId, ownershipScope);
 
         if (signal.aborted) {
           return;

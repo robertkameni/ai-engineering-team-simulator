@@ -5,6 +5,10 @@ import {
 import { createSimulationRoster, getTeamMember } from "@/ai/agents/roster";
 import { resolveDebateTurnContext } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
+import {
+  canCorrectRole,
+  incrementRoleCorrectionCount,
+} from "@/ai/orchestration/debate-correction-caps";
 import { classifyProjectTeamTemplate } from "@/ai/orchestration/classify-project";
 import {
   buildArchitectInsufficientReviewerFeedback,
@@ -104,6 +108,7 @@ export async function runSimulation(
       lastRejectFeedback: null,
       lastRejectTarget: null,
       reviewerRejectionCount: 0,
+      roleCorrectionCounts: {},
       transcript: [],
       isArchitectRevision: false,
     };
@@ -414,6 +419,18 @@ async function handleArchitectQualityGate(
   state.lastRejectFeedback = rejectPersisted;
   state.lastRejectTarget = "architect";
 
+  if (!canCorrectRole(state.roleCorrectionCounts, "architect")) {
+    console.warn("Architect correction cap reached, closing debate", {
+      runId: ctx.runId,
+    });
+    return { kind: "break", outcome: "cap_reached" };
+  }
+
+  state.roleCorrectionCounts = incrementRoleCorrectionCount(
+    state.roleCorrectionCounts,
+    "architect",
+  );
+
   return { kind: "reroute", targetRole: "architect" };
 }
 
@@ -464,7 +481,19 @@ function resolveReviewerOutcome(
       return { kind: "break", outcome: "cap_reached" };
     }
 
+    if (!canCorrectRole(state.roleCorrectionCounts, parsed.rejectRole)) {
+      console.warn("Per-role correction cap reached, closing debate", {
+        runId: ctx.runId,
+        rejectRole: parsed.rejectRole,
+      });
+      return { kind: "break", outcome: "cap_reached" };
+    }
+
     state.reviewerRejectionCount += 1;
+    state.roleCorrectionCounts = incrementRoleCorrectionCount(
+      state.roleCorrectionCounts,
+      parsed.rejectRole,
+    );
     state.lastRejectFeedback = parsed.displayText.trim() || null;
     state.lastRejectTarget = parsed.rejectRole;
     return { kind: "reroute", targetRole: parsed.rejectRole };
@@ -473,11 +502,20 @@ function resolveReviewerOutcome(
   console.warn("Invalid reviewer decision, routing correction");
 
   const fallback = resolveUnknownReviewerDecision();
+  const fallbackRole = fallback.rejectRole ?? "pm";
 
   if (state.turnCount < MAX_SIMULATION_TURNS) {
+    if (!canCorrectRole(state.roleCorrectionCounts, fallbackRole)) {
+      return { kind: "break", outcome: "unknown_reject_fallback" };
+    }
+
+    state.roleCorrectionCounts = incrementRoleCorrectionCount(
+      state.roleCorrectionCounts,
+      fallbackRole,
+    );
     state.lastRejectFeedback = parsed.displayText.trim() || null;
-    state.lastRejectTarget = fallback.rejectRole ?? "pm";
-    return { kind: "reroute", targetRole: fallback.rejectRole ?? "pm" };
+    state.lastRejectTarget = fallbackRole;
+    return { kind: "reroute", targetRole: fallbackRole };
   }
 
   return { kind: "break", outcome: "unknown_reject_fallback" };

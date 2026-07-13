@@ -1,0 +1,81 @@
+import {
+  SIMULATION_AGENT_ORDER,
+  type SimulationAgentRole,
+} from "@/ai/agents/config";
+import { getTeamMember, type TeamRoster } from "@/ai/agents/roster";
+import type { TranscriptEntry } from "@/ai/context/transcript";
+
+const PREFLIGHT_PIPELINE_ROLES = [
+  "pm",
+  "architect",
+  "backend",
+  "frontend",
+  "devops",
+] as const satisfies readonly SimulationAgentRole[];
+
+const OPERATIONAL_SIGNAL_PATTERNS = [
+  { id: "backup", label: "automated backup / restore", pattern: /\b(backup|restore|snapshot)\b/i },
+  { id: "auth_refresh", label: "auth token refresh", pattern: /\b(refresh token|token refresh|interceptor)\b/i },
+  { id: "alerting", label: "silent degradation alerting", pattern: /\b(alert|degradation|monitor|observability)\b/i },
+  { id: "onboarding", label: "first-run onboarding", pattern: /\b(onboard|first[- ]run|setup flow|time-to-first)\b/i },
+] as const;
+
+function countMarkdownSections(content: string): number {
+  return (content.match(/^##\s+/gm) ?? []).length;
+}
+
+function hasCrossCritiqueSignal(content: string, roster: TeamRoster): boolean {
+  const teammateNames = PREFLIGHT_PIPELINE_ROLES.filter((role) => role !== "pm").map(
+    (role) => getTeamMember(roster, role).name,
+  );
+  return teammateNames.some((name) => content.includes(name));
+}
+
+export function buildReviewerPreflightChecklist(
+  transcript: TranscriptEntry[],
+  roster: TeamRoster,
+): string {
+  const spokenRoles = new Set(
+    transcript.map((entry) => entry.role).filter((role) => role !== "reviewer"),
+  );
+  const missingRoles = PREFLIGHT_PIPELINE_ROLES.filter((role) => !spokenRoles.has(role));
+
+  const roleLines = PREFLIGHT_PIPELINE_ROLES.map((role) => {
+    const member = getTeamMember(roster, role);
+    const entry = transcript.findLast((item) => item.role === role);
+    if (!entry) {
+      return `- ${member.name} (${role}): **missing** — no message in transcript`;
+    }
+
+    const sectionCount = countMarkdownSections(entry.content);
+    const crossCritique = hasCrossCritiqueSignal(entry.content, roster);
+    return `- ${member.name} (${role}): spoke (${entry.content.length} chars, ${sectionCount} ## sections, cross-critique signal: ${crossCritique ? "yes" : "no"})`;
+  });
+
+  const combinedTranscript = transcript.map((entry) => entry.content).join("\n");
+  const operationalLines = OPERATIONAL_SIGNAL_PATTERNS.map((signal) => {
+    const found = signal.pattern.test(combinedTranscript);
+    return `- ${signal.label}: ${found ? "mentioned" : "not detected"}`;
+  });
+
+  const pipelineComplete = missingRoles.length === 0;
+
+  return [
+    "## Debate pre-flight checklist (server-computed)",
+    "",
+    "Use this checklist to avoid unnecessary [REJECT] loops. If every role spoke with substantive ## sections and operational signals are present, prefer [APPROVE] unless a concrete blocking flaw remains.",
+    "",
+    "### Pipeline coverage",
+    pipelineComplete
+      ? "- All pipeline roles have spoken."
+      : `- Missing roles: ${missingRoles.join(", ")}`,
+    "",
+    "### Role status",
+    ...roleLines,
+    "",
+    "### Operational signals (keyword scan)",
+    ...operationalLines,
+    "",
+    `Turns so far: ${transcript.length}. Pipeline order: ${SIMULATION_AGENT_ORDER.join(" → ")}.`,
+  ].join("\n");
+}

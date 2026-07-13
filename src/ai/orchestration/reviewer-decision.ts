@@ -5,7 +5,7 @@ import {
 } from "@/ai/agents/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 
-export const MAX_SIMULATION_TURNS = 24;
+export const MAX_SIMULATION_TURNS = 12;
 
 /** After this many reviewer [REJECT] decisions, debate exits with cap_reached. */
 export const MAX_REVIEWER_REJECTION_CYCLES = 1;

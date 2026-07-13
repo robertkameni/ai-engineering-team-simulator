@@ -5,6 +5,7 @@ import { getTeamMember, type TeamRoster } from "@/ai/agents/roster";
 import { buildLanguageMatchDirective } from "@/ai/context/detect-product-language";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { windowTranscriptForTurn } from "@/ai/context/window-transcript";
+import { buildReviewerPreflightChecklist } from "@/ai/orchestration/reviewer-preflight";
 import { getAgentTurnPrompt } from "@/ai/prompts";
 import type { AgentRole } from "@/features/agents/types";
 
@@ -92,6 +93,13 @@ export function buildAgentMessages(
     messages.push({
       role: "user",
       content: `[MESSAGE FROM TEAMMATE ${entry.agentName} (${teammateTitle})]:\n\n${formatTranscriptMessage(entry)}`,
+    });
+  }
+
+  if (role === "reviewer" && transcript.length > 0) {
+    messages.push({
+      role: "user",
+      content: buildReviewerPreflightChecklist(transcript, roster),
     });
   }
 

@@ -21,7 +21,7 @@ Rules:
   - ## Component Architecture: **4 named components max** — props sketch, internal state, server/client designation. Do not exceed 4.
   - ## Frontend Risks (mandatory, never truncate): CLS, race conditions, hydration mismatch, **accessibility gaps** (color-only indicators, keyboard navigation, screen reader labels — each with a concrete mitigation). This section must end with a complete sentence.
 - Translate section titles to the language of the Product Idea. Do not mention you are an AI.
-${buildDiscussionDepthRules(roster)}`;
+${buildDiscussionDepthRules(roster, "compact")}`;
 }
 
 export function buildFrontendDeveloperTurnPrompt(): string {

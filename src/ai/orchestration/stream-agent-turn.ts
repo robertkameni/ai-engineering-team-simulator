@@ -251,29 +251,5 @@ async function continueAgentStreamIfTruncated({
     merged = `${merged}${continuation.trimStart()}`;
   }
 
-  if (looksLikeTruncatedAgentOutput(merged, role)) {
-    console.warn(`${role}: still truncated after continuation, second pass`);
-    const second = await collectAgentStream({
-      runId,
-      role,
-      productIdea,
-      transcript,
-      roster,
-      templateId,
-      config: {
-        ...config,
-        maxOutputTokens: TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS,
-      },
-      debateContext,
-      usageAccumulator,
-      abortSignal,
-      send,
-      continuationOf: merged,
-    });
-    if (second.trim()) {
-      merged = `${merged}${second.trimStart()}`;
-    }
-  }
-
   return merged;
 }
