@@ -1,4 +1,5 @@
 import {
+  MAX_TRUNCATION_CONTINUATIONS,
   TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS,
   getAgentConfig,
   type SimulationAgentRole,
@@ -222,33 +223,43 @@ async function continueAgentStreamIfTruncated({
   fullText: string;
 }): Promise<string> {
   let merged = fullText.trim();
-  if (!looksLikeTruncatedAgentOutput(merged, role)) {
-    return merged;
-  }
 
-  assertNotAborted(abortSignal);
-  console.warn(`${role}: output looks truncated, requesting continuation`);
+  for (
+    let continuationIndex = 0;
+    continuationIndex < MAX_TRUNCATION_CONTINUATIONS;
+    continuationIndex += 1
+  ) {
+    if (!looksLikeTruncatedAgentOutput(merged, role)) {
+      return merged;
+    }
 
-  const continuation = await collectAgentStream({
-    runId,
-    role,
-    productIdea,
-    transcript,
-    roster,
-    templateId,
-    config: {
-      ...config,
-      maxOutputTokens: TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS,
-    },
-    debateContext,
-    usageAccumulator,
-    abortSignal,
-    send,
-    continuationOf: merged,
-  });
+    assertNotAborted(abortSignal);
+    console.warn(`${role}: output looks truncated, requesting continuation`, {
+      continuationIndex: continuationIndex + 1,
+      maxContinuations: MAX_TRUNCATION_CONTINUATIONS,
+    });
 
-  if (continuation.trim()) {
-    merged = `${merged}${continuation.trimStart()}`;
+    const continuation = await collectAgentStream({
+      runId,
+      role,
+      productIdea,
+      transcript,
+      roster,
+      templateId,
+      config: {
+        ...config,
+        maxOutputTokens: TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS,
+      },
+      debateContext,
+      usageAccumulator,
+      abortSignal,
+      send,
+      continuationOf: merged,
+    });
+
+    if (continuation.trim()) {
+      merged = `${merged}${continuation.trimStart()}`;
+    }
   }
 
   return merged;

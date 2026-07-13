@@ -99,7 +99,9 @@ export function buildAgentMessages(
   if (role === "reviewer" && transcript.length > 0) {
     messages.push({
       role: "user",
-      content: buildReviewerPreflightChecklist(transcript, roster),
+      content: buildReviewerPreflightChecklist(transcript, roster, {
+        isReReview: debateContext.isReReview,
+      }),
     });
   }
 

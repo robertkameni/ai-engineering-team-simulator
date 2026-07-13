@@ -34,6 +34,7 @@ function hasCrossCritiqueSignal(content: string, roster: TeamRoster): boolean {
 export function buildReviewerPreflightChecklist(
   transcript: TranscriptEntry[],
   roster: TeamRoster,
+  options?: { isReReview?: boolean },
 ): string {
   const spokenRoles = new Set(
     transcript.map((entry) => entry.role).filter((role) => role !== "reviewer"),
@@ -60,10 +61,14 @@ export function buildReviewerPreflightChecklist(
 
   const pipelineComplete = missingRoles.length === 0;
 
+  const reviewGuidance = options?.isReReview
+    ? "RE-REVIEW: The corrected agent just spoke. If they addressed your prior objections with concrete changes, issue [APPROVE]. Reject only when a named concern is still missing from their latest message."
+    : "FIRST-PASS REVIEW: Apply your ZERO-APPROVE DEFAULT — reject the single most severe unresolved gap unless every mitigation already appears in a teammate's prior message (not your own review).";
+
   return [
     "## Debate pre-flight checklist (server-computed)",
     "",
-    "Use this checklist to avoid unnecessary [REJECT] loops. If every role spoke with substantive ## sections and operational signals are present, prefer [APPROVE] unless a concrete blocking flaw remains.",
+    reviewGuidance,
     "",
     "### Pipeline coverage",
     pipelineComplete

@@ -31,7 +31,7 @@ export function buildImplementationQuoteHint(roster: TeamRoster): string {
   return `You MUST include at least one claim from ${roster.backend.name} (${roster.backend.title}), ${roster.frontend.name} (${roster.frontend.title}), or ${roster.devops.name} (${roster.devops.title}) if they have spoken.`;
 }
 
-const FEEDBACK_EXCERPT_MAX_CHARS = 800;
+const FEEDBACK_EXCERPT_MAX_CHARS = 1400;
 
 export function truncateFeedbackExcerpt(feedback: string): string {
   const trimmed = feedback.trim();

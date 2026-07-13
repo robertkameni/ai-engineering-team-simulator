@@ -101,6 +101,7 @@ ${sectionRules}
 - Write as a polished internal document — NOT meeting notes.
 - Do NOT append speaker names to bullets (no "(Name)" suffixes).
 - Synthesize consensus; note disagreement only in the review artifact.
+- When the same role spoke more than once, only their latest message is authoritative — ignore superseded earlier turns.
 - Omit sections with no substance from the debate.
 - **No code blocks or code fences** (\`\`\`). This is a specification document for developers to implement from. Describe everything in prose. Use inline backticks only for single terms like file names, env vars, or function names.`;
 

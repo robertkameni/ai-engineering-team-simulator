@@ -38,8 +38,9 @@ import {
 } from "../ai/orchestration/reviewer-decision.js";
 
 describe("hasExceededReviewerRejectionCap", () => {
-  it("allows the first reviewer rejection", () => {
+  it("allows reviewer rejections below the configured cap", () => {
     assert.equal(hasExceededReviewerRejectionCap(0), false);
+    assert.equal(hasExceededReviewerRejectionCap(MAX_REVIEWER_REJECTION_CYCLES - 1), false);
   });
 
   it("blocks further rejections after the configured cap", () => {
@@ -78,16 +79,15 @@ describe("parseReviewerDecision", () => {
     assert.equal(parsed.rejectRole, undefined);
   });
 
-  it("returns unknown for inline [APPROVE] in the body", () => {
-    const padding = "a".repeat(500);
-    const afterTag = "b".repeat(80);
-    const raw = `${padding} Early mention [APPROVE] ${afterTag}`;
+  it("returns unknown for inline [APPROVE] outside the terminal region", () => {
+    const padding = "a".repeat(700);
+    const raw = `${padding} Early mention [APPROVE] ${"b".repeat(700)}`;
     const parsed = parseReviewerDecision(raw);
     assert.equal(parsed.decision, "unknown");
   });
 
-  it("returns unknown when tail after tag exceeds 60 characters", () => {
-    const tail = "x".repeat(61);
+  it("returns unknown when tail after tag exceeds 120 characters", () => {
+    const tail = "x".repeat(121);
     const parsed = parseReviewerDecision(`## Review\n\n[APPROVE]${tail}`);
     assert.equal(parsed.decision, "unknown");
   });
@@ -347,11 +347,13 @@ describe("windowTranscriptForTurn", () => {
 });
 
 describe("debate correction caps", () => {
-  it("allows one correction per role", () => {
+  it("allows two corrections per role", () => {
     assert.equal(canCorrectRole({}, "pm"), true);
     const afterFirst = incrementRoleCorrectionCount({}, "pm");
-    assert.equal(canCorrectRole(afterFirst, "pm"), false);
-    assert.equal(MAX_CORRECTIONS_PER_ROLE, 1);
+    assert.equal(canCorrectRole(afterFirst, "pm"), true);
+    const afterSecond = incrementRoleCorrectionCount(afterFirst, "pm");
+    assert.equal(canCorrectRole(afterSecond, "pm"), false);
+    assert.equal(MAX_CORRECTIONS_PER_ROLE, 2);
   });
 });
 

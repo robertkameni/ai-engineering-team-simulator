@@ -5,17 +5,17 @@ import {
 } from "@/ai/agents/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 
-export const MAX_SIMULATION_TURNS = 12;
+export const MAX_SIMULATION_TURNS = 16;
 
 /** After this many reviewer [REJECT] decisions, debate exits with cap_reached. */
-export const MAX_REVIEWER_REJECTION_CYCLES = 1;
+export const MAX_REVIEWER_REJECTION_CYCLES = 2;
 
 export function hasExceededReviewerRejectionCap(rejectionCount: number): boolean {
   return rejectionCount >= MAX_REVIEWER_REJECTION_CYCLES;
 }
 
-const TERMINAL_REGION_CHARS = 400;
-const MAX_TAIL_AFTER_TAG_CHARS = 60;
+const TERMINAL_REGION_CHARS = 600;
+const MAX_TAIL_AFTER_TAG_CHARS = 120;
 
 const REJECTABLE_ROLES = [
   "pm",

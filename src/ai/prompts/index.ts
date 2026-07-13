@@ -59,7 +59,12 @@ Reviewer feedback:
 ${excerpt}
 """
 
-You must respond point-by-point. Do not ignore their criticism. Re-engage the cross-critique rule: if relevant, reference another teammate's choice you are optimizing or defending.`;
+This is a CORRECTION turn — do NOT repost your full prior plan verbatim.
+- Start with a "## Changes" section listing only deltas vs your previous message in the transcript.
+- Quote each reviewer objection before your fix.
+- Keep cross-critique brief; prioritize resolving flagged flaws.
+
+You must respond point-by-point. Do not ignore their criticism. Re-engage the cross-critique rule only when relevant to a flagged flaw.`;
 }
 
 function resolvePromptTemplateId(templateId: TeamTemplateId): "software" | "physical" {
