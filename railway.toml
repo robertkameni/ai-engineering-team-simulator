@@ -2,9 +2,6 @@
 builder = "NIXPACKS"
 buildCommand = "npm run build"
 
-[nixpacks]
-packages = ["unzip"]
-
 [deploy]
 startCommand = "npm run start"
 restartPolicyType = "ON_FAILURE"
