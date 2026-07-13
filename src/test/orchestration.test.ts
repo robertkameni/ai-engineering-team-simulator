@@ -11,6 +11,7 @@ import {
   isSoftwareArchitectDeliverableInsufficient,
 } from "../ai/orchestration/agent-deliverable-quality.js";
 import { looksLikeTruncatedAgentOutput } from "../ai/orchestration/looks-like-truncated-agent-output.js";
+import { createSimulationRoster } from "@/ai/agents/roster";
 import {
   extractReviewerDecisionTag,
   isDebateComplete,
@@ -18,6 +19,7 @@ import {
   MAX_SIMULATION_TURNS,
   parseDebateOutcomeFromRunSummary,
   parseReviewerDecision,
+  resolveRejectIdentifier,
   resolveUnknownReviewerDecision,
   reviewerVisibleText,
   stripReviewerDecisionTag,
@@ -65,6 +67,24 @@ describe("parseReviewerDecision", () => {
     const tail = "x".repeat(61);
     const parsed = parseReviewerDecision(`## Review\n\n[APPROVE]${tail}`);
     assert.equal(parsed.decision, "unknown");
+  });
+
+  it("parses [REJECT: agent display name] when roster is provided", () => {
+    const roster = createSimulationRoster("software");
+    const frontendName = roster.frontend.name;
+    const parsed = parseReviewerDecision(
+      `## Review\n\nMissing PIN validation.\n\n[REJECT: ${frontendName}]`,
+      roster,
+    );
+    assert.equal(parsed.decision, "reject");
+    assert.equal(parsed.rejectRole, "frontend");
+  });
+
+  it("resolveRejectIdentifier maps roster names to roles", () => {
+    const roster = createSimulationRoster("software");
+    assert.equal(resolveRejectIdentifier(roster.backend.name, roster), "backend");
+    assert.equal(resolveRejectIdentifier("pm", roster), "pm");
+    assert.equal(resolveRejectIdentifier(roster.reviewer.name, roster), null);
   });
 });
 

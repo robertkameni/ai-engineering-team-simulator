@@ -302,7 +302,7 @@ async function runDebateTurn(
     state.isArchitectRevision = false;
   }
 
-  return resolveReviewerOutcome(role, fullText, state);
+  return resolveReviewerOutcome(role, fullText, state, ctx);
 }
 
 async function executeDebateTurn(
@@ -353,7 +353,7 @@ async function recoverUnknownReviewerTag(
   fullText: string,
   ctx: TurnContext,
 ): Promise<string> {
-  if (role !== "reviewer" || parseReviewerDecision(fullText).decision !== "unknown") {
+  if (role !== "reviewer" || parseReviewerDecision(fullText, ctx.roster).decision !== "unknown") {
     return fullText;
   }
 
@@ -453,12 +453,13 @@ function resolveReviewerOutcome(
   role: SimulationAgentRole,
   fullText: string,
   state: DebateState,
+  ctx: TurnContext,
 ): TurnDirective {
   if (role !== "reviewer") {
     return { kind: "progress" };
   }
 
-  const parsed = parseReviewerDecision(fullText);
+  const parsed = parseReviewerDecision(fullText, ctx.roster);
 
   if (parsed.decision === "approve") {
     state.lastRejectFeedback = null;

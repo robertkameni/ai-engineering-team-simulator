@@ -18,6 +18,8 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 600;
 
+const SSE_KEEPALIVE_INTERVAL_MS = 25_000;
+
 const requestSchema = z.object({
   prompt: z.string().trim().min(1).max(4000),
 });
@@ -52,6 +54,17 @@ export async function POST(request: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      const keepaliveTimer = setInterval(() => {
+        if (signal.aborted) {
+          return;
+        }
+        try {
+          controller.enqueue(new TextEncoder().encode(": keepalive\n\n"));
+        } catch {
+          clearInterval(keepaliveTimer);
+        }
+      }, SSE_KEEPALIVE_INTERVAL_MS);
+
       const send = (event: SimulationStreamEvent) => {
         if (signal.aborted) {
           return;
@@ -168,6 +181,7 @@ export async function POST(request: Request) {
         }
         send({ type: "error", message: "Simulation failed" });
       } finally {
+        clearInterval(keepaliveTimer);
         controller.close();
       }
     },

@@ -1,7 +1,9 @@
 import {
   isSimulationAgent,
+  SIMULATION_AGENT_ORDER,
   type SimulationAgentRole,
 } from "@/ai/agents/config";
+import type { TeamRoster } from "@/ai/agents/roster";
 
 export const MAX_SIMULATION_TURNS = 24;
 
@@ -36,11 +38,40 @@ type ExtractedDecisionTag =
   | { kind: "approve"; tagStart: number; tagEnd: number }
   | { kind: "reject"; role: string; tagStart: number; tagEnd: number };
 
-const REJECT_TAG_IN_TEXT =
-  /\[REJECT:\s*(pm|architect|backend|frontend|devops|reviewer)\s*\]/gi;
+const REJECT_TAG_IN_TEXT = /\[REJECT:\s*([^\]]+?)\s*\]/gi;
 
 function isRejectableRole(role: string): role is RejectableRole {
   return (REJECTABLE_ROLES as readonly string[]).includes(role);
+}
+
+/** Maps a role slug or roster display name to a correction target role. */
+export function resolveRejectIdentifier(
+  identifier: string,
+  roster?: TeamRoster,
+): SimulationAgentRole | null {
+  const normalized = identifier.trim().toLowerCase();
+  if (!normalized || normalized === "reviewer") {
+    return null;
+  }
+
+  if (isRejectableRole(normalized) && isSimulationAgent(normalized)) {
+    return normalized;
+  }
+
+  if (!roster) {
+    return null;
+  }
+
+  for (const role of SIMULATION_AGENT_ORDER) {
+    if (role === "reviewer") {
+      continue;
+    }
+    if (roster[role].name.trim().toLowerCase() === normalized) {
+      return role;
+    }
+  }
+
+  return null;
 }
 
 function isBoundedConversationalTail(tail: string): boolean {
@@ -56,6 +87,7 @@ function isBoundedConversationalTail(tail: string): boolean {
 /** Analyzes the terminal region for a valid decision tag with optional short tail. */
 export function extractReviewerDecisionTag(
   raw: string,
+  roster?: TeamRoster,
 ): ExtractedDecisionTag | null {
   const trimmed = raw.trimEnd();
   if (!trimmed) {
@@ -100,12 +132,16 @@ export function extractReviewerDecisionTag(
     if (!isBoundedConversationalTail(tail)) {
       continue;
     }
+    const roleIdentifier = match[1]!.trim();
+    if (!resolveRejectIdentifier(roleIdentifier, roster)) {
+      continue;
+    }
     const candidate = {
       tagStart: idx,
       tagEnd,
       tag: {
         kind: "reject" as const,
-        role: match[1]!.toLowerCase(),
+        role: roleIdentifier,
         tagStart: idx,
         tagEnd,
       },
@@ -118,8 +154,11 @@ export function extractReviewerDecisionTag(
   return best?.tag ?? null;
 }
 
-export function stripReviewerDecisionTag(text: string): string {
-  const tag = extractReviewerDecisionTag(text);
+export function stripReviewerDecisionTag(
+  text: string,
+  roster?: TeamRoster,
+): string {
+  const tag = extractReviewerDecisionTag(text, roster);
   if (!tag) {
     return text.trimEnd();
   }
@@ -133,9 +172,12 @@ export function reviewerVisibleText(fullText: string): string {
   return text;
 }
 
-export function parseReviewerDecision(raw: string): ParsedReviewerDecision {
+export function parseReviewerDecision(
+  raw: string,
+  roster?: TeamRoster,
+): ParsedReviewerDecision {
   const trimmed = raw.trimEnd();
-  const tag = extractReviewerDecisionTag(trimmed);
+  const tag = extractReviewerDecisionTag(trimmed, roster);
 
   if (!tag) {
     return {
@@ -146,17 +188,17 @@ export function parseReviewerDecision(raw: string): ParsedReviewerDecision {
 
   if (tag.kind === "approve") {
     return {
-      displayText: stripReviewerDecisionTag(trimmed),
+      displayText: stripReviewerDecisionTag(trimmed, roster),
       decision: "approve",
     };
   }
 
-  const role = tag.role;
-  if (isRejectableRole(role) && isSimulationAgent(role)) {
+  const rejectRole = resolveRejectIdentifier(tag.role, roster);
+  if (rejectRole) {
     return {
-      displayText: stripReviewerDecisionTag(trimmed),
+      displayText: stripReviewerDecisionTag(trimmed, roster),
       decision: "reject",
-      rejectRole: role,
+      rejectRole,
     };
   }
 

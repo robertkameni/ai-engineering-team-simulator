@@ -18,6 +18,26 @@ import type { TeamRosterPreview } from "@/features/simulation/team-roster-previe
 
 import { formatMessageTime } from "@/lib/format-time";
 
+function formatSimulationStreamError(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return "Simulation failed";
+  }
+
+  const message = error.message.trim();
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized === "network error" ||
+    normalized === "failed to fetch" ||
+    normalized.includes("networkerror") ||
+    normalized.includes("load failed")
+  ) {
+    return "Connection lost during the simulation. The server may still be processing — check your run history and retry if the run did not complete.";
+  }
+
+  return message || "Simulation failed";
+}
+
 const POLL_ARTIFACT_INTERVAL_MS = 800;
 /** Match artifacts route synthesis budget (approx). */
 const POLL_ARTIFACT_MAX_MS = 320_000;
@@ -472,7 +492,7 @@ export function useSimulationStream() {
         setStatus("failed");
         setActiveAgent(null);
         setArtifactsStatus("unavailable");
-        setError(err instanceof Error ? err.message : "Simulation failed");
+        setError(formatSimulationStreamError(err));
       }
     },
     [pollArtifactsUntilSettled, router],
