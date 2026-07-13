@@ -13,11 +13,10 @@ import {
 } from "@/lib/rate-limit-config";
 import { getClientIpFromHeaders } from "@/lib/rate-limit";
 import {
-  getRedis,
-  hasRedisConfig,
-  isProduction,
-  isRateLimitDisabled,
-} from "@/lib/rate-limit-redis";
+  applyRateLimitCheck,
+  preflightRateLimit,
+} from "@/lib/rate-limit-execution";
+import { getRedis } from "@/lib/rate-limit-redis";
 
 const authLimiterCache = new Map<AuthRateLimitAction, Ratelimit>();
 
@@ -47,55 +46,21 @@ export async function assertAuthRateLimit(
   action: AuthRateLimitAction,
   email: string,
 ): Promise<RateLimitResult> {
-  if (isRateLimitDisabled()) {
-    return { ok: true };
-  }
-
-  if (!hasRedisConfig()) {
-    if (isProduction()) {
-      console.error("Auth rate limiting unavailable: missing Upstash Redis env");
-      return {
-        ok: false,
-        status: 503,
-        retryAfterSec: 60,
-        error: "Rate limiting unavailable",
-      };
-    }
-    console.warn("Auth rate limiting skipped: UPSTASH_REDIS_REST_* not configured");
-    return { ok: true };
+  const preflight = preflightRateLimit({
+    missingConfigLogMessage: "Auth rate limiting unavailable: missing Upstash Redis env",
+    devSkipLogMessage: "Auth rate limiting skipped: UPSTASH_REDIS_REST_* not configured",
+  });
+  if (!preflight.shouldLimit) {
+    return preflight.result;
   }
 
   const ip = getClientIpFromHeaders(request.headers);
   const identifier = resolveAuthRateLimitKey(action, ip, email);
+  const limiter = getAuthLimiter(action);
 
-  try {
-    const limiter = getAuthLimiter(action);
-    const result = await limiter.limit(identifier);
-
-    if (!result.success) {
-      const retryAfterSec = Math.max(
-        1,
-        Math.ceil((result.reset - Date.now()) / 1000),
-      );
-      return {
-        ok: false,
-        status: 429,
-        retryAfterSec,
-        error: "Rate limit exceeded",
-      };
-    }
-
-    return { ok: true };
-  } catch (error) {
-    console.error("Auth rate limit check failed:", error);
-    if (isProduction()) {
-      return {
-        ok: false,
-        status: 503,
-        retryAfterSec: 60,
-        error: "Rate limiting unavailable",
-      };
-    }
-    return { ok: true };
-  }
+  return applyRateLimitCheck(
+    limiter,
+    identifier,
+    "Auth rate limit check failed:",
+  );
 }

@@ -1,31 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import dynamic from "next/dynamic";
+import { useMemo } from "react";
 
 import { SavedRunMobileContext } from "@/features/workspace/saved-run-mobile-context";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
+import { useWorkspaceMobileSheetState } from "@/features/workspace/use-workspace-mobile-sheet-state";
+import { WorkspaceMobileSheetPortals } from "@/features/workspace/workspace-mobile-sheet-portals";
 import type {
   ArtifactsPanelStatus,
   PartialRunArtifacts,
 } from "@/features/artifacts/types";
 import type { DebateExitOutcome } from "@/features/agents/types";
-
-const SidebarMobileSheet = dynamic(
-  () =>
-    import("@/features/workspace/sidebar-mobile-sheet").then(
-      (module) => module.SidebarMobileSheet,
-    ),
-  { ssr: false },
-);
-
-const ArtifactsMobileSheet = dynamic(
-  () =>
-    import("@/features/workspace/artifacts-mobile-sheet").then(
-      (module) => module.ArtifactsMobileSheet,
-    ),
-  { ssr: false },
-);
 
 interface SavedRunMobileSheetsProps {
   pathname: string;
@@ -50,23 +35,23 @@ export function SavedRunMobileSheets({
   debateOutcome = null,
   children,
 }: SavedRunMobileSheetsProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [artifactsOpen, setArtifactsOpen] = useState(false);
-  const [sidebarSheetReady, setSidebarSheetReady] = useState(false);
-  const [artifactsSheetReady, setArtifactsSheetReady] = useState(false);
+  const {
+    sidebarOpen,
+    setSidebarOpen,
+    artifactsOpen,
+    setArtifactsOpen,
+    sidebarSheetReady,
+    artifactsSheetReady,
+    openSidebar,
+    openArtifacts,
+  } = useWorkspaceMobileSheetState();
 
   const mobileContext = useMemo(
     () => ({
-      openSidebar: () => {
-        setSidebarSheetReady(true);
-        setSidebarOpen(true);
-      },
-      openArtifacts: () => {
-        setArtifactsSheetReady(true);
-        setArtifactsOpen(true);
-      },
+      openSidebar,
+      openArtifacts,
     }),
-    [],
+    [openSidebar, openArtifacts],
   );
 
   const artifactPanelProps = {
@@ -81,22 +66,18 @@ export function SavedRunMobileSheets({
     <SavedRunMobileContext.Provider value={mobileContext}>
       {children}
 
-      {sidebarSheetReady ? (
-        <SidebarMobileSheet
-          open={sidebarOpen}
-          onOpenChange={setSidebarOpen}
-          pathname={pathname}
-          initialRecentRuns={initialRecentRuns}
-        />
-      ) : null}
-
-      {showArtifactPanel && artifactsSheetReady ? (
-        <ArtifactsMobileSheet
-          open={artifactsOpen}
-          onOpenChange={setArtifactsOpen}
-          {...artifactPanelProps}
-        />
-      ) : null}
+      <WorkspaceMobileSheetPortals
+        pathname={pathname}
+        initialRecentRuns={initialRecentRuns}
+        showArtifactPanel={showArtifactPanel}
+        sidebarOpen={sidebarOpen}
+        onSidebarOpenChange={setSidebarOpen}
+        artifactsOpen={artifactsOpen}
+        onArtifactsOpenChange={setArtifactsOpen}
+        sidebarSheetReady={sidebarSheetReady}
+        artifactsSheetReady={artifactsSheetReady}
+        artifactPanelProps={artifactPanelProps}
+      />
     </SavedRunMobileContext.Provider>
   );
 }

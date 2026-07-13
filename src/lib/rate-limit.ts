@@ -9,11 +9,10 @@ import {
   type RateLimitResult,
 } from "@/lib/rate-limit-config";
 import {
-  getRedis,
-  hasRedisConfig,
-  isProduction,
-  isRateLimitDisabled,
-} from "@/lib/rate-limit-redis";
+  applyRateLimitCheck,
+  preflightRateLimit,
+} from "@/lib/rate-limit-execution";
+import { getRedis } from "@/lib/rate-limit-redis";
 
 export { rateLimitResponse } from "@/lib/rate-limit-response";
 
@@ -84,55 +83,21 @@ export async function assertRateLimit(
   action: RateLimitAction,
   userId?: string | null,
 ): Promise<RateLimitResult> {
-  if (isRateLimitDisabled()) {
-    return { ok: true };
-  }
-
-  if (!hasRedisConfig()) {
-    if (isProduction()) {
-      console.error("Rate limiting unavailable: missing Upstash Redis env");
-      return {
-        ok: false,
-        status: 503,
-        retryAfterSec: 60,
-        error: "Rate limiting unavailable",
-      };
-    }
-    console.warn("Rate limiting skipped: UPSTASH_REDIS_REST_* not configured");
-    return { ok: true };
+  const preflight = preflightRateLimit({
+    missingConfigLogMessage: "Rate limiting unavailable: missing Upstash Redis env",
+    devSkipLogMessage: "Rate limiting skipped: UPSTASH_REDIS_REST_* not configured",
+  });
+  if (!preflight.shouldLimit) {
+    return preflight.result;
   }
 
   const authenticated = Boolean(userId);
   const identifier = await resolveRateLimitIdentifier(request, userId);
+  const limiter = getLimiter(action, authenticated);
 
-  try {
-    const limiter = getLimiter(action, authenticated);
-    const result = await limiter.limit(identifier);
-
-    if (!result.success) {
-      const retryAfterSec = Math.max(
-        1,
-        Math.ceil((result.reset - Date.now()) / 1000),
-      );
-      return {
-        ok: false,
-        status: 429,
-        retryAfterSec,
-        error: "Rate limit exceeded",
-      };
-    }
-
-    return { ok: true };
-  } catch (error) {
-    console.error("Rate limit check failed:", error);
-    if (isProduction()) {
-      return {
-        ok: false,
-        status: 503,
-        retryAfterSec: 60,
-        error: "Rate limiting unavailable",
-      };
-    }
-    return { ok: true };
-  }
+  return applyRateLimitCheck(
+    limiter,
+    identifier,
+    "Rate limit check failed:",
+  );
 }

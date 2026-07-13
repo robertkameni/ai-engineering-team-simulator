@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { Sparkles } from "lucide-react";
-
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { SidebarBrandLink } from "@/features/workspace/sidebar-brand-link";
 import { SidebarSimulationAction } from "@/features/workspace/sidebar-simulation-action";
 import { SidebarRecentRuns } from "@/features/workspace/sidebar-recent-runs";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
@@ -22,23 +20,7 @@ export function SidebarContent({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="px-4 py-4">
-        <Link
-          href="/"
-          onClick={onNavigate}
-          className="flex items-center gap-2 rounded-lg transition-colors hover:bg-white/4"
-        >
-          <span className="glass-card flex size-9 shrink-0 items-center justify-center rounded-xl">
-            <Sparkles className="size-4 text-agent-architect" />
-          </span>
-          <span className="min-w-0">
-            <p className="truncate text-title font-semibold tracking-tight">
-              Team Sim
-            </p>
-            <p className="truncate text-caption text-muted-foreground">
-              Engineering simulator
-            </p>
-          </span>
-        </Link>
+        <SidebarBrandLink onNavigate={onNavigate} />
       </header>
 
       <section className="px-3 pb-2">

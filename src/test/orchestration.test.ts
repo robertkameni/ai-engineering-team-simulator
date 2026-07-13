@@ -14,8 +14,10 @@ import { looksLikeTruncatedAgentOutput } from "../ai/orchestration/looks-like-tr
 import { createSimulationRoster } from "@/ai/agents/roster";
 import {
   extractReviewerDecisionTag,
+  hasExceededReviewerRejectionCap,
   isDebateComplete,
   isLegacyUntaggedReviewerCompletion,
+  MAX_REVIEWER_REJECTION_CYCLES,
   MAX_SIMULATION_TURNS,
   parseDebateOutcomeFromRunSummary,
   parseReviewerDecision,
@@ -24,6 +26,17 @@ import {
   reviewerVisibleText,
   stripReviewerDecisionTag,
 } from "../ai/orchestration/reviewer-decision.js";
+
+describe("hasExceededReviewerRejectionCap", () => {
+  it("allows the first reviewer rejection", () => {
+    assert.equal(hasExceededReviewerRejectionCap(0), false);
+  });
+
+  it("blocks further rejections after the configured cap", () => {
+    assert.equal(hasExceededReviewerRejectionCap(MAX_REVIEWER_REJECTION_CYCLES), true);
+    assert.equal(hasExceededReviewerRejectionCap(MAX_REVIEWER_REJECTION_CYCLES + 1), true);
+  });
+});
 
 describe("parseReviewerDecision", () => {
   it("parses strict terminal [APPROVE]", () => {

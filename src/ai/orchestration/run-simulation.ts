@@ -22,6 +22,7 @@ import {
 } from "@/ai/orchestration/peer-criticism-detector";
 import {
   type DebateExitOutcome,
+  hasExceededReviewerRejectionCap,
   MAX_SIMULATION_TURNS,
   parseReviewerDecision,
   resolveUnknownReviewerDecision,
@@ -102,6 +103,7 @@ export async function runSimulation(
       nextRole: SIMULATION_AGENT_ORDER[0],
       lastRejectFeedback: null,
       lastRejectTarget: null,
+      reviewerRejectionCount: 0,
       transcript: [],
       isArchitectRevision: false,
     };
@@ -188,22 +190,8 @@ async function runDebateLoop(
   return "cap_reached";
 }
 
-function shouldTriggerArchitectRevision(state: DebateState): boolean {
-  if (state.nextRole !== "devops") return false;
-  if (state.isArchitectRevision) return false;
-
-  const architectEntry = state.transcript.find(
-    (e) => e.role === "architect",
-  );
-  if (!architectEntry) return false;
-
-  const criticisms = state.transcript.filter(
-    (e) =>
-      (e.role === "backend" || e.role === "frontend" || e.role === "devops") &&
-      e.content.includes(architectEntry.agentName),
-  );
-
-  return criticisms.length > 0;
+function shouldTriggerArchitectRevision(_state: DebateState): boolean {
+  return false;
 }
 
 function applyLinearProgression(state: DebateState): boolean {
@@ -312,10 +300,10 @@ async function executeDebateTurn(
   debateContext: ReturnType<typeof resolveDebateTurnContext>,
   transcript: TranscriptEntry[],
   ctx: TurnContext,
-  options?: { disableTools?: boolean },
+  options?: { disableTools?: boolean; },
 ): Promise<
-  | { kind: "break"; outcome: DebateExitOutcome }
-  | { kind: "text"; fullText: string }
+  | { kind: "break"; outcome: DebateExitOutcome; }
+  | { kind: "text"; fullText: string; }
 > {
   try {
     const fullText = await streamAgentTurn({
@@ -468,6 +456,15 @@ function resolveReviewerOutcome(
   }
 
   if (parsed.decision === "reject" && parsed.rejectRole) {
+    if (hasExceededReviewerRejectionCap(state.reviewerRejectionCount)) {
+      console.warn("Reviewer rejection cap reached, closing debate", {
+        runId: ctx.runId,
+        reviewerRejectionCount: state.reviewerRejectionCount,
+      });
+      return { kind: "break", outcome: "cap_reached" };
+    }
+
+    state.reviewerRejectionCount += 1;
     state.lastRejectFeedback = parsed.displayText.trim() || null;
     state.lastRejectTarget = parsed.rejectRole;
     return { kind: "reroute", targetRole: parsed.rejectRole };

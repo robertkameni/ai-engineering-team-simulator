@@ -1,10 +1,12 @@
 import { Prisma } from "@/generated/prisma/client";
 
-import { setAuthSessionCookie } from "@/lib/auth/auth-session";
 import { authCredentialsSchema } from "@/lib/auth/auth-schemas";
-import { claimGuestRunsForUser } from "@/lib/auth/claim-guest-runs";
-import { getGuestSessionId } from "@/lib/auth/guest-session";
 import { assertAuthRateLimit } from "@/lib/auth/auth-rate-limit";
+import {
+  authServerErrorResponse,
+  finalizeAuthenticatedUserSession,
+  parseAuthRequestBody,
+} from "@/lib/auth/auth-route-helpers";
 import { hashPassword } from "@/lib/auth/password";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
@@ -12,14 +14,12 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  const parsedBody = await parseAuthRequestBody(request);
+  if (!parsedBody.ok) {
+    return parsedBody.response;
   }
 
-  const parsed = authCredentialsSchema.safeParse(body);
+  const parsed = authCredentialsSchema.safeParse(parsedBody.body);
   if (!parsed.success) {
     return Response.json(
       { error: "Valid email and password (8+ characters) required" },
@@ -41,17 +41,7 @@ export async function POST(request: Request) {
       data: { email, passwordHash },
     });
 
-    await setAuthSessionCookie({ userId: user.id, email: user.email });
-
-    const guestSessionId = await getGuestSessionId();
-    if (guestSessionId) {
-      await claimGuestRunsForUser(user.id, guestSessionId);
-    }
-
-    return Response.json({
-      userId: user.id,
-      email: user.email,
-    });
+    return finalizeAuthenticatedUserSession(user);
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -64,18 +54,10 @@ export async function POST(request: Request) {
       );
     }
 
-    console.error("Register failed:", error);
-
-    if (error instanceof Error && error.message.includes("AUTH_SECRET")) {
-      return Response.json(
-        { error: "Server authentication is not configured (AUTH_SECRET)." },
-        { status: 503 },
-      );
-    }
-
-    return Response.json(
-      { error: "Registration failed. Please try again." },
-      { status: 500 },
+    return authServerErrorResponse(
+      error,
+      "Register failed:",
+      "Registration failed. Please try again.",
     );
   }
 }

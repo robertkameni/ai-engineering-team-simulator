@@ -10,162 +10,14 @@ import type {
   RunStatus,
   SimulationMessage,
 } from "@/features/agents/types";
-import {
-  parseSimulationEvent,
-  type SimulationStreamEvent,
-} from "@/lib/simulation-stream";
+import { parseSimulationEvent } from "@/lib/simulation-stream";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 
-import { formatMessageTime } from "@/lib/format-time";
-
-function formatSimulationStreamError(error: unknown): string {
-  if (!(error instanceof Error)) {
-    return "Simulation failed";
-  }
-
-  const message = error.message.trim();
-  const normalized = message.toLowerCase();
-
-  if (
-    normalized === "network error" ||
-    normalized === "failed to fetch" ||
-    normalized.includes("networkerror") ||
-    normalized.includes("load failed")
-  ) {
-    return "Connection lost during the simulation. The server may still be processing — check your run history and retry if the run did not complete.";
-  }
-
-  return message || "Simulation failed";
-}
-
-const POLL_ARTIFACT_INTERVAL_MS = 800;
-/** Match artifacts route synthesis budget (approx). */
-const POLL_ARTIFACT_MAX_MS = 320_000;
-const POLL_RUN_PROGRESS_INTERVAL_MS = 2_000;
-/** Railway SSE cap is 15 minutes; allow polling slightly longer. */
-const POLL_RUN_PROGRESS_MAX_MS = 16 * 60 * 1000;
-
-type RunProgressResponse = {
-  id: string;
-  status: RunStatus;
-  messages: SimulationMessage[];
-  artifacts: PartialRunArtifacts | null;
-  artifactsStatus: ArtifactsPanelStatus;
-  debateOutcome: DebateExitOutcome | null;
-  teamRoster: TeamRosterPreview | null;
-};
-
-async function fetchRunProgress(
-  runId: string,
-  signal?: AbortSignal,
-): Promise<RunProgressResponse | null> {
-  try {
-    const response = await fetch(`/api/runs/${runId}`, { signal });
-    if (!response.ok) {
-      return null;
-    }
-    return (await response.json()) as RunProgressResponse;
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return null;
-    }
-    return null;
-  }
-}
-
-function waitForRunProgressPoll(
-  signal?: AbortSignal,
-  intervalMs = POLL_RUN_PROGRESS_INTERVAL_MS,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = globalThis.setTimeout(resolve, intervalMs);
-    if (!signal) {
-      return;
-    }
-    if (signal.aborted) {
-      globalThis.clearTimeout(timer);
-      reject(new DOMException("Aborted", "AbortError"));
-      return;
-    }
-    signal.addEventListener(
-      "abort",
-      () => {
-        globalThis.clearTimeout(timer);
-        reject(new DOMException("Aborted", "AbortError"));
-      },
-      { once: true },
-    );
-  });
-}
-
-type ArtifactsFetchResult =
-  | {
-    ok: true;
-    artifacts: PartialRunArtifacts | null;
-    status: ArtifactsPanelStatus;
-    debateOutcome: DebateExitOutcome | null;
-  }
-  | { ok: false; retryable: boolean; };
-
-function isRetryableArtifactsHttpStatus(status: number): boolean {
-  return status === 408 || status === 429 || status >= 500;
-}
-
-async function fetchArtifactsState(
-  id: string,
-  signal?: AbortSignal,
-): Promise<ArtifactsFetchResult> {
-  let response: Response;
-  try {
-    response = await fetch(`/api/runs/${id}/artifacts`, { signal });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return { ok: false, retryable: false };
-    }
-    return { ok: false, retryable: true };
-  }
-
-  if (!response.ok) {
-    return {
-      ok: false,
-      retryable: isRetryableArtifactsHttpStatus(response.status),
-    };
-  }
-
-  const data = (await response.json()) as {
-    artifacts: PartialRunArtifacts | null;
-    status: ArtifactsPanelStatus;
-    debateOutcome?: DebateExitOutcome | null;
-  };
-
-  return {
-    ok: true,
-    artifacts: data.artifacts,
-    status: data.status,
-    debateOutcome: data.debateOutcome ?? null,
-  };
-}
-
-function waitForArtifactPoll(signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = globalThis.setTimeout(resolve, POLL_ARTIFACT_INTERVAL_MS);
-    if (signal) {
-      if (signal.aborted) {
-        globalThis.clearTimeout(timer);
-        reject(new DOMException("Aborted", "AbortError"));
-        return;
-      }
-      signal.addEventListener(
-        "abort",
-        () => {
-          globalThis.clearTimeout(timer);
-          reject(new DOMException("Aborted", "AbortError"));
-        },
-        { once: true },
-      );
-    }
-  });
-}
+import { createSimulationStreamEventHandler } from "./simulation-stream-events";
+import {
+  formatSimulationStreamError,
+  recoverRunAfterStreamDrop,
+} from "./simulation-stream-polling";
 
 export interface StartSimulationOptions {
   signal?: AbortSignal;
@@ -190,140 +42,40 @@ export function useSimulationStream() {
 
   const panelArtifactsStatus = artifactsStatus;
 
-  const pollArtifactsUntilSettled = useCallback(
-    async (
-      id: string,
-      signal?: AbortSignal,
-    ): Promise<ArtifactsPanelStatus | null> => {
-      const isActive = () => signal == null || !signal.aborted;
+  const artifactSetters = {
+    setArtifacts,
+    setArtifactsStatus,
+    setDebateOutcome,
+  };
 
-      const deadline = Date.now() + POLL_ARTIFACT_MAX_MS;
-      while (Date.now() < deadline) {
-        if (!isActive()) return null;
-
-        const result = await fetchArtifactsState(id, signal);
-
-        if (!isActive()) return null;
-
-        if (!result.ok) {
-          if (result.retryable) {
-            try {
-              await waitForArtifactPoll(signal);
-            } catch {
-              return null;
-            }
-            continue;
-          }
-          if (isActive()) {
-            setArtifactsStatus("unavailable");
-          }
-          return "unavailable";
-        }
-
-        if (isActive()) {
-          setArtifacts(result.artifacts);
-          setArtifactsStatus(result.status);
-          setDebateOutcome(result.debateOutcome);
-        }
-
-        if (result.status === "ready") {
-          return result.status;
-        }
-
-        if (result.status === "unavailable") {
-          return result.status;
-        }
-
-        try {
-          await waitForArtifactPoll(signal);
-        } catch {
-          return null;
-        }
-      }
-
-      if (!isActive()) return null;
-
-      const finalResult = await fetchArtifactsState(id, signal);
-      if (!isActive()) return null;
-
-      if (finalResult.ok) {
-        setArtifacts(finalResult.artifacts);
-        setArtifactsStatus(finalResult.status);
-        setDebateOutcome(finalResult.debateOutcome);
-        return finalResult.status;
-      }
-
-      setArtifactsStatus("unavailable");
-      return "unavailable";
-    },
-    [],
-  );
-
-  const recoverRunAfterStreamDrop = useCallback(
-    async (id: string, signal?: AbortSignal) => {
-      const isActive = () => signal == null || !signal.aborted;
-
-      setStatus("running");
-      setError(null);
-      setActiveAgent(null);
-      activeMessageIdRef.current = null;
-
-      const deadline = Date.now() + POLL_RUN_PROGRESS_MAX_MS;
-      while (Date.now() < deadline) {
-        if (!isActive()) {
-          return;
-        }
-
-        const progress = await fetchRunProgress(id, signal);
-        if (!isActive()) {
-          return;
-        }
-
-        if (progress) {
-          setRunId(progress.id);
-          setMessages(progress.messages);
-          if (progress.teamRoster) {
-            setTeamRoster(progress.teamRoster);
-          }
-          setArtifacts(progress.artifacts);
-          setArtifactsStatus(progress.artifactsStatus);
-          setDebateOutcome(progress.debateOutcome);
-
-          if (progress.status === "complete") {
-            setStatus("complete");
-            setError(
-              progress.artifactsStatus === "unavailable"
-                ? "Artifact synthesis failed"
-                : null,
-            );
-            router.replace(`/runs/${id}`);
-            return;
-          }
-
-          if (progress.status === "failed") {
-            setStatus("failed");
-            setError("Simulation failed");
-            return;
-          }
-        }
-
-        try {
-          await waitForRunProgressPoll(signal);
-        } catch {
-          return;
-        }
-      }
-
-      if (!isActive()) {
-        return;
-      }
-
-      setStatus("failed");
-      setError(
-        "Connection lost and the simulation did not finish in time. Check your run history — it may still complete in the background.",
-      );
-    },
-    [router],
+  const recoverAfterDrop = useCallback(
+    (id: string, signal?: AbortSignal) =>
+      recoverRunAfterStreamDrop(
+        id,
+        {
+          ...artifactSetters,
+          setStatus,
+          setError,
+          setActiveAgent,
+          setRunId,
+          setMessages,
+          setTeamRoster,
+        },
+        (completedRunId) => router.replace(`/runs/${completedRunId}`),
+        signal,
+      ),
+    [
+      router,
+      setArtifacts,
+      setArtifactsStatus,
+      setDebateOutcome,
+      setStatus,
+      setError,
+      setActiveAgent,
+      setRunId,
+      setMessages,
+      setTeamRoster,
+    ],
   );
 
   const start = useCallback(
@@ -354,7 +106,9 @@ export function useSimulationStream() {
         setDebateOutcome(null);
       }
       activeMessageIdRef.current = null;
-      let currentRunId: string | null = null;
+
+      const currentRunIdRef = { current: null as string | null };
+      const streamSettledRef = { current: false };
 
       try {
         const response = await fetch("/api/simulate", {
@@ -380,8 +134,7 @@ export function useSimulationStream() {
             payload != null && typeof payload.retryAfter === "number"
               ? payload.retryAfter
               : undefined;
-          const base =
-            errorText ?? `Request failed (${response.status})`;
+          const base = errorText ?? `Request failed (${response.status})`;
           if (response.status === 429 && retryAfter != null) {
             const minutes = Math.max(1, Math.ceil(retryAfter / 60));
             throw new Error(`${base}. Try again in about ${minutes} min.`);
@@ -396,151 +149,24 @@ export function useSimulationStream() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let streamSettled = false;
 
-        const handleStreamEvent = async (event: SimulationStreamEvent) => {
-          if (event.type === "run_started") {
-            currentRunId = event.runId;
-            setRunId(event.runId);
-            setArtifactsStatus("pending");
-          } else if (event.type === "team_ready") {
-            setTeamRoster({
-              templateId: event.templateId,
-              members: event.members,
-            });
-          } else if (event.type === "agent_start") {
-            setActiveAgent(event.role);
-            const id = crypto.randomUUID();
-            activeMessageIdRef.current = id;
-            setMessages((prev) => [
-              ...prev,
-              {
-                id,
-                role: event.role,
-                agentName: event.name,
-                agentTitle: event.title,
-                content: "",
-                isStreaming: true,
-                activeTools: [],
-                createdAt: formatMessageTime(new Date()),
-              },
-            ]);
-          } else if (event.type === "tool_start") {
-            const activeId = activeMessageIdRef.current;
-            if (!activeId) return;
-
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === activeId
-                  ? {
-                    ...message,
-                    activeTools: [
-                      ...(message.activeTools ?? []),
-                      { name: event.toolName, args: event.args },
-                    ],
-                  }
-                  : message,
-              ),
-            );
-          } else if (event.type === "tool_end") {
-            const activeId = activeMessageIdRef.current;
-            if (!activeId) return;
-
-            setMessages((prev) =>
-              prev.map((message) => {
-                if (message.id !== activeId) return message;
-                const tools = [...(message.activeTools ?? [])];
-                const index = tools.findIndex(
-                  (tool) => tool.name === event.toolName,
-                );
-                if (index !== -1) tools.splice(index, 1);
-                return { ...message, activeTools: tools };
-              }),
-            );
-          } else if (event.type === "text-delta") {
-            const activeId = activeMessageIdRef.current;
-            if (!activeId) return;
-
-            setMessages((prev) =>
-              prev.map((message) =>
-                message.id === activeId
-                  ? { ...message, content: message.content + event.delta }
-                  : message,
-              ),
-            );
-          } else if (event.type === "agent_end") {
-            const activeId = activeMessageIdRef.current;
-
-            if (activeId) {
-              setMessages((prev) =>
-                prev.map((message) =>
-                  message.id === activeId
-                    ? { ...message, isStreaming: false, activeTools: [] }
-                    : message,
-                ),
-              );
-            }
-            activeMessageIdRef.current = null;
-            setActiveAgent(null);
-          } else if (event.type === "artifacts_start") {
-            setArtifactsStatus("generating");
-          } else if (event.type === "heartbeat") {
-            return;
-          } else if (event.type === "error") {
-            streamSettled = true;
-            setError(event.message);
-            setStatus("failed");
-            setActiveAgent(null);
-
-            const activeId = activeMessageIdRef.current;
-            if (activeId) {
-              setMessages((prev) =>
-                prev.map((message) =>
-                  message.id === activeId
-                    ? { ...message, isStreaming: false, activeTools: [] }
-                    : message,
-                ),
-              );
-              activeMessageIdRef.current = null;
-            }
-
-            if (currentRunId) {
-              await pollArtifactsUntilSettled(currentRunId, signal);
-            } else if (isActive()) {
-              setArtifactsStatus("unavailable");
-            }
-          } else if (event.type === "done") {
-            streamSettled = true;
-
-            if (!isActive()) return;
-
-            setRunId(event.runId);
-            currentRunId = event.runId;
-
-            const finalPanel = await pollArtifactsUntilSettled(
-              event.runId,
-              signal,
-            );
-
-            if (!isActive()) return;
-
-            if (finalPanel === "unavailable") {
-              setStatus("complete");
-              setError((prev) => prev ?? "Artifact synthesis failed");
-            } else if (finalPanel === "ready") {
-              setError(null);
-              setStatus((current) =>
-                current === "failed" ? current : "complete",
-              );
-            } else if (finalPanel != null) {
-              setStatus((current) =>
-                current === "failed" ? current : "complete",
-              );
-            }
-
-            router.replace(`/runs/${event.runId}`);
-          }
-        };
+        const handleStreamEvent = createSimulationStreamEventHandler({
+          signal,
+          isActive,
+          currentRunIdRef,
+          activeMessageIdRef,
+          streamSettledRef,
+          setRunId,
+          setStatus,
+          setError,
+          setActiveAgent,
+          setMessages,
+          setTeamRoster,
+          setArtifactsStatus,
+          setArtifacts,
+          setDebateOutcome,
+          router,
+        });
 
         const processBufferedLines = async (flush: boolean) => {
           if (flush) {
@@ -597,9 +223,9 @@ export function useSimulationStream() {
 
         if (!isActive()) return;
 
-        if (!streamSettled) {
-          if (currentRunId) {
-            await recoverRunAfterStreamDrop(currentRunId, signal);
+        if (!streamSettledRef.current) {
+          if (currentRunIdRef.current) {
+            await recoverAfterDrop(currentRunIdRef.current, signal);
           } else {
             setStatus("failed");
             setError("Simulation interrupted before completion");
@@ -614,8 +240,8 @@ export function useSimulationStream() {
         }
         if (!isActive()) return;
 
-        if (currentRunId) {
-          await recoverRunAfterStreamDrop(currentRunId, signal);
+        if (currentRunIdRef.current) {
+          await recoverAfterDrop(currentRunIdRef.current, signal);
           return;
         }
 
@@ -625,7 +251,7 @@ export function useSimulationStream() {
         setError(formatSimulationStreamError(err));
       }
     },
-    [pollArtifactsUntilSettled, recoverRunAfterStreamDrop, router],
+    [recoverAfterDrop, router],
   );
 
   const cancel = useCallback(() => {

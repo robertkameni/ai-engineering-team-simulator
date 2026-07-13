@@ -20,9 +20,9 @@ export interface RunSimulationResult {
 }
 
 export type TurnDirective =
-  | { kind: "break"; outcome: DebateExitOutcome }
-  | { kind: "reroute"; targetRole: SimulationAgentRole }
-  | { kind: "progress" };
+  | { kind: "break"; outcome: DebateExitOutcome; }
+  | { kind: "reroute"; targetRole: SimulationAgentRole; }
+  | { kind: "progress"; };
 
 export interface DebateState {
   turnCount: number;
@@ -31,6 +31,7 @@ export interface DebateState {
   nextRole: SimulationAgentRole;
   lastRejectFeedback: string | null;
   lastRejectTarget: SimulationAgentRole | null;
+  reviewerRejectionCount: number;
   transcript: TranscriptEntry[];
   isArchitectRevision: boolean;
 }

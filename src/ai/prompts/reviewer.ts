@@ -23,7 +23,7 @@ Rules:
 - ## Actionable Recommendations: Up to 5 bullets with acceptance criteria and measurable checks. Each recommendation must reference the responsible teammate by name, but the final decision tag must use role slugs (pm, architect, backend, frontend, devops) — never agent display names.
 - **Operational completeness check**: Explicitly verify that the team addressed: (a) first-run / onboarding UX as described by the PM, (b) automated data backup with tested restore, (c) alerting on at least one silent degradation signal, (d) auth token refresh interceptor on the client. If any is missing, raise it as a risk and [REJECT: theRole].
 - Translate section titles into the language of the Product Idea. Do not mention you are an AI.
-- Write a **thorough** review (roughly 600–900 words).
+- Write a **thorough** review (roughly 350–500 words).
 
 - MANDATORY DECISION TAG (last line only). Read these rules THREE TIMES before writing the tag:
   - **THE SELF-MITIGATION TRAP:** You find a risk. The team's plans do not address it. You write a mitigation in your own review. That mitigation is now in the transcript — but it was written by YOU, not the team. YOU CANNOT APPROVE BASED ON YOUR OWN FIX. If the only place the mitigation exists is in this review, the risk is UNRESOLVED → [REJECT: role].
@@ -36,9 +36,9 @@ ${buildDiscussionDepthRules(roster)}`;
 
 export function buildReviewerTurnPrompt(
   roster: TeamRoster,
-  options?: { isReReview?: boolean },
+  options?: { isReReview?: boolean; },
 ): string {
-  const base = `Write a thorough engineering review (roughly 600–900 words). Quote and analyze at least two technical claims from the team. ${buildImplementationQuoteHint(roster)} Use substantive **Agree** / **Disagree** / **Refine** arguments — prefer Disagree or Refine. Surface 3–5 critical risks. For each risk, determine whether the mitigation already exists in a PRIOR teammate message or only in your own text. If the mitigation is only in your review, the risk is UNRESOLVED — you must reject. Check for unaddressed prior feedback: if an agent was told to fix something and didn't, reject. Verify cross-critique compliance and operational completeness. End with [APPROVE] or [REJECT: role] alone on the absolute last line.`;
+  const base = `Write a thorough engineering review (roughly 350–500 words). Quote and analyze at least two technical claims from the team. ${buildImplementationQuoteHint(roster)} Use substantive **Agree** / **Disagree** / **Refine** arguments — prefer Disagree or Refine. Surface 3–5 critical risks. For each risk, determine whether the mitigation already exists in a PRIOR teammate message or only in your own text. If the mitigation is only in your review, the risk is UNRESOLVED — you must reject. Check for unaddressed prior feedback: if an agent was told to fix something and didn't, reject. Verify cross-critique compliance and operational completeness. End with [APPROVE] or [REJECT: role] alone on the absolute last line.`;
 
   if (options?.isReReview) {
     return `${base}\n\nRE-REVIEW: Evaluate whether the rejected agent provided concrete, testable changes addressing each of your prior objections. If any concern remains unresolved or was addressed with a vague promise, reject again. Do not lower the bar because this is a second attempt — the fix must be in the agent's message, not implied.`;

@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import dynamic from "next/dynamic";
+import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 
 import { ArtifactPanel } from "@/features/artifacts/artifact-panel";
@@ -11,26 +10,12 @@ import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 import { Sidebar } from "@/features/workspace/sidebar";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
+import { useWorkspaceMobileSheetState } from "@/features/workspace/use-workspace-mobile-sheet-state";
 import { WorkspaceMobileContext } from "@/features/workspace/workspace-mobile-context";
+import { WorkspaceMobileSheetPortals } from "@/features/workspace/workspace-mobile-sheet-portals";
 import { WorkspaceRunProvider } from "@/features/workspace/workspace-run-context";
 import { SiteFooter } from "@/components/site-footer";
 import { useMinWidth } from "@/hooks/use-media-query";
-
-const SidebarMobileSheet = dynamic(
-  () =>
-    import("@/features/workspace/sidebar-mobile-sheet").then(
-      (module) => module.SidebarMobileSheet,
-    ),
-  { ssr: false },
-);
-
-const ArtifactsMobileSheet = dynamic(
-  () =>
-    import("@/features/workspace/artifacts-mobile-sheet").then(
-      (module) => module.ArtifactsMobileSheet,
-    ),
-  { ssr: false },
-);
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -61,10 +46,16 @@ export function AppShell({
 }: AppShellProps) {
   const pathname = usePathname();
   const isWide = useMinWidth(960);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [artifactsOpen, setArtifactsOpen] = useState(false);
-  const [sidebarSheetReady, setSidebarSheetReady] = useState(false);
-  const [artifactsSheetReady, setArtifactsSheetReady] = useState(false);
+  const {
+    sidebarOpen,
+    setSidebarOpen,
+    artifactsOpen,
+    setArtifactsOpen,
+    sidebarSheetReady,
+    artifactsSheetReady,
+    openSidebar,
+    openArtifacts,
+  } = useWorkspaceMobileSheetState();
 
   const showArtifactPanel =
     artifactsStatus !== "idle" ||
@@ -75,17 +66,11 @@ export function AppShell({
 
   const mobileContext = useMemo(
     () => ({
-      openSidebar: () => {
-        setSidebarSheetReady(true);
-        setSidebarOpen(true);
-      },
-      openArtifacts: () => {
-        setArtifactsSheetReady(true);
-        setArtifactsOpen(true);
-      },
+      openSidebar,
+      openArtifacts,
       showArtifactsAction,
     }),
-    [showArtifactsAction],
+    [openSidebar, openArtifacts, showArtifactsAction],
   );
 
   const artifactPanelProps = {
@@ -116,22 +101,18 @@ export function AppShell({
         <SiteFooter />
       </div>
 
-      {sidebarSheetReady ? (
-        <SidebarMobileSheet
-          open={sidebarOpen}
-          onOpenChange={setSidebarOpen}
-          pathname={pathname}
-          initialRecentRuns={initialRecentRuns}
-        />
-      ) : null}
-
-      {showArtifactPanel && artifactsSheetReady ? (
-        <ArtifactsMobileSheet
-          open={artifactsOpen}
-          onOpenChange={setArtifactsOpen}
-          {...artifactPanelProps}
-        />
-      ) : null}
+      <WorkspaceMobileSheetPortals
+        pathname={pathname}
+        initialRecentRuns={initialRecentRuns}
+        showArtifactPanel={showArtifactPanel}
+        sidebarOpen={sidebarOpen}
+        onSidebarOpenChange={setSidebarOpen}
+        artifactsOpen={artifactsOpen}
+        onArtifactsOpenChange={setArtifactsOpen}
+        sidebarSheetReady={sidebarSheetReady}
+        artifactsSheetReady={artifactsSheetReady}
+        artifactPanelProps={artifactPanelProps}
+      />
       </WorkspaceMobileContext.Provider>
     </WorkspaceRunProvider>
   );

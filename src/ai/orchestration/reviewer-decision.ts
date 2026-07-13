@@ -7,6 +7,13 @@ import type { TeamRoster } from "@/ai/agents/roster";
 
 export const MAX_SIMULATION_TURNS = 24;
 
+/** After this many reviewer [REJECT] decisions, debate exits with cap_reached. */
+export const MAX_REVIEWER_REJECTION_CYCLES = 1;
+
+export function hasExceededReviewerRejectionCap(rejectionCount: number): boolean {
+  return rejectionCount >= MAX_REVIEWER_REJECTION_CYCLES;
+}
+
 const TERMINAL_REGION_CHARS = 400;
 const MAX_TAIL_AFTER_TAG_CHARS = 60;
 
@@ -35,8 +42,8 @@ export interface ParsedReviewerDecision {
 }
 
 type ExtractedDecisionTag =
-  | { kind: "approve"; tagStart: number; tagEnd: number }
-  | { kind: "reject"; role: string; tagStart: number; tagEnd: number };
+  | { kind: "approve"; tagStart: number; tagEnd: number; }
+  | { kind: "reject"; role: string; tagStart: number; tagEnd: number; };
 
 const REJECT_TAG_IN_TEXT = /\[REJECT:\s*([^\]]+?)\s*\]/gi;
 
@@ -97,7 +104,7 @@ export function extractReviewerDecisionTag(
   const regionStart = Math.max(0, trimmed.length - TERMINAL_REGION_CHARS);
   const approveNeedle = "[APPROVE]";
 
-  let best: { tagStart: number; tagEnd: number; tag: ExtractedDecisionTag } | null =
+  let best: { tagStart: number; tagEnd: number; tag: ExtractedDecisionTag; } | null =
     null;
 
   let searchFrom = trimmed.length;
@@ -272,7 +279,7 @@ export function parseDebateOutcomeFromRunSummary(
       parsed !== null &&
       "debateOutcome" in parsed
     ) {
-      const outcome = (parsed as { debateOutcome: unknown }).debateOutcome;
+      const outcome = (parsed as { debateOutcome: unknown; }).debateOutcome;
       if (
         outcome === "approved" ||
         outcome === "cap_reached" ||

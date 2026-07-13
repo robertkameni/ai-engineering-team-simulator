@@ -220,10 +220,12 @@ export async function generateRunArtifacts({
     assertSimulationWithinBudget(usageAccumulator);
   }
 
-  const entries: [ArtifactType, ArtifactDocument][] = [];
+  const parallelEntries = await Promise.all(
+    ARTIFACT_TYPES.map(async (type) => {
+      if (usageAccumulator) {
+        assertSimulationWithinBudget(usageAccumulator);
+      }
 
-  if (usageAccumulator) {
-    for (const type of ARTIFACT_TYPES) {
       const document = await generateArtifactDocument(
         type,
         transcriptPrompt,
@@ -233,27 +235,13 @@ export async function generateRunArtifacts({
         debateOutcome,
       );
       await onArtifactComplete?.(type, document);
-      entries.push([type, document]);
-    }
-  } else {
-    const parallelEntries = await Promise.all(
-      ARTIFACT_TYPES.map(async (type) => {
-        const document = await generateArtifactDocument(
-          type,
-          transcriptPrompt,
-          templateId,
-          productIdea,
-          usageAccumulator,
-          debateOutcome,
-        );
-        await onArtifactComplete?.(type, document);
-        return [type, document] as const;
-      }),
-    );
-    for (const entry of parallelEntries) {
-      entries.push([entry[0], entry[1]]);
-    }
-  }
+      return [type, document] as const;
+    }),
+  );
+
+  const entries: [ArtifactType, ArtifactDocument][] = parallelEntries.map(
+    (entry) => [entry[0], entry[1]],
+  );
 
   return Object.fromEntries(entries) as RunArtifactsOutput;
 }
