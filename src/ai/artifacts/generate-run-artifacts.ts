@@ -88,7 +88,7 @@ async function generateArtifactDocument(
 
   const isBlueprint = type === "blueprint";
   const sectionRules = isBlueprint
-    ? `- The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}\n- 3–6 bullets per section; each bullet is a concrete, copy-paste-ready detail: exact version numbers, full file paths, SQL column types, API method+path pairs, environment variable names with descriptions, TypeScript interface signatures, or component prop types.\n- Prefer verbatim extraction over summarization. If a teammate specified an exact SQL query, include it. If they named a package version, include it.\n- Each bullet should be a self-contained technical specification item — not a narrative sentence.`
+    ? `- The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}\n- 3–6 bullets per section; each bullet describes a concrete, copy-paste-ready detail in prose: exact version numbers, full file paths, SQL column types, API method+path pairs, environment variable names with descriptions, TypeScript interface signatures, or component prop types.\n- Describe everything in prose — never use code blocks. For example, instead of copying a SQL query verbatim, describe it as "SELECT expense_splits.member_id, SUM(share_cents) FROM expense_splits JOIN expenses ON expense_splits.expense_id = expenses.id WHERE expenses.group_id = $1 GROUP BY expense_splits.member_id."\n- Each bullet should be a self-contained technical specification item — not a narrative sentence.`
     : `- The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}\n- 4–6 bullets per section; each bullet is 1–2 complete sentences with concrete detail (up to ~50 words per bullet).`;
 
   const system = `${unapprovedNotice}You are a technical writer producing the "${type}" deliverable from a team debate.
@@ -101,7 +101,8 @@ ${sectionRules}
 - Write as a polished internal document — NOT meeting notes.
 - Do NOT append speaker names to bullets (no "(Name)" suffixes).
 - Synthesize consensus; note disagreement only in the review artifact.
-- Omit sections with no substance from the debate.`;
+- Omit sections with no substance from the debate.
+- **No code blocks or code fences** (\`\`\`). This is a specification document for developers to implement from. Describe everything in prose. Use inline backticks only for single terms like file names, env vars, or function names.`;
 
   try {
     if (usageAccumulator) {

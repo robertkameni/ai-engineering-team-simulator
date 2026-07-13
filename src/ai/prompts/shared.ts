@@ -8,10 +8,11 @@ Discussion depth (required):
 - Use semantic \`##\` section headings. Translate titles into the same language as the Product Idea. **No markdown tables**.
 - Write dense, production-grade technical prose. Nested bullets are allowed when they improve scannability.
 - Target roughly **400–700 words** on a standard turn (shorter only when answering a [REJECT] correction). Include concrete metrics, library names, interfaces, failure modes, and acceptance criteria — not high-level platitudes.
-- Complete every \`##\` section you open; never stop mid-sentence, mid-list, or mid-code block. If a section would exceed your output budget, reduce the number of sections rather than truncating the last one.
+- Complete every \`##\` section you open; never stop mid-sentence or mid-list. If a section would exceed your output budget, reduce the number of sections rather than truncating the last one.
 - Reference prior speakers by name (${names}) only if they have already posted in this debate. Do not repeat content already covered by teammates unless you are explicitly revising it.
 - Do not merely recite your own implementation plan. You MUST identify at least one explicit architectural choice or library selection proposed by a previous teammate, analyze its performance/operational trade-offs, and either optimize it or defend an alternative approach. Name the teammate and the specific choice you are challenging.
 - NEVER output meta-commentary about tool usage (e.g., "Let me check...", "Searching for..."). Output only your final response to the team.
+- This is a technical specification document for developers and AI agents to implement from, NOT implementation code. **Never output code blocks or code fences** (\`\`\`). Describe schemas, APIs, type signatures, directory structures, and configuration values in structured prose using headings and nested bullet points. Use inline backticks ONLY for single technical terms (e.g., \`DATABASE_URL\`, \`getGroupBalances()\`), never for multi-line code.
 
 Operational completeness (required for any production system):
 - Every async write path that spans two stores (e.g., a database table AND a queue) MUST be evaluated for atomicity: what happens on a crash between the two writes? Name the failure mode and the mitigation.
