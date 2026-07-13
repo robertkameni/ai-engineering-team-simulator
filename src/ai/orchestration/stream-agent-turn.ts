@@ -10,6 +10,8 @@ import type { DebateTurnContext } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import {
   isArchitectDeliverableInsufficient,
+  isFrontendDeliverableInsufficient,
+  buildFrontendInsufficientContinuationPrompt,
 } from "@/ai/orchestration/agent-deliverable-quality";
 import { normalizeAgentPersistedText } from "@/ai/orchestration/agent-stream-text";
 import { looksLikeTruncatedAgentOutput } from "@/ai/orchestration/looks-like-truncated-agent-output";
@@ -166,6 +168,50 @@ export async function streamAgentTurn({
             roster,
             templateId,
             config: toollessConfig,
+            debateContext,
+            usageAccumulator,
+            abortSignal,
+            send,
+            fullText,
+          });
+        }
+      }
+    }
+
+    if (role === "frontend") {
+      const normalizedFrontend = normalizeAgentPersistedText(role, fullText);
+      if (isFrontendDeliverableInsufficient(normalizedFrontend)) {
+        assertNotAborted(abortSignal);
+        console.warn(`${role}: deliverable incomplete, requesting completion stream`);
+        const completionConfig = {
+          ...config,
+          maxOutputTokens: Math.max(config.maxOutputTokens, 2600),
+        };
+        const completionText = await collectAgentStream({
+          runId,
+          role,
+          productIdea,
+          transcript,
+          roster,
+          templateId,
+          config: completionConfig,
+          debateContext,
+          usageAccumulator,
+          abortSignal,
+          send,
+          continuationOf: normalizedFrontend,
+          supplementalUserPrompt: buildFrontendInsufficientContinuationPrompt(),
+        });
+        if (completionText.trim()) {
+          fullText = `${normalizedFrontend}${completionText.trimStart()}`;
+          fullText = await continueAgentStreamIfTruncated({
+            runId,
+            role,
+            productIdea,
+            transcript,
+            roster,
+            templateId,
+            config: completionConfig,
             debateContext,
             usageAccumulator,
             abortSignal,

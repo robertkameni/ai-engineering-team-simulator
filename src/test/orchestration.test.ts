@@ -255,6 +255,30 @@ describe("looksLikeTruncatedAgentOutput", () => {
       true,
     );
   });
+
+  it("detects incomplete frontend component bullet and missing risks section", () => {
+    const truncatedComponent = [
+      "## Component Architecture",
+      "",
+      "**Component 4: WelcomeForm** — Client Component",
+      "",
+      "- Props: hireId and availableRoles",
+      "- Internal",
+    ].join("\n");
+
+    assert.equal(looksLikeTruncatedAgentOutput(truncatedComponent, "frontend"), true);
+
+    const missingRisks = [
+      "## UI & Routing",
+      "",
+      "App map with three route groups and nested layouts for dashboard views.",
+      "",
+      "## Key Flows",
+      "",
+      "Flow one covers magic-link onboarding from email click to checklist render.",
+    ].join("\n");
+    assert.equal(looksLikeTruncatedAgentOutput(missingRisks, "frontend"), true);
+  });
 });
 
 describe("isSoftwareArchitectDeliverableInsufficient", () => {

@@ -9,6 +9,28 @@ const OPEN_INLINE_CODE_AT_END = /`[^`\n]+$/;
 
 const BARE_HTTP_STATUS_AT_END = /\b(?:50[0-4]|40[0-4])\s*$/i;
 
+const INCOMPLETE_LIST_BULLET =
+  /^-\s+(?:Internal|Props|State|Renders|Uses|Handles|Accepts|Returns|Emits)\.?$/i;
+
+const INCOMPLETE_COMPONENT_HEADING = /\*\*Component \d+:/i;
+
+const FRONTEND_RISKS_HEADING = /^##\s+.*(?:Frontend Risks|Risques frontend|Risques FE)/im;
+
+function hasFrontendRisksSection(text: string): boolean {
+  return FRONTEND_RISKS_HEADING.test(text);
+}
+
+function lastNonEmptyLine(text: string): string {
+  const lines = text.trim().split("\n");
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index]?.trim() ?? "";
+    if (line.length > 0) {
+      return line;
+    }
+  }
+  return "";
+}
+
 /** Heuristic: model hit maxOutputTokens or stopped mid-thought. */
 export function looksLikeTruncatedAgentOutput(
   text: string,
@@ -32,8 +54,25 @@ export function looksLikeTruncatedAgentOutput(
     return true;
   }
 
-  const lastLine = trimmed.split("\n").pop()?.trim() ?? "";
+  const lastLine = lastNonEmptyLine(trimmed);
+
+  if (INCOMPLETE_LIST_BULLET.test(lastLine)) {
+    return true;
+  }
+
+  if (lastLine.startsWith("- Props:") && lastLine.length < 40) {
+    return true;
+  }
+
+  if (INCOMPLETE_COMPONENT_HEADING.test(lastLine)) {
+    return true;
+  }
+
   if (lastLine.length >= 8 && /\([^)\n]*$/.test(lastLine) && lastLine.includes("(")) {
+    return true;
+  }
+
+  if (role === "frontend" && trimmed.length >= 120 && !hasFrontendRisksSection(trimmed)) {
     return true;
   }
 
@@ -50,6 +89,9 @@ export function looksLikeTruncatedAgentOutput(
   }
 
   if (lastLine.length < 12) {
+    if (/^-\s+\S+$/u.test(lastLine)) {
+      return true;
+    }
     return false;
   }
 
@@ -62,7 +104,7 @@ export function looksLikeTruncatedAgentOutput(
 
 export function buildTruncationContinuationPrompt(tail: string): string {
   const excerpt = tail.trim().slice(-600);
-  return `Your previous team message was cut off by the output limit. Continue from the exact next token — do not repeat sentences or headings already written, do not add meta-commentary about limits. Close any open backticks, parentheses, or JSON. Last characters of your prior message:
+  return `Your previous team message was cut off by the output limit. Continue from the exact next token — do not repeat sentences or headings already written, do not add meta-commentary about limits. Close any open backticks, parentheses, or JSON. If you were listing component props, finish that component, then complete ## Frontend Risks (or your role's final mandatory section) with a complete sentence. Last characters of your prior message:
 
 """${excerpt}"""`;
 }

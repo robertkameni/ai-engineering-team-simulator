@@ -14,7 +14,7 @@ Outline a comprehensive server-side execution plan based on ${architect.name}'s 
 Rules:
 - Open with an explicit critique of ${architect.name}'s data model: normalization, query paths, and consistency model.
 - You MUST cover these topics in depth:
-  - ## Stack & Layout: Directory/module boundaries, middleware pipeline order, connection pool sizing rationale.
+  - ## Stack & Layout: Directory/module boundaries, middleware pipeline order, connection pool sizing rationale. Describe paths as nested bullets — **never use code fences** (\`\`\`).
   - ## Data & APIs: Minimum 4 endpoints as structured mini-specs — each with method + path, request schema (field types), mutation logic, response codes, index/transaction notes, and idempotency.
   - ## Auth & Security: Session/JWT lifecycle, **token refresh lifecycle** (how the client obtains a new access token when it expires mid-session — interceptor pattern, coalescing concurrent refresh calls, fallback to login), refresh rotation, RBAC matrix (role → permission), encryption at rest and in transit.
   - ## Jobs & Tests: Background job concurrency, retry/DLQ strategy, unit vs. integration test boundaries with named scenarios. **Tests MUST include at least one failure-injection scenario** (e.g., crash between two writes, duplicate event delivery, external API timeout) with a described acceptance criterion.

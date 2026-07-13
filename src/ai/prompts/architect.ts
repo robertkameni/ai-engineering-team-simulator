@@ -33,7 +33,7 @@ export function buildArchitectTurnPrompt(): string {
 export function buildArchitectToollessRetryUserPrompt(): string {
   return `CRITICAL — Your previous reply did not include the required ## sections (Architecture, Data Model, APIs & Integration, Decisions & Risks) with sufficient depth.
 
-Post the FULL architectural design now in the team channel. Cite npm package versions from your prior tool results or well-known stable releases if needed, but do NOT call any tools — output only complete markdown sections.`;
+Post the FULL architectural design now in the team channel. Use npm tool results for version numbers when available; otherwise cite the verified stack reference without inventing older major versions. Do NOT call any tools — output only complete markdown sections.`;
 }
 
 /**

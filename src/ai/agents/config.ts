@@ -49,7 +49,7 @@ const ACTIVE_AGENTS: Record<SimulationAgentRole, AgentModelConfig> = {
   frontend: {
     role: "frontend",
     model: "deepseek-v4-flash",
-    maxOutputTokens: 1700,
+    maxOutputTokens: 2600,
     temperature: 0.4,
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   },
@@ -73,7 +73,7 @@ const ACTIVE_AGENTS: Record<SimulationAgentRole, AgentModelConfig> = {
 export const TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS = 1800;
 
 /** Max continuation streams per agent turn when output looks truncated. */
-export const MAX_TRUNCATION_CONTINUATIONS = 2;
+export const MAX_TRUNCATION_CONTINUATIONS = 3;
 
 export function getAgentConfig(role: SimulationAgentRole): AgentModelConfig {
   return ACTIVE_AGENTS[role];

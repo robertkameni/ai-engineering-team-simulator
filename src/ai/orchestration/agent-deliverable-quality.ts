@@ -56,6 +56,32 @@ export function isArchitectDeliverableInsufficient(
   return isSoftwareArchitectDeliverableInsufficient(text);
 }
 
+const FRONTEND_RISKS_HEADING = /^##\s+.*(?:Frontend Risks|Risques frontend|Risques FE)/im;
+
+export function isFrontendDeliverableInsufficient(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length < 200) {
+    return true;
+  }
+
+  if (!FRONTEND_RISKS_HEADING.test(trimmed)) {
+    return true;
+  }
+
+  const lastLine = trimmed.split("\n").pop()?.trim() ?? "";
+  if (/^-\s+(?:Internal|Props|State|Renders|Uses|Handles)\.?$/i.test(lastLine)) {
+    return true;
+  }
+
+  return false;
+}
+
+export function buildFrontendInsufficientContinuationPrompt(): string {
+  return `CRITICAL — Your frontend plan was cut off or is missing ## Frontend Risks.
+
+Continue from where you stopped. Finish any incomplete component entry, then add ## Frontend Risks with CLS, race conditions, hydration mismatch, and accessibility mitigations. End with a complete sentence. Do not repeat sections already complete.`;
+}
+
 export function buildArchitectInsufficientReviewerFeedback(
   architectExcerpt: string,
   templateId: TeamTemplateId,

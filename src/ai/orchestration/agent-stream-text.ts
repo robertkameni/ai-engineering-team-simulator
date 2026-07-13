@@ -42,6 +42,25 @@ export function hasCompletedOpeningBlock(fullText: string): boolean {
   return /\n\n/.test(fullText) || /^##\s/m.test(fullText);
 }
 
+function unwrapMarkdownCodeFencesToProse(text: string): string {
+  return text.replace(/```[\w-]*\n([\s\S]*?)```/g, (_match, body: string) => {
+    const lines = body
+      .trim()
+      .split("\n")
+      .map((line: string) => line.trim())
+      .filter((line: string) => line.length > 0)
+      .map((line: string) => `- ${line}`);
+    return lines.join("\n");
+  });
+}
+
+function mergeMergedRiskParagraphs(text: string): string {
+  return text.replace(
+    /(\*\*Risk \d+:[^*]+(?:\*\*)?[^*\n]+)(?=\*\*Risk \d+:|$)/g,
+    (segment) => segment.trim(),
+  ).replace(/(\.)(\*\*Risk \d+:)/g, "$1\n\n$2");
+}
+
 function normalizeMarkdownHeadings(text: string): string {
   return text
     .replace(/([.!?…]["'»]?)\s*(##\s+)/g, "$1\n\n$2")
@@ -59,6 +78,10 @@ export function normalizeAgentPersistedText(
     text = stripToolOnlyOpeningBlock(text);
   }
   text = normalizeMarkdownHeadings(text);
+  if (role === "architect" || role === "backend" || role === "devops") {
+    text = unwrapMarkdownCodeFencesToProse(text);
+    text = mergeMergedRiskParagraphs(text);
+  }
   return text.trim();
 }
 

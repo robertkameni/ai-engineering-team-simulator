@@ -4,6 +4,7 @@ import type { SimulationAgentRole } from "@/ai/agents/config";
 import { getTeamMember, type TeamRoster } from "@/ai/agents/roster";
 import { buildLanguageMatchDirective } from "@/ai/context/detect-product-language";
 import type { TranscriptEntry } from "@/ai/context/transcript";
+import { buildSimulationStackReferenceDirective } from "@/ai/context/simulation-stack-reference";
 import { windowTranscriptForTurn } from "@/ai/context/window-transcript";
 import { buildReviewerPreflightChecklist } from "@/ai/orchestration/reviewer-preflight";
 import { getAgentTurnPrompt } from "@/ai/prompts";
@@ -61,6 +62,13 @@ export function resolveDebateTurnContext(
   return {};
 }
 
+const STACK_REFERENCE_ROLES = new Set<SimulationAgentRole>([
+  "architect",
+  "backend",
+  "frontend",
+  "devops",
+]);
+
 export function buildAgentMessages(
   role: AgentRole,
   productIdea: string,
@@ -74,6 +82,13 @@ export function buildAgentMessages(
       content: formatProductIdeaBlock(productIdea),
     },
   ];
+
+  if (STACK_REFERENCE_ROLES.has(role)) {
+    messages.push({
+      role: "user",
+      content: buildSimulationStackReferenceDirective(),
+    });
+  }
 
   const windowedTranscript = windowTranscriptForTurn(
     transcript,

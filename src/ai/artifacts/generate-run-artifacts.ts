@@ -2,6 +2,7 @@ import { generateText, Output } from "ai";
 
 import { sectionGuidelinesForArtifact } from "@/ai/artifacts/artifact-templates";
 import { buildTranscriptForArtifacts } from "@/ai/artifacts/build-transcript";
+import { buildSimulationStackReferenceDirective } from "@/ai/context/simulation-stack-reference";
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { TranscriptEntry } from "@/ai/context/transcript";
@@ -93,7 +94,7 @@ async function generateArtifactDocument(
 
   const system = `${unapprovedNotice}You are a technical writer producing the "${type}" deliverable from a team debate.
 
-Focus: ${focus}
+${type === "implementation" || type === "architecture" ? `${buildSimulationStackReferenceDirective()}\n\n` : ""}Focus: ${focus}
 
 Output rules:
 ${sectionRules}
