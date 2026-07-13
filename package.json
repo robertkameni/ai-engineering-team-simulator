@@ -59,5 +59,8 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.1",
     "typescript": "^7"
+  },
+  "overrides": {
+    "picomatch": "4.0.5"
   }
 }
