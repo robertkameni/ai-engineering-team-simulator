@@ -1,7 +1,9 @@
+import "server-only";
+
+import { generateRunArtifacts } from "@/ai/artifacts/generate-run-artifacts";
 import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
 import { isStoredSimulationAgentRole } from "@/ai/config";
 import type { TeamRoster } from "@/ai/agents/roster";
-import { generateRunArtifacts } from "@/ai/artifacts/generate-run-artifacts";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import {
   assertSimulationWithinBudget,
@@ -10,22 +12,9 @@ import {
 import { isDebateComplete } from "@/ai/orchestration/reviewer-decision";
 import type { AgentRole } from "@/features/agents/types";
 import { getPersonaBase } from "@/features/agents/personas";
-import {
-  ARTIFACT_TYPES,
-  type ArtifactType,
-} from "@/features/artifacts/schemas";
 import type { PartialRunArtifacts } from "@/features/artifacts/types";
-import {
-  runArtifactsOutputToBundle,
-  saveSingleArtifact,
-} from "@/lib/db/artifacts";
-import {
-  claimArtifactGeneration,
-  toAppArtifactStatus,
-  updateArtifactStatus,
-} from "@/lib/db/artifact-status";
-import { getRunWithMessages, touchRunActivity, updateRunStatus } from "@/lib/db/runs";
-import { reconcileStaleRunIfNeeded } from "@/lib/db/run-reconcile";
+import { saveSingleArtifact } from "@/lib/db/artifacts";
+import { getRunWithMessages, touchRunActivity } from "@/lib/db/runs";
 import { toAppRunStatus } from "@/lib/db/run-status";
 import {
   getTeamRoster,
@@ -38,18 +27,18 @@ import {
   type RunOwnershipScope,
 } from "@/lib/auth/run-ownership";
 
-export type RegenerateRunArtifactsError =
+export type GenerateBlueprintArtifactError =
   | "not_found"
   | "forbidden"
   | "no_messages"
   | "run_in_progress"
-  | "generation_active"
+  | "already_ready"
   | "generation_failed"
   | "budget_exceeded";
 
-export type RegenerateRunArtifactsResult =
+export type GenerateBlueprintArtifactResult =
   | { ok: true; artifacts: PartialRunArtifacts; }
-  | { ok: false; error: RegenerateRunArtifactsError; message?: string; };
+  | { ok: false; error: GenerateBlueprintArtifactError; message?: string; };
 
 function buildRosterFromMessages(
   messages: { agentRole: string; agentName: string | null; }[],
@@ -83,14 +72,13 @@ function mapMessagesToTranscript(
   });
 }
 
-export async function regenerateRunArtifacts(
+export async function generateBlueprintArtifact(
   runId: string,
   options: {
     scope: RunOwnershipScope;
     usageAccumulator?: RunUsageAccumulator;
-    artifactTypes?: readonly ArtifactType[];
   },
-): Promise<RegenerateRunArtifactsResult> {
+): Promise<GenerateBlueprintArtifactResult> {
   const access = await requireRunAccess(runId, options.scope);
   if (!access.ok) {
     return {
@@ -99,20 +87,7 @@ export async function regenerateRunArtifacts(
     };
   }
 
-  let run = await getRunWithMessages(runId);
-  if (!run) {
-    return { ok: false, error: "not_found" };
-  }
-
-  await reconcileStaleRunIfNeeded({
-    id: run.id,
-    status: run.status,
-    artifactStatus: run.artifactStatus,
-    updatedAt: run.updatedAt,
-    messageCount: run.messages.length,
-  });
-
-  run = await getRunWithMessages(runId);
+  const run = await getRunWithMessages(runId);
   if (!run) {
     return { ok: false, error: "not_found" };
   }
@@ -122,7 +97,6 @@ export async function regenerateRunArtifacts(
   }
 
   const status = toAppRunStatus(run.status);
-  const artifactStatus = toAppArtifactStatus(run.artifactStatus);
   const debateComplete = isDebateComplete(
     run.messages.map((message) => ({
       agentRole: message.agentRole,
@@ -130,19 +104,15 @@ export async function regenerateRunArtifacts(
     })),
   );
 
-  if (status === "idle") {
+  if (status === "idle" || (status === "running" && !debateComplete)) {
     return { ok: false, error: "run_in_progress" };
   }
 
-  if (status === "running") {
-    if (!debateComplete) {
-      return { ok: false, error: "run_in_progress" };
-    }
-    if (artifactStatus === "generating" || artifactStatus === "ready") {
-      return { ok: false, error: "run_in_progress" };
-    }
-  } else if (artifactStatus === "generating") {
-    return { ok: false, error: "run_in_progress" };
+  const existingBlueprint = run.artifacts.find(
+    (artifact) => artifact.type === "blueprint",
+  );
+  if (existingBlueprint) {
+    return { ok: false, error: "already_ready" };
   }
 
   const simulationMessages = run.messages.filter((message) =>
@@ -150,10 +120,7 @@ export async function regenerateRunArtifacts(
   );
 
   if (simulationMessages.length === 0) {
-    return {
-      ok: false,
-      error: "generation_failed",
-    };
+    return { ok: false, error: "generation_failed" };
   }
 
   const rosterArtifact = run.artifacts.find(
@@ -169,24 +136,10 @@ export async function regenerateRunArtifacts(
       assertSimulationWithinBudget(options.usageAccumulator);
     } catch (error) {
       if (isSimulationBudgetExceeded(error)) {
-        console.warn("Regenerate artifacts: budget exceeded before generation", {
-          runId,
-          estimatedCostUsd: error.estimatedCostUsd,
-          maxCostUsd: error.maxCostUsd,
-        });
         return { ok: false, error: "budget_exceeded" };
       }
       throw error;
     }
-  }
-
-  const claimed = await claimArtifactGeneration(runId);
-  if (!claimed) {
-    return {
-      ok: false,
-      error: "generation_active",
-      message: "A generation process is already active for this workspace.",
-    };
   }
 
   try {
@@ -198,42 +151,32 @@ export async function regenerateRunArtifacts(
       roster,
       runSummary: run.summary,
       usageAccumulator: options.usageAccumulator,
-      artifactTypes: options.artifactTypes ?? ARTIFACT_TYPES,
+      artifactTypes: ["blueprint"],
       onArtifactComplete: async (type, document) => {
         await saveSingleArtifact(runId, type, document);
       },
     });
-    const bundle = runArtifactsOutputToBundle(artifactOutput);
-    await updateArtifactStatus(runId, "ready");
-    if (status !== "complete") {
-      await updateRunStatus(runId, "complete");
+
+    const blueprint = artifactOutput.blueprint;
+    if (!blueprint) {
+      return { ok: false, error: "generation_failed" };
     }
 
-    return { ok: true, artifacts: bundle };
+    return {
+      ok: true,
+      artifacts: { blueprint: blueprint.sections },
+    };
   } catch (error) {
     if (isSimulationBudgetExceeded(error)) {
-      console.warn("Regenerate artifacts: budget exceeded during generation", {
-        runId,
-        estimatedCostUsd: error.estimatedCostUsd,
-        maxCostUsd: error.maxCostUsd,
-      });
-      await updateArtifactStatus(runId, "failed");
-      if (status === "running") {
-        await updateRunStatus(runId, "complete");
-      }
       return { ok: false, error: "budget_exceeded" };
     }
 
-    console.error("Regenerate artifacts failed:", error);
-    await updateArtifactStatus(runId, "failed");
-    if (status === "running") {
-      await updateRunStatus(runId, "complete");
-    }
+    console.error("Blueprint artifact generation failed:", error);
     return {
       ok: false,
       error: "generation_failed",
       message:
-        error instanceof Error ? error.message : "Artifact generation failed",
+        error instanceof Error ? error.message : "Blueprint generation failed",
     };
   }
 }

@@ -17,11 +17,11 @@ import {
 import { getDeepSeekModel } from "@/ai/providers";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import {
-  ARTIFACT_TYPES,
+  CORE_ARTIFACT_TYPES,
   type ArtifactDocument,
   type ArtifactType,
   artifactDocumentSchema,
-  type RunArtifactsOutput,
+  type RunArtifactsOutput
 } from "@/features/artifacts/schemas";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 
@@ -197,6 +197,7 @@ export async function generateRunArtifacts({
   onArtifactComplete,
   usageAccumulator,
   runSummary,
+  artifactTypes = CORE_ARTIFACT_TYPES,
 }: {
   productIdea: string;
   transcript: TranscriptEntry[];
@@ -207,7 +208,8 @@ export async function generateRunArtifacts({
   ) => Promise<void> | void;
   usageAccumulator?: RunUsageAccumulator;
   runSummary?: string | null;
-}): Promise<RunArtifactsOutput> {
+  artifactTypes?: readonly ArtifactType[];
+}): Promise<Partial<RunArtifactsOutput>> {
   const templateId = roster.templateId;
   const debateOutcome = parseDebateOutcomeFromRunSummary(runSummary ?? null);
   const transcriptPrompt = buildTranscriptForArtifacts(
@@ -221,7 +223,7 @@ export async function generateRunArtifacts({
   }
 
   const parallelEntries = await Promise.all(
-    ARTIFACT_TYPES.map(async (type) => {
+    artifactTypes.map(async (type) => {
       if (usageAccumulator) {
         assertSimulationWithinBudget(usageAccumulator);
       }
@@ -243,5 +245,5 @@ export async function generateRunArtifacts({
     (entry) => [entry[0], entry[1]],
   );
 
-  return Object.fromEntries(entries) as RunArtifactsOutput;
+  return Object.fromEntries(entries) as Partial<RunArtifactsOutput>;
 }

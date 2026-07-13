@@ -1,34 +1,37 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
+
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
 } from "@/components/ui/tabs";
 import { ArtifactSections } from "@/features/artifacts/artifact-sections";
 import { ArtifactPanelPlaceholder } from "@/features/artifacts/artifact-panel-placeholder";
 import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skeleton";
+import { GenerateBlueprintButton } from "@/features/artifacts/generate-blueprint-button";
 import { RegenerateArtifactsButton } from "@/features/artifacts/regenerate-artifacts-button";
 import { SheetClose } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import {
-  ARTIFACT_TAB_LIST_CLASS,
-  ARTIFACT_TAB_TRIGGER_BASE,
-  getArtifactTabConfig,
+    ARTIFACT_TAB_LIST_CLASS,
+    ARTIFACT_TAB_TRIGGER_BASE,
+    getArtifactTabConfig,
 } from "@/features/artifacts/artifact-tab-styles";
 import { ArtifactDebateWarningBanner } from "@/features/artifacts/artifact-debate-warning-banner";
 import {
-  artifactPanelSubtitle,
-  countRunArtifacts,
-  isUnapprovedDebateOutcome,
-  shouldShowArtifactTabs,
-  type DebateProgress,
+    artifactPanelSubtitle,
+    countRunArtifacts,
+    isUnapprovedDebateOutcome,
+    shouldShowArtifactTabs,
+    type DebateProgress,
 } from "@/features/artifacts/artifact-panel-phase";
 import type {
-  ArtifactsPanelStatus,
-  PartialRunArtifacts,
+    ArtifactsPanelStatus,
+    PartialRunArtifacts,
 } from "@/features/artifacts/types";
 import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
@@ -59,10 +62,20 @@ export function ArtifactPanel({
   teamRoster = null,
   debateOutcome = null,
 }: ArtifactPanelProps) {
-  const showTabs = shouldShowArtifactTabs(status, artifacts);
+  const [panelArtifacts, setPanelArtifacts] = useState(artifacts);
+
+  useEffect(() => {
+    setPanelArtifacts(artifacts);
+  }, [artifacts]);
+
+  const handleBlueprintGenerated = useCallback((generated: PartialRunArtifacts) => {
+    setPanelArtifacts((current) => ({ ...current, ...generated }));
+  }, []);
+
+  const showTabs = shouldShowArtifactTabs(status, panelArtifacts);
   const isSheet = layout === "sheet";
   const showRegenerate = canRegenerateArtifacts && regenerateRunId != null;
-  const artifactCount = countRunArtifacts(artifacts);
+  const artifactCount = countRunArtifacts(panelArtifacts);
   const subtitle = artifactPanelSubtitle(
     status,
     debateProgress,
@@ -142,8 +155,15 @@ export function ArtifactPanel({
                 value={tab.value}
                 className="artifact-tab-content m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-6 data-[state=inactive]:hidden data-[state=active]:flex data-[state=active]:flex-col"
               >
-                {artifacts?.[tab.value] ? (
-                  <ArtifactSections sections={artifacts[tab.value]!} />
+                {panelArtifacts?.[tab.value] ? (
+                  <ArtifactSections sections={panelArtifacts[tab.value]!} />
+                ) : tab.value === "blueprint" &&
+                  regenerateRunId &&
+                  status === "ready" ? (
+                  <GenerateBlueprintButton
+                    runId={regenerateRunId}
+                    onGenerated={handleBlueprintGenerated}
+                  />
                 ) : (
                   <ArtifactPanelSkeleton />
                 )}

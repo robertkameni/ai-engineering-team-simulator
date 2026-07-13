@@ -71,15 +71,18 @@ export async function saveSingleArtifact(
 }
 
 export function runArtifactsOutputToBundle(
-  output: RunArtifactsOutput,
-): RunArtifacts {
-  return {
-    requirements: output.requirements.sections,
-    architecture: output.architecture.sections,
-    implementation: output.implementation.sections,
-    blueprint: output.blueprint.sections,
-    review: output.review.sections,
-  };
+  output: Partial<RunArtifactsOutput>,
+): Partial<RunArtifacts> {
+  const bundle = {} as Partial<RunArtifacts>;
+
+  for (const type of ARTIFACT_TYPES) {
+    const document = output[type];
+    if (document) {
+      bundle[type] = document.sections;
+    }
+  }
+
+  return bundle;
 }
 
 function parseArtifactDocument(data: unknown): ArtifactDocument | null {
@@ -96,7 +99,7 @@ function isCompleteRunArtifacts(
 }
 
 export function mapDbArtifactsToRunArtifacts(
-  rows: { type: string; data: unknown }[],
+  rows: { type: string; data: unknown; }[],
 ): Partial<RunArtifacts> | null {
   const bundle = {} as Partial<RunArtifacts>;
   let found = 0;

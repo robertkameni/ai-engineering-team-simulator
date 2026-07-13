@@ -4,12 +4,12 @@ import {
   isSimulationAborted,
   runSimulation,
 } from "@/ai/orchestration/run-simulation";
-import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
 import { getRunOwnershipContextWithGuestSession } from "@/lib/auth/run-ownership";
 import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
+import { scheduleCoreArtifactSynthesis } from "@/lib/ai/schedule-artifact-synthesis";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
-import { setRunUsageTotals, updateRunStatus, updateRunSummary } from "@/lib/db/runs";
+import { setRunUsageTotals, updateRunSummary } from "@/lib/db/runs";
 import {
   encodeSimulationEvent,
   type SimulationStreamEvent,
@@ -51,6 +51,7 @@ export async function POST(request: Request) {
   const signal = request.signal;
   let runId: string | undefined;
   let synthesisStarted = false;
+  const ownershipScope = { userId, guestSessionId };
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -84,45 +85,22 @@ export async function POST(request: Request) {
           usageAccumulator,
         });
         runId = simulation.runId;
-
         synthesisStarted = true;
-        const synthesis = await regenerateRunArtifacts(runId, {
-          scope: { userId, guestSessionId },
-          usageAccumulator,
-        });
-
-        if (!synthesis.ok) {
-          await setRunUsageTotals(runId, usageAccumulator.getTotals());
-
-          if (synthesis.error === "budget_exceeded") {
-            console.warn("Artifact synthesis stopped: run cost budget exceeded", {
-              runId,
-            });
-            await reconcileRunFailure(runId, {
-              debateComplete: true,
-              artifactPhaseStarted: true,
-            });
-            await updateRunStatus(runId, "failed");
-            send({ type: "error", message: "Artifact cost budget exceeded" });
-          } else {
-            console.error("Artifact synthesis failed:", synthesis);
-            await reconcileRunFailure(runId, {
-              debateComplete: true,
-              artifactPhaseStarted: true,
-            });
-            await updateRunStatus(runId, "failed");
-            send({ type: "error", message: "Artifact synthesis failed" });
-          }
-          return;
-        }
-
-        if (signal.aborted) {
-          await setRunUsageTotals(runId, usageAccumulator.getTotals());
-          return;
-        }
 
         await setRunUsageTotals(runId, usageAccumulator.getTotals());
-        await updateRunStatus(runId, "complete");
+
+        void scheduleCoreArtifactSynthesis({
+          runId,
+          scope: ownershipScope,
+          usageAccumulator,
+        }).catch((error) => {
+          console.error("Background artifact synthesis crashed", { runId, error });
+        });
+
+        if (signal.aborted) {
+          return;
+        }
+
         send({ type: "done", runId });
       } catch (error) {
         if (runId) {

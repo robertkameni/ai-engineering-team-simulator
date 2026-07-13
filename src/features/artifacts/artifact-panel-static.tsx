@@ -1,19 +1,20 @@
 import { ArtifactSections } from "@/features/artifacts/artifact-sections";
+import { BlueprintTabContent } from "@/features/artifacts/blueprint-tab-content";
 import { ArtifactPanelPlaceholder } from "@/features/artifacts/artifact-panel-placeholder";
 import { RegenerateArtifactsButton } from "@/features/artifacts/regenerate-artifacts-button";
 import { ArtifactDebateWarningBanner } from "@/features/artifacts/artifact-debate-warning-banner";
 import {
-  artifactPanelSubtitle,
-  countRunArtifacts,
-  debateProgressFromMessages,
-  isUnapprovedDebateOutcome,
-  shouldShowArtifactTabs,
+    artifactPanelSubtitle,
+    countRunArtifacts,
+    debateProgressFromMessages,
+    isUnapprovedDebateOutcome,
+    shouldShowArtifactTabs,
 } from "@/features/artifacts/artifact-panel-phase";
 import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skeleton";
 import { ARTIFACT_TAB_LIST_CLASS, ARTIFACT_TAB_TRIGGER_STATIC, getArtifactTabConfig } from "@/features/artifacts/artifact-tab-styles";
 import type {
-  ArtifactsPanelStatus,
-  PartialRunArtifacts,
+    ArtifactsPanelStatus,
+    PartialRunArtifacts,
 } from "@/features/artifacts/types";
 import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
@@ -123,6 +124,13 @@ export function ArtifactPanelStatic({
               >
                 {artifacts?.[tab.value] ? (
                   <ArtifactSections sections={artifacts[tab.value]!} />
+                ) : tab.value === "blueprint" &&
+                  regenerateRunId &&
+                  status === "ready" ? (
+                  <BlueprintTabContent
+                    runId={regenerateRunId}
+                    sections={artifacts?.blueprint}
+                  />
                 ) : (
                   <ArtifactPanelSkeleton />
                 )}

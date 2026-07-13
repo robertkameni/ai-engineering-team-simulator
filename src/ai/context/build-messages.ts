@@ -4,6 +4,7 @@ import type { SimulationAgentRole } from "@/ai/agents/config";
 import { getTeamMember, type TeamRoster } from "@/ai/agents/roster";
 import { buildLanguageMatchDirective } from "@/ai/context/detect-product-language";
 import type { TranscriptEntry } from "@/ai/context/transcript";
+import { windowTranscriptForTurn } from "@/ai/context/window-transcript";
 import { getAgentTurnPrompt } from "@/ai/prompts";
 import type { AgentRole } from "@/features/agents/types";
 
@@ -73,7 +74,20 @@ export function buildAgentMessages(
     },
   ];
 
-  for (const entry of transcript) {
+  const windowedTranscript = windowTranscriptForTurn(
+    transcript,
+    roster,
+    debateContext,
+  );
+
+  if (windowedTranscript.omittedSummary) {
+    messages.push({
+      role: "user",
+      content: windowedTranscript.omittedSummary,
+    });
+  }
+
+  for (const entry of windowedTranscript.entries) {
     const teammateTitle = getTeamMember(roster, entry.role).title;
     messages.push({
       role: "user",

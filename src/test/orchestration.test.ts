@@ -13,6 +13,10 @@ import {
 import { looksLikeTruncatedAgentOutput } from "../ai/orchestration/looks-like-truncated-agent-output.js";
 import { createSimulationRoster } from "@/ai/agents/roster";
 import {
+  TRANSCRIPT_WINDOW_RECENT_COUNT,
+  windowTranscriptForTurn,
+} from "@/ai/context/window-transcript";
+import {
   extractReviewerDecisionTag,
   hasExceededReviewerRejectionCap,
   isDebateComplete,
@@ -296,5 +300,42 @@ describe("classify-project keyword helpers", () => {
       true,
     );
     assert.equal(isKeywordHybridProject("Next.js todo app"), false);
+  });
+});
+
+describe("windowTranscriptForTurn", () => {
+  it("returns the full transcript for correction turns", () => {
+    const roster = createSimulationRoster("software");
+    const transcript = Array.from({ length: 8 }, (_, index) => ({
+      role: "pm" as const,
+      agentName: roster.pm.name,
+      content: `Message ${index + 1}`,
+    }));
+
+    const windowed = windowTranscriptForTurn(transcript, roster, {
+      correction: {
+        reviewerName: roster.reviewer.name,
+        feedback: "Fix scope",
+        targetRole: "pm",
+      },
+    });
+
+    assert.equal(windowed.omittedSummary, null);
+    assert.equal(windowed.entries.length, 8);
+  });
+
+  it("windows long transcripts to recent messages with a summary", () => {
+    const roster = createSimulationRoster("software");
+    const transcript = Array.from({ length: 8 }, (_, index) => ({
+      role: "pm" as const,
+      agentName: roster.pm.name,
+      content: `Message ${index + 1} with enough detail to matter.`,
+    }));
+
+    const windowed = windowTranscriptForTurn(transcript, roster, {});
+
+    assert.ok(windowed.omittedSummary?.includes("Earlier debate summary"));
+    assert.equal(windowed.entries.length, TRANSCRIPT_WINDOW_RECENT_COUNT);
+    assert.equal(windowed.entries[0]?.content, "Message 5 with enough detail to matter.");
   });
 });

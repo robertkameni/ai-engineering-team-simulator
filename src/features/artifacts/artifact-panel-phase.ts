@@ -1,5 +1,5 @@
 import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
-import { ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
+import { ARTIFACT_TYPES, CORE_ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
 import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
 import type {
   ArtifactsPanelStatus,
@@ -50,14 +50,27 @@ export function countRunArtifacts(
   return ARTIFACT_TYPES.filter((type) => artifacts[type] != null).length;
 }
 
+export function countCoreArtifacts(
+  artifacts: PartialRunArtifacts | null | undefined,
+): number {
+  if (!artifacts) return 0;
+  return CORE_ARTIFACT_TYPES.filter((type) => artifacts[type] != null).length;
+}
+
+export function hasCoreArtifacts(
+  artifacts: PartialRunArtifacts | null | undefined,
+): boolean {
+  return countCoreArtifacts(artifacts) === CORE_ARTIFACT_TYPES.length;
+}
+
 export function shouldShowArtifactTabs(
   status: ArtifactsPanelStatus,
   artifacts: PartialRunArtifacts | null | undefined,
 ): boolean {
-  const count = countRunArtifacts(artifacts);
-  if (count === 0) return false;
-  if (status === "generating") return true;
-  return status === "ready" && count === ARTIFACT_TYPES.length;
+  const totalCount = countRunArtifacts(artifacts);
+  if (totalCount === 0) return false;
+  if (status === "generating") return totalCount > 0;
+  return status === "ready" && hasCoreArtifacts(artifacts);
 }
 
 export function artifactPanelSubtitle(
@@ -74,12 +87,15 @@ export function artifactPanelSubtitle(
       return "Phase 1 · waiting for debate";
     case "generating":
       if (artifactCount != null && artifactCount > 0) {
-        return `Phase 2 · ${artifactCount} of ${ARTIFACT_TYPES.length} deliverables ready`;
+        return `Phase 2 · ${artifactCount} of ${CORE_ARTIFACT_TYPES.length} core deliverables ready`;
       }
       return "Phase 2 · synthesizing deliverables";
     case "ready":
       if (isUnapprovedDebateOutcome(debateOutcome)) {
         return "Phase 3 · Finished with open risks (unapproved)";
+      }
+      if (artifactCount != null && artifactCount < ARTIFACT_TYPES.length) {
+        return "Phase 3 · ready — generate blueprint on demand";
       }
       return "Phase 3 · ready to review";
     case "unavailable":
@@ -90,7 +106,7 @@ export function artifactPanelSubtitle(
 }
 
 export function debateProgressFromMessages(
-  messages: { role: AgentRole; isStreaming?: boolean }[],
+  messages: { role: AgentRole; isStreaming?: boolean; }[],
   activeAgent: AgentRole | null,
 ): DebateProgress {
   const completed = messages.filter((message) => !message.isStreaming).length;

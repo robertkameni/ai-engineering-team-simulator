@@ -41,7 +41,7 @@ export function buildReviewerTurnPrompt(
   const base = `Write a thorough engineering review (roughly 350–500 words). Quote and analyze at least two technical claims from the team. ${buildImplementationQuoteHint(roster)} Use substantive **Agree** / **Disagree** / **Refine** arguments — prefer Disagree or Refine. Surface 3–5 critical risks. For each risk, determine whether the mitigation already exists in a PRIOR teammate message or only in your own text. If the mitigation is only in your review, the risk is UNRESOLVED — you must reject. Check for unaddressed prior feedback: if an agent was told to fix something and didn't, reject. Verify cross-critique compliance and operational completeness. End with [APPROVE] or [REJECT: role] alone on the absolute last line.`;
 
   if (options?.isReReview) {
-    return `${base}\n\nRE-REVIEW: Evaluate whether the rejected agent provided concrete, testable changes addressing each of your prior objections. If any concern remains unresolved or was addressed with a vague promise, reject again. Do not lower the bar because this is a second attempt — the fix must be in the agent's message, not implied.`;
+    return `${base}\n\nRE-REVIEW: Evaluate whether the rejected agent provided concrete, testable changes addressing each of your prior objections. If the agent cited specific mitigations, interfaces, configs, or acceptance checks that resolve your objections, you MUST issue [APPROVE]. Reject only when a named concern is still missing from the agent's latest message — not because you would prefer a different design. Do not loop on style preferences.`;
   }
 
   return base;
