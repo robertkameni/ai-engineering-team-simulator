@@ -1,2 +1,5 @@
 [phases.setup]
 aptPkgs = ["...", "unzip"]
+
+[phases.build]
+cmds = ["npm ci && npm run build"]

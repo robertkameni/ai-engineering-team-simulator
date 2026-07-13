@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.git/
+.env*
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.DS_Store
+.vercel
+src/generated
+.fallow/
