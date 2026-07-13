@@ -2,4 +2,4 @@
 aptPkgs = ["...", "unzip"]
 
 [phases.install]
-cmds = ["npm install --no-audit --no-fund"]
+cmds = ["npm install --include=dev --no-audit --no-fund"]
