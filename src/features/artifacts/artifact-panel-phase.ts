@@ -11,12 +11,13 @@ import type { SynthesisValidationFlags } from "@/features/artifacts/synthesis-va
 
 export function isUnapprovedDebateOutcome(
   outcome: DebateExitOutcome | null | undefined,
-): outcome is "cap_reached" | "unknown_reject_fallback" | "reviewer_error" | "degraded_truncated" {
+): outcome is "cap_reached" | "unknown_reject_fallback" | "reviewer_error" | "degraded_truncated" | "insufficient_budget" {
   return (
     outcome === "cap_reached" ||
     outcome === "unknown_reject_fallback" ||
     outcome === "reviewer_error" ||
-    outcome === "degraded_truncated"
+    outcome === "degraded_truncated" ||
+    outcome === "insufficient_budget"
   );
 }
 
@@ -34,6 +35,9 @@ export function debateOutcomeWarningMessage(outcome: DebateExitOutcome): string 
   if (outcome === "degraded_truncated") {
     return "Reviewer approved but critical agent turns were truncated. Deliverables are degraded — some sections may be incomplete.";
   }
+  if (outcome === "insufficient_budget") {
+    return "Insufficient remaining turns for a complete correction cycle. Debate closed with open review gaps preserved.";
+  }
   return "";
 }
 
@@ -43,6 +47,7 @@ export function debateOutcomeLabel(outcome: DebateExitOutcome): string {
   if (outcome === "unknown_reject_fallback") return "Reviewer decision unclear";
   if (outcome === "reviewer_error") return "Reviewer error";
   if (outcome === "degraded_truncated") return "Degraded — truncated turns";
+  if (outcome === "insufficient_budget") return "Insufficient closure budget";
   return outcome;
 }
 

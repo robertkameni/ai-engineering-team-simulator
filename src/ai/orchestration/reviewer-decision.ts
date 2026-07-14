@@ -4,12 +4,25 @@ import {
   type SimulationAgentRole,
 } from "@/ai/agents/config";
 import type { TeamRoster } from "@/ai/agents/roster";
+import type { TeamTemplateId } from "@/ai/agents/team-templates";
 
-export const MAX_SIMULATION_TURNS = 16;
+const SOFTWARE_MAX_TURNS = 20;
+const PHYSICAL_MAX_TURNS = 16;
+
+export function getMaxSimulationTurns(templateId: TeamTemplateId): number {
+  return templateId === "physical" ? PHYSICAL_MAX_TURNS : SOFTWARE_MAX_TURNS;
+}
+
+/** @deprecated Use {@link getMaxSimulationTurns} instead. */
+export const MAX_SIMULATION_TURNS = SOFTWARE_MAX_TURNS;
+
 export const MIN_TURNS_FOR_REVISION_FINISH = 4;
 
-export function canScheduleArchitectRevision(turnCount: number): boolean {
-  return turnCount + MIN_TURNS_FOR_REVISION_FINISH <= MAX_SIMULATION_TURNS;
+export function canScheduleArchitectRevision(
+  turnCount: number,
+  maxTurns = MAX_SIMULATION_TURNS,
+): boolean {
+  return turnCount + MIN_TURNS_FOR_REVISION_FINISH <= maxTurns;
 }
 
 /** After this many reviewer [REJECT] decisions, debate exits with cap_reached.
@@ -44,7 +57,12 @@ export type DebateExitOutcome =
   | "reviewer_error"
   /** TRUNCATION APPROVAL GUARD — reviewer issued [APPROVE] but one or more
    *  critical-role turns were truncated. The approval is downgraded. */
-  | "degraded_truncated";
+  | "degraded_truncated"
+  /** BUDGET-AWARE REVIEWER GUARD — reviewer issued [REJECT] but the
+   *  remaining turn budget is insufficient for a complete correction
+   *  → re-review → closure cycle. The debate exits with open gaps
+   *  preserved rather than entering a doomed reject path. */
+  | "insufficient_budget";
 
 export interface ParsedReviewerDecision {
   displayText: string;
@@ -254,12 +272,19 @@ export function isLegacyUntaggedReviewerCompletion(message: DebateMessage): bool
   return true;
 }
 
-export function isDebateComplete(messages: DebateMessage[]): boolean {
+export function isDebateComplete(
+  messages: DebateMessage[],
+  templateId?: TeamTemplateId,
+): boolean {
   if (messages.length === 0) {
     return false;
   }
 
-  if (messages.length >= MAX_SIMULATION_TURNS) {
+  const maxTurns = templateId
+    ? getMaxSimulationTurns(templateId)
+    : MAX_SIMULATION_TURNS;
+
+  if (messages.length >= maxTurns) {
     return true;
   }
 
@@ -278,12 +303,13 @@ export function isDebateComplete(messages: DebateMessage[]): boolean {
 
 export function isUnapprovedDebateExitOutcome(
   outcome: DebateExitOutcome | null | undefined,
-): outcome is "cap_reached" | "unknown_reject_fallback" | "reviewer_error" | "degraded_truncated" {
+): outcome is "cap_reached" | "unknown_reject_fallback" | "reviewer_error" | "degraded_truncated" | "insufficient_budget" {
   return (
     outcome === "cap_reached" ||
     outcome === "unknown_reject_fallback" ||
     outcome === "reviewer_error" ||
-    outcome === "degraded_truncated"
+    outcome === "degraded_truncated" ||
+    outcome === "insufficient_budget"
   );
 }
 
@@ -307,7 +333,8 @@ export function parseDebateOutcomeFromRunSummary(
         outcome === "cap_reached" ||
         outcome === "unknown_reject_fallback" ||
         outcome === "reviewer_error" ||
-        outcome === "degraded_truncated"
+        outcome === "degraded_truncated" ||
+        outcome === "insufficient_budget"
       ) {
         return outcome;
       }

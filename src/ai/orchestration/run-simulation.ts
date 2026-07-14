@@ -28,7 +28,7 @@ import {
   type DebateExitOutcome,
   hasExceededReviewerRejectionCap,
   canScheduleArchitectRevision,
-  MAX_SIMULATION_TURNS,
+  getMaxSimulationTurns,
   parseReviewerDecision,
   resolveUnknownReviewerDecision,
   stripReviewerDecisionTag,
@@ -128,6 +128,8 @@ export async function runSimulation(
       isArchitectRevision: false,
       hasTruncatedCriticalTurn: false,
       reviewIssues: [],
+      isGateReroute: false,
+      hasHadEarlyReview: false,
     };
 
     const ctx: TurnContext = {
@@ -183,21 +185,27 @@ async function runDebateLoop(
   state: DebateState,
   ctx: TurnContext,
 ): Promise<DebateExitOutcome> {
-  while (state.turnCount < MAX_SIMULATION_TURNS) {
+  const maxTurns = getMaxSimulationTurns(ctx.templateId);
+
+  while (state.turnCount < maxTurns) {
     assertNotAborted(ctx.abortSignal);
 
     const directive = await runDebateTurn(state, ctx);
 
     if (directive.kind === "break") {
-      if (state.turnCount >= MAX_SIMULATION_TURNS) {
-        console.warn("Simulation reached MAX_SIMULATION_TURNS", { runId: ctx.runId });
+      if (state.turnCount >= maxTurns) {
+        console.warn("Simulation reached maxTurns", { runId: ctx.runId, maxTurns });
       }
       return directive.outcome;
     }
 
     if (directive.kind === "reroute") {
       state.nextRole = directive.targetRole;
-      state.returnToReviewer = true;
+
+      if (!state.isGateReroute) {
+        state.returnToReviewer = true;
+      }
+      state.isGateReroute = false;
       continue;
     }
 
@@ -212,12 +220,18 @@ async function runDebateLoop(
       continue;
     }
 
+    if (shouldTriggerSoftwareEarlyReview(state, ctx)) {
+      state.nextRole = "reviewer";
+      state.hasHadEarlyReview = true;
+      continue;
+    }
+
     if (!applyLinearProgression(state)) {
       return "cap_reached";
     }
   }
 
-  console.warn("Simulation reached MAX_SIMULATION_TURNS", { runId: ctx.runId });
+  console.warn("Simulation reached maxTurns", { runId: ctx.runId, maxTurns });
   return "cap_reached";
 }
 
@@ -234,10 +248,13 @@ function shouldTriggerArchitectRevision(
   if (!canCorrectRole(state.roleCorrectionCounts, "architect")) {
     return false;
   }
-  if (!canScheduleArchitectRevision(state.turnCount)) {
+
+  const maxTurns = getMaxSimulationTurns(ctx.templateId);
+  if (!canScheduleArchitectRevision(state.turnCount, maxTurns)) {
     console.info("Skipping architect revision — insufficient turn budget remaining", {
       runId: ctx.runId,
       turnCount: state.turnCount,
+      maxTurns,
     });
     return false;
   }
@@ -256,6 +273,51 @@ function shouldTriggerArchitectRevision(
   );
 
   return criticism.criticized;
+}
+
+function shouldTriggerSoftwareEarlyReview(
+  state: DebateState,
+  ctx: TurnContext,
+): boolean {
+  if (ctx.templateId === "physical") {
+    return false;
+  }
+
+  if (state.hasHadEarlyReview) {
+    return false;
+  }
+
+  if (state.nextRole === "reviewer") {
+    return false;
+  }
+
+  if (state.returnToReviewer) {
+    return false;
+  }
+
+  if (state.isArchitectRevision) {
+    return false;
+  }
+
+  const architectSpoke = state.transcript.some(
+    (entry) => entry.role === "architect",
+  );
+  if (!architectSpoke) {
+    return false;
+  }
+
+  if (state.nextRole !== "backend") {
+    return false;
+  }
+
+  console.info("SOFTWARE EARLY REVIEW CHECKPOINT triggered", {
+    runId: ctx.runId,
+    templateId: ctx.templateId,
+    turnCount: state.turnCount,
+    pipelineProgress: state.transcript.map((e) => e.role),
+  });
+
+  return true;
 }
 
 function applyLinearProgression(state: DebateState): boolean {
@@ -550,8 +612,7 @@ async function handleArchitectQualityGate(
 
   state.turnCount += 1;
 
-  state.lastRejectFeedback = rejectPersisted;
-  state.lastRejectTarget = "architect";
+  state.isGateReroute = true;
 
   if (!canCorrectRole(state.roleCorrectionCounts, "architect")) {
     console.warn("Architect correction cap reached, closing debate", {
@@ -699,6 +760,25 @@ function resolveReviewerOutcome(
       return { kind: "break", outcome: "cap_reached" };
     }
 
+    const maxTurns = getMaxSimulationTurns(ctx.templateId);
+    const remainingBudget = maxTurns - state.turnCount;
+
+    if (remainingBudget < 2) {
+      console.warn(
+        "BUDGET-AWARE REVIEWER GUARD: insufficient remaining budget for reject cycle — exiting with open gaps",
+        {
+          runId: ctx.runId,
+          turnCount: state.turnCount,
+          maxTurns,
+          remainingBudget,
+          rejectRole: parsed.rejectRole,
+          templateId: ctx.templateId,
+          openIssues: buildIssueSnapshot(state.reviewIssues).totalOpen,
+        },
+      );
+      return { kind: "break", outcome: "insufficient_budget" };
+    }
+
     state.reviewerRejectionCount += 1;
     state.roleCorrectionCounts = incrementRoleCorrectionCount(
       state.roleCorrectionCounts,
@@ -714,7 +794,10 @@ function resolveReviewerOutcome(
   const fallback = resolveUnknownReviewerDecision();
   const fallbackRole = fallback.rejectRole ?? "pm";
 
-  if (state.turnCount < MAX_SIMULATION_TURNS) {
+  const maxTurns = getMaxSimulationTurns(ctx.templateId);
+  const remainingBudget = maxTurns - state.turnCount;
+
+  if (remainingBudget >= 2 && state.turnCount < maxTurns) {
     if (!canCorrectRole(state.roleCorrectionCounts, fallbackRole)) {
       return { kind: "break", outcome: "unknown_reject_fallback" };
     }

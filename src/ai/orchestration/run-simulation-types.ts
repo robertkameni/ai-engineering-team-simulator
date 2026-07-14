@@ -40,6 +40,15 @@ export interface DebateState {
   hasTruncatedCriticalTurn: boolean;
   /** STRUCTURED RESOLUTION TRACKING — structured issues across correction cycles. */
   reviewIssues: ReviewIssue[];
+  /** ARCHITECT GATE CLEANUP — true when the current reroute originated from
+   *  handleArchitectQualityGate rather than a real reviewer rejection.
+   *  Suppresses returnToReviewer in runDebateLoop so the pipeline continues
+   *  after architect re-contributes. */
+  isGateReroute: boolean;
+  /** SOFTWARE EARLY REVIEW CHECKPOINT — true after an early reviewer
+   *  checkpoint has been inserted for software-template runs. Prevents
+   *  multiple early-review insertions in the same debate. */
+  hasHadEarlyReview: boolean;
 }
 
 export interface TurnContext {

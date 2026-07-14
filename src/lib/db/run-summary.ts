@@ -12,6 +12,7 @@ const VALID_DEBATE_OUTCOMES = new Set<string>([
   "unknown_reject_fallback",
   "reviewer_error",
   "degraded_truncated",
+  "insufficient_budget",
   "aborted",
 ]);
 

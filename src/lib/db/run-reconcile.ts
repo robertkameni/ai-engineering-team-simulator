@@ -1,6 +1,6 @@
 import {
   isLegacyUntaggedReviewerCompletion,
-  MAX_SIMULATION_TURNS,
+  getMaxSimulationTurns,
   parseReviewerDecision,
 } from "@/ai/orchestration/reviewer-decision";
 import type {
@@ -164,7 +164,7 @@ function resolveStaleDebateCompletion(
   messageCount: number,
   lastMessage: { agentRole: string; content: string; },
 ): boolean {
-  if (messageCount >= MAX_SIMULATION_TURNS) {
+  if (messageCount >= getMaxSimulationTurns("software")) {
     return true;
   }
 

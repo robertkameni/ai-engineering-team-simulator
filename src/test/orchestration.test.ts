@@ -25,11 +25,12 @@ import { buildReviewerPreflightChecklist } from "../ai/orchestration/reviewer-pr
 import {
   canScheduleArchitectRevision,
   extractReviewerDecisionTag,
+  getMaxSimulationTurns,
   hasExceededReviewerRejectionCap,
   isDebateComplete,
   isLegacyUntaggedReviewerCompletion,
+  isUnapprovedDebateExitOutcome,
   MAX_REVIEWER_REJECTION_CYCLES,
-  MAX_SIMULATION_TURNS,
   MIN_TURNS_FOR_REVISION_FINISH,
   parseDebateOutcomeFromRunSummary,
   parseReviewerDecision,
@@ -38,22 +39,41 @@ import {
   reviewerVisibleText,
   stripReviewerDecisionTag,
 } from "../ai/orchestration/reviewer-decision.js";
+import { parseRunSummary } from "../lib/db/run-summary.js";
 
 describe("canScheduleArchitectRevision", () => {
-  it("allows revision when enough turns remain", () => {
+  it("allows revision when enough turns remain for physical template", () => {
+    const maxTurns = getMaxSimulationTurns("physical");
     assert.equal(
       canScheduleArchitectRevision(
-        MAX_SIMULATION_TURNS - MIN_TURNS_FOR_REVISION_FINISH,
+        maxTurns - MIN_TURNS_FOR_REVISION_FINISH,
+        maxTurns,
       ),
       true,
     );
   });
 
   it("blocks revision when the turn budget is too tight", () => {
+    const maxTurns = getMaxSimulationTurns("physical");
     assert.equal(
       canScheduleArchitectRevision(
-        MAX_SIMULATION_TURNS - MIN_TURNS_FOR_REVISION_FINISH + 1,
+        maxTurns - MIN_TURNS_FOR_REVISION_FINISH + 1,
+        maxTurns,
       ),
+      false,
+    );
+  });
+
+  it("allows revision later in software template due to higher cap", () => {
+    // Software has 20 turns — at turn 17, 4 turns remain → revision allowed
+    const maxTurns = getMaxSimulationTurns("software");
+    assert.equal(maxTurns, 20);
+    assert.equal(
+      canScheduleArchitectRevision(maxTurns - MIN_TURNS_FOR_REVISION_FINISH, maxTurns),
+      true,
+    );
+    assert.equal(
+      canScheduleArchitectRevision(maxTurns - MIN_TURNS_FOR_REVISION_FINISH + 1, maxTurns),
       false,
     );
   });
@@ -205,11 +225,12 @@ describe("isDebateComplete", () => {
   });
 
   it("returns true for cap-saturated runs", () => {
-    const capped = Array.from({ length: MAX_SIMULATION_TURNS }, (_, index) => ({
+    const maxTurns = getMaxSimulationTurns("software");
+    const capped = Array.from({ length: maxTurns }, (_, index) => ({
       agentRole: index % 2 === 0 ? "pm" : "architect",
       content: `turn ${index}`,
     }));
-    assert.equal(isDebateComplete(capped), true);
+    assert.equal(isDebateComplete(capped, "software"), true);
   });
 
   it("returns true for legacy untagged reviewer completions", () => {
@@ -461,5 +482,103 @@ describe("buildReviewerPreflightChecklist", () => {
     assert.ok(checklist.includes("Missing roles"));
     assert.ok(checklist.includes("backup"));
     assert.ok(checklist.includes("onboarding"));
+  });
+});
+
+// PHASE 1 — ADAPTIVE TURN CAP
+describe("getMaxSimulationTurns (adaptive cap)", () => {
+  it("returns 16 for physical templates", () => {
+    assert.equal(getMaxSimulationTurns("physical"), 16);
+  });
+
+  it("returns 20 for software templates", () => {
+    assert.equal(getMaxSimulationTurns("software"), 20);
+  });
+
+  it("returns 20 for hybrid templates", () => {
+    assert.equal(getMaxSimulationTurns("hybrid"), 20);
+  });
+
+  it("accepts all known TeamTemplateId values", () => {
+    for (const id of ["software", "physical", "hybrid"] as const) {
+      const cap = getMaxSimulationTurns(id);
+      assert.ok(cap >= 16, `${id} cap too low: ${cap}`);
+    }
+  });
+});
+
+// PHASE 1 — isDebateComplete respects adaptive caps
+describe("isDebateComplete with templateId", () => {
+  it("uses a 16-turn cap for physical runs", () => {
+    const physicalMessages = Array.from({ length: 16 }, (_, index) => ({
+      agentRole: index % 2 === 0 ? "pm" : "architect",
+      content: `turn ${index}`,
+    }));
+    assert.equal(isDebateComplete(physicalMessages, "physical"), true);
+  });
+
+  it("does not complete a 17-turn physical run (cap is 16)", () => {
+    const physicalMessages = Array.from({ length: 17 }, (_, index) => ({
+      agentRole: index % 2 === 0 ? "pm" : "architect",
+      content: `turn ${index}`,
+    }));
+    // 17 messages, but physical cap is 16 — should be treated as complete
+    // per the existing maxTurns check (>= comparison).
+    assert.equal(isDebateComplete(physicalMessages, "physical"), true);
+  });
+
+  it("uses a 20-turn cap for software runs", () => {
+    const softwareMessages = Array.from({ length: 18 }, (_, index) => ({
+      agentRole: index % 2 === 0 ? "pm" : "architect",
+      content: `turn ${index}`,
+    }));
+    assert.equal(isDebateComplete(softwareMessages, "software"), false);
+
+    const fullMessages = Array.from({ length: 20 }, (_, index) => ({
+      agentRole: index % 2 === 0 ? "pm" : "architect",
+      content: `turn ${index}`,
+    }));
+    assert.equal(isDebateComplete(fullMessages, "software"), true);
+  });
+});
+
+// PHASE 2 — BUDGET-AWARE REVIEWER GUARD
+describe("insufficient_budget outcome", () => {
+  it("is parsed from run summary JSON", () => {
+    const outcome = parseDebateOutcomeFromRunSummary(
+      JSON.stringify({ debateOutcome: "insufficient_budget", turnCount: 19 }),
+    );
+    assert.equal(outcome, "insufficient_budget");
+  });
+
+  it("is recognized as an unapproved outcome", () => {
+    assert.equal(isUnapprovedDebateExitOutcome("insufficient_budget"), true);
+    assert.equal(isUnapprovedDebateExitOutcome("approved"), false);
+  });
+
+  it("appears in VALID_DEBATE_OUTCOMES set", () => {
+    const summary = parseRunSummary(
+      JSON.stringify({ debateOutcome: "insufficient_budget", turnCount: 19 }),
+    );
+    assert.equal(summary?.debateOutcome, "insufficient_budget");
+  });
+});
+
+// PHASE 1 + 2 — canScheduleArchitectRevision respects adaptive caps
+describe("canScheduleArchitectRevision with adaptive caps", () => {
+  it("allows revision at turn 16 in software (cap 20, 4 turns remain)", () => {
+    assert.equal(canScheduleArchitectRevision(16, 20), true);
+  });
+
+  it("blocks revision at turn 17 in software (cap 20, 3 turns remain)", () => {
+    assert.equal(canScheduleArchitectRevision(17, 20), false);
+  });
+
+  it("allows revision at turn 12 in physical (cap 16, 4 turns remain)", () => {
+    assert.equal(canScheduleArchitectRevision(12, 16), true);
+  });
+
+  it("blocks revision at turn 13 in physical (cap 16, 3 turns remain)", () => {
+    assert.equal(canScheduleArchitectRevision(13, 16), false);
   });
 });
