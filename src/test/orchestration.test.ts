@@ -23,12 +23,14 @@ import {
 } from "../ai/orchestration/debate-correction-caps.js";
 import { buildReviewerPreflightChecklist } from "../ai/orchestration/reviewer-preflight.js";
 import {
+  canScheduleArchitectRevision,
   extractReviewerDecisionTag,
   hasExceededReviewerRejectionCap,
   isDebateComplete,
   isLegacyUntaggedReviewerCompletion,
   MAX_REVIEWER_REJECTION_CYCLES,
   MAX_SIMULATION_TURNS,
+  MIN_TURNS_FOR_REVISION_FINISH,
   parseDebateOutcomeFromRunSummary,
   parseReviewerDecision,
   resolveRejectIdentifier,
@@ -36,6 +38,26 @@ import {
   reviewerVisibleText,
   stripReviewerDecisionTag,
 } from "../ai/orchestration/reviewer-decision.js";
+
+describe("canScheduleArchitectRevision", () => {
+  it("allows revision when enough turns remain", () => {
+    assert.equal(
+      canScheduleArchitectRevision(
+        MAX_SIMULATION_TURNS - MIN_TURNS_FOR_REVISION_FINISH,
+      ),
+      true,
+    );
+  });
+
+  it("blocks revision when the turn budget is too tight", () => {
+    assert.equal(
+      canScheduleArchitectRevision(
+        MAX_SIMULATION_TURNS - MIN_TURNS_FOR_REVISION_FINISH + 1,
+      ),
+      false,
+    );
+  });
+});
 
 describe("hasExceededReviewerRejectionCap", () => {
   it("allows reviewer rejections below the configured cap", () => {

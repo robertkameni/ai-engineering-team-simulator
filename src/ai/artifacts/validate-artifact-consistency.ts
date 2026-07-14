@@ -68,3 +68,39 @@ export function buildStackConsistencyFixPrompt(violations: readonly string[]): s
     "Regenerate this artifact using only the verified modern web stack reference and prior artifacts.",
   ].join("\n");
 }
+
+export function buildDeterministicStackMajorDirective(): string {
+  const snapshot = getVerifiedStackSnapshot();
+  const requiredMajors: string[] = [];
+
+  if (snapshot.nextMajor != null) {
+    requiredMajors.push(`- Next.js ${snapshot.nextMajor}`);
+  }
+
+  if (snapshot.prismaMajor != null) {
+    requiredMajors.push(`- Prisma ${snapshot.prismaMajor}`);
+  }
+
+  if (requiredMajors.length === 0) {
+    return "";
+  }
+
+  return [
+    "Required dependency majors (use exactly these unless the product idea explicitly requires something else):",
+    ...requiredMajors,
+  ].join("\n");
+}
+
+export function buildDeterministicStackConsistencyFixPrompt(
+  violations: readonly string[],
+): string {
+  const deterministicMajors = buildDeterministicStackMajorDirective();
+
+  return [
+    buildStackConsistencyFixPrompt(violations),
+    deterministicMajors,
+    "Replace every stale major version mention with the required majors above.",
+  ]
+    .filter((section) => section.trim().length > 0)
+    .join("\n\n");
+}

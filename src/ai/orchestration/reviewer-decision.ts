@@ -6,6 +6,11 @@ import {
 import type { TeamRoster } from "@/ai/agents/roster";
 
 export const MAX_SIMULATION_TURNS = 16;
+export const MIN_TURNS_FOR_REVISION_FINISH = 4;
+
+export function canScheduleArchitectRevision(turnCount: number): boolean {
+  return turnCount + MIN_TURNS_FOR_REVISION_FINISH <= MAX_SIMULATION_TURNS;
+}
 
 /** After this many reviewer [REJECT] decisions, debate exits with cap_reached. */
 export const MAX_REVIEWER_REJECTION_CYCLES = 2;

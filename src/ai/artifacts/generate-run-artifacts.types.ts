@@ -11,6 +11,12 @@ import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 export interface GenerateRunArtifactsResult {
   readonly artifacts: Partial<RunArtifactsOutput>;
   readonly consistencyRetries: number;
+  readonly stackValidationFailed: boolean;
+}
+
+export interface StackRetryResult {
+  readonly retryCount: number;
+  readonly stackValidationFailed: boolean;
 }
 
 export interface ArtifactSynthesisRetryContext {

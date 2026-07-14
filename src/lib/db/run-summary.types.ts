@@ -7,9 +7,11 @@ export interface RunSummaryPayload {
   readonly turnCount: number | null;
   readonly synthesisVersion?: number;
   readonly consistencyRetries?: number;
+  readonly stackValidationFailed?: boolean;
 }
 
 export interface RunSummarySynthesisTelemetry {
   readonly synthesisVersion: number;
   readonly consistencyRetries: number;
+  readonly stackValidationFailed?: boolean;
 }

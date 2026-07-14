@@ -22,6 +22,7 @@ describe("run summary helpers", () => {
       turnCount: 12,
       synthesisVersion: undefined,
       consistencyRetries: undefined,
+      stackValidationFailed: undefined,
     });
   });
 
@@ -34,6 +35,7 @@ describe("run summary helpers", () => {
     const merged = mergeRunSummarySynthesisTelemetry(existing, {
       synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
       consistencyRetries: 1,
+      stackValidationFailed: true,
     });
 
     assert.deepEqual(parseRunSummary(merged), {
@@ -41,6 +43,7 @@ describe("run summary helpers", () => {
       turnCount: 16,
       synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
       consistencyRetries: 1,
+      stackValidationFailed: true,
     });
   });
 });

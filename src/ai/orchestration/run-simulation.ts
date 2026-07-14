@@ -27,6 +27,7 @@ import {
 import {
   type DebateExitOutcome,
   hasExceededReviewerRejectionCap,
+  canScheduleArchitectRevision,
   MAX_SIMULATION_TURNS,
   parseReviewerDecision,
   resolveUnknownReviewerDecision,
@@ -214,6 +215,13 @@ function shouldTriggerArchitectRevision(
     return false;
   }
   if (!canCorrectRole(state.roleCorrectionCounts, "architect")) {
+    return false;
+  }
+  if (!canScheduleArchitectRevision(state.turnCount)) {
+    console.info("Skipping architect revision — insufficient turn budget remaining", {
+      runId: ctx.runId,
+      turnCount: state.turnCount,
+    });
     return false;
   }
 

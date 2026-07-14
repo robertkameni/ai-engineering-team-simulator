@@ -11,6 +11,7 @@ import type {
   GenerateRunArtifactsResult,
   RetryCrossInconsistentArtifactsParams,
   RetryStackInconsistentArtifactsParams,
+  StackRetryResult,
 } from "@/ai/artifacts/generate-run-artifacts.types";
 import { mergeCorrectionTurns } from "@/ai/artifacts/merge-correction-turns";
 import {
@@ -19,6 +20,7 @@ import {
   validateArtifactCrossConsistency,
 } from "@/ai/artifacts/validate-artifact-cross-consistency";
 import {
+  buildDeterministicStackConsistencyFixPrompt,
   buildStackConsistencyFixPrompt,
   validateArtifactStackConsistency,
 } from "@/ai/artifacts/validate-artifact-consistency";
@@ -326,8 +328,22 @@ function resolveStackRetryTypes(violations: readonly string[]): ArtifactType[] {
   return ARTIFACT_SYNTHESIS_ORDER.filter((type) => retryTypes.has(type));
 }
 
-async function retryStackInconsistentArtifacts(
+function resolveSecondStackRetryTypes(violations: readonly string[]): ArtifactType[] {
+  const hasBlueprintViolation = violations.some((violation) =>
+    violation.startsWith("blueprint:"),
+  );
+
+  if (hasBlueprintViolation) {
+    return ["blueprint"];
+  }
+
+  return resolveStackRetryTypes(violations);
+}
+
+async function regenerateStackArtifactsForViolations(
   params: RetryStackInconsistentArtifactsParams,
+  retryTypes: readonly ArtifactType[],
+  fixNotice: string,
 ): Promise<number> {
   const {
     output,
@@ -340,14 +356,6 @@ async function retryStackInconsistentArtifacts(
     debateOutcome,
     onArtifactComplete,
   } = params;
-
-  const violations = validateArtifactStackConsistency(output);
-  if (violations.length === 0) {
-    return 0;
-  }
-
-  const fixNotice = buildStackConsistencyFixPrompt(violations);
-  const retryTypes = resolveStackRetryTypes(violations);
 
   for (const type of retryTypes) {
     if (usageAccumulator) {
@@ -377,6 +385,42 @@ async function retryStackInconsistentArtifacts(
   }
 
   return retryTypes.length;
+}
+
+async function retryStackInconsistentArtifacts(
+  params: RetryStackInconsistentArtifactsParams,
+): Promise<StackRetryResult> {
+  let violations = validateArtifactStackConsistency(params.output);
+  if (violations.length === 0) {
+    return { retryCount: 0, stackValidationFailed: false };
+  }
+
+  let retryCount = 0;
+
+  retryCount += await regenerateStackArtifactsForViolations(
+    params,
+    resolveStackRetryTypes(violations),
+    buildStackConsistencyFixPrompt(violations),
+  );
+
+  violations = validateArtifactStackConsistency(params.output);
+  if (violations.length === 0) {
+    return { retryCount, stackValidationFailed: false };
+  }
+
+  retryCount += await regenerateStackArtifactsForViolations(
+    params,
+    resolveSecondStackRetryTypes(violations),
+    buildDeterministicStackConsistencyFixPrompt(violations),
+  );
+
+  violations = validateArtifactStackConsistency(params.output);
+  if (violations.length > 0) {
+    console.warn("Stack validation failed after retries", { violations });
+    return { retryCount, stackValidationFailed: true };
+  }
+
+  return { retryCount, stackValidationFailed: false };
 }
 
 async function retryCrossInconsistentArtifacts(
@@ -498,7 +542,7 @@ export async function generateRunArtifacts({
     await onArtifactComplete?.(type, document);
   }
 
-  const stackRetries = await retryStackInconsistentArtifacts({
+  const stackRetryResult = await retryStackInconsistentArtifacts({
     output,
     transcriptPrompt,
     consensusDirectives,
@@ -523,5 +567,9 @@ export async function generateRunArtifacts({
     onArtifactComplete,
   });
 
-  return { artifacts: output, consistencyRetries: stackRetries + crossRetries };
+  return {
+    artifacts: output,
+    consistencyRetries: stackRetryResult.retryCount + crossRetries,
+    stackValidationFailed: stackRetryResult.stackValidationFailed,
+  };
 }

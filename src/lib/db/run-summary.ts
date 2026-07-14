@@ -48,11 +48,17 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
         ? record.consistencyRetries
         : undefined;
 
+    const stackValidationFailed =
+      typeof record.stackValidationFailed === "boolean"
+        ? record.stackValidationFailed
+        : undefined;
+
     return {
       debateOutcome,
       turnCount,
       synthesisVersion,
       consistencyRetries,
+      stackValidationFailed,
     };
   } catch {
     return null;
@@ -70,5 +76,6 @@ export function mergeRunSummarySynthesisTelemetry(
     turnCount: existing?.turnCount ?? null,
     synthesisVersion: telemetry.synthesisVersion,
     consistencyRetries: telemetry.consistencyRetries,
+    stackValidationFailed: telemetry.stackValidationFailed,
   });
 }

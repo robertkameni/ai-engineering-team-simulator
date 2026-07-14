@@ -201,6 +201,7 @@ export async function regenerateRunArtifacts(
       mergeRunSummarySynthesisTelemetry(run.summary, {
         synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
         consistencyRetries: synthesisResult.consistencyRetries,
+        stackValidationFailed: synthesisResult.stackValidationFailed,
       }),
     );
     await updateArtifactStatus(runId, "ready");
