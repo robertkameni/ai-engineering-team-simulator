@@ -4,7 +4,10 @@ import type {
 } from "@/features/artifacts/types";
 import type { RunUsageTotals } from "@/lib/ai/run-usage";
 import type { DebateExitOutcome } from "@/ai/orchestration/reviewer-decision";
-import type { OpsFollowUpLastCorrectionRole } from "@/lib/db/ops-follow-up-summary";
+import type {
+  OpsFollowUpCheckpoint,
+  OpsFollowUpLastCorrectionRole,
+} from "@/lib/db/ops-follow-up-summary";
 
 export type { DebateExitOutcome };
 
@@ -67,6 +70,7 @@ export interface MockRun {
   opsFollowUpUnresolvedDevopsIssueCount?: number;
   opsFollowUpLastCorrectionRole?: OpsFollowUpLastCorrectionRole | null;
   opsFollowUpEvaluationTurn?: number | null;
+  opsFollowUpArchitectCheckpoint?: OpsFollowUpCheckpoint | null;
 }
 
 export interface MockArtifactSection {

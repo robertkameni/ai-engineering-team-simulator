@@ -1,6 +1,9 @@
 import type { DebateExitOutcome } from "@/ai/orchestration/reviewer-decision";
 
-import type { OpsFollowUpLastCorrectionRole } from "@/lib/db/ops-follow-up-summary";
+import type {
+  OpsFollowUpCheckpoint,
+  OpsFollowUpLastCorrectionRole,
+} from "@/lib/db/ops-follow-up-summary";
 
 export type RunSummaryDebateOutcome = DebateExitOutcome | "aborted";
 
@@ -22,6 +25,7 @@ export interface RunSummaryPayload {
   readonly opsFollowUpUnresolvedDevopsIssueCount?: number;
   readonly opsFollowUpLastCorrectionRole?: OpsFollowUpLastCorrectionRole | null;
   readonly opsFollowUpEvaluationTurn?: number | null;
+  readonly opsFollowUpArchitectCheckpoint?: OpsFollowUpCheckpoint | null;
 }
 
 export interface RunSummarySynthesisTelemetry {

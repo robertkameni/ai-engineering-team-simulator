@@ -32,8 +32,13 @@ export interface RunExportContext {
   templateId?: TeamTemplateId;
 }
 
-function resolveRunOpsFollowUpFields(run: MockRun) {
-  return opsFollowUpFieldsFromCheckpoint(
+interface RunOpsFollowUpExportFields {
+  readonly last: ReturnType<typeof opsFollowUpFieldsFromCheckpoint>;
+  readonly architectCheckpoint: import("@/lib/db/ops-follow-up-summary").OpsFollowUpCheckpoint | null;
+}
+
+function resolveRunOpsFollowUpFields(run: MockRun): RunOpsFollowUpExportFields {
+  const last = opsFollowUpFieldsFromCheckpoint(
     run.opsFollowUpEvaluated
       ? {
           opsFollowUpEvaluated: run.opsFollowUpEvaluated,
@@ -48,6 +53,7 @@ function resolveRunOpsFollowUpFields(run: MockRun) {
         }
       : null,
   );
+  return { last, architectCheckpoint: run.opsFollowUpArchitectCheckpoint ?? null };
 }
 
 function resolveTemplateId(templateId?: TeamTemplateId): TeamTemplateId {
@@ -128,7 +134,8 @@ function appendMetadata(lines: string[], ctx: RunExportContext): void {
     );
   }
 
-  appendOpsFollowUpMetadataLines(lines, resolveRunOpsFollowUpFields(run));
+  const opsFields = resolveRunOpsFollowUpFields(run);
+  appendOpsFollowUpMetadataLines(lines, opsFields.last, opsFields.architectCheckpoint);
 }
 
 function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
@@ -192,7 +199,8 @@ function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
     );
   }
 
-  appendOpsFollowUpMetadataHtml(parts, resolveRunOpsFollowUpFields(run));
+  const opsFields = resolveRunOpsFollowUpFields(run);
+  appendOpsFollowUpMetadataHtml(parts, opsFields.last, opsFields.architectCheckpoint);
 }
 
 function blocksToMarkdown(blocks: MessageBlock[]): string[] {

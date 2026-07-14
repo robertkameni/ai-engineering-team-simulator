@@ -62,6 +62,7 @@ import {
   markDevOpsOperationalIssuesAttempted,
   scheduleOpsFollowUpTurn,
   recordOpsFollowUpCheckpoint,
+  selectOpsFollowUpSummary,
 } from "@/ai/orchestration/ops-follow-up";
 import { opsFollowUpFieldsFromCheckpoint } from "@/lib/db/ops-follow-up-summary";
 import {
@@ -139,6 +140,7 @@ export async function runSimulation(
       hasHadOpsFollowUpForCurrentReject: false,
       focusedOpsFollowUp: null,
       opsFollowUpCheckpoint: null,
+      opsFollowUpCheckpoints: [],
     };
 
     const ctx: TurnContext = {
@@ -157,6 +159,12 @@ export async function runSimulation(
 
     debateComplete = true;
 
+    const opsFollowUpSummary = selectOpsFollowUpSummary(state.opsFollowUpCheckpoints);
+    const architectCheckpoint =
+      opsFollowUpSummary.relevantArchitect !== opsFollowUpSummary.last
+        ? opsFollowUpSummary.relevantArchitect
+        : undefined;
+
     await updateRunSummary(
       run.id,
       buildRunSummaryPayload({
@@ -164,7 +172,8 @@ export async function runSimulation(
         turnCount: state.turnCount,
         hasTruncatedCriticalTurn: state.hasTruncatedCriticalTurn || undefined,
         openReviewIssueCount: buildIssueSnapshot(state.reviewIssues).totalOpen || undefined,
-        ...opsFollowUpFieldsFromCheckpoint(state.opsFollowUpCheckpoint),
+        ...opsFollowUpFieldsFromCheckpoint(opsFollowUpSummary.last),
+        opsFollowUpArchitectCheckpoint: architectCheckpoint,
       }),
     );
 

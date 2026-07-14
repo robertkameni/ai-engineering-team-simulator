@@ -40,6 +40,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       run.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
     opsFollowUpLastCorrectionRole: run.opsFollowUpLastCorrectionRole ?? null,
     opsFollowUpEvaluationTurn: run.opsFollowUpEvaluationTurn ?? null,
+    opsFollowUpArchitectCheckpoint: run.opsFollowUpArchitectCheckpoint ?? null,
   });
 }
 

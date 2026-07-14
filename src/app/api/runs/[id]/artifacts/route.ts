@@ -50,6 +50,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
     opsFollowUpLastCorrectionRole:
       summaryPayload?.opsFollowUpLastCorrectionRole ?? null,
     opsFollowUpEvaluationTurn: summaryPayload?.opsFollowUpEvaluationTurn ?? null,
+    opsFollowUpArchitectCheckpoint:
+      summaryPayload?.opsFollowUpArchitectCheckpoint ?? null,
   });
 }
 

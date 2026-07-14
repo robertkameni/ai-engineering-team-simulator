@@ -16,6 +16,7 @@ const DEFAULT_OPS_FIELDS = {
   opsFollowUpUnresolvedDevopsIssueCount: 0,
   opsFollowUpLastCorrectionRole: null,
   opsFollowUpEvaluationTurn: null,
+  opsFollowUpArchitectCheckpoint: null,
 } as const;
 
 describe("run summary helpers", () => {

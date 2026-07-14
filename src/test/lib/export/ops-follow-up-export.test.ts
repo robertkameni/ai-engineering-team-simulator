@@ -9,7 +9,7 @@ function buildExportRun(overrides: Partial<MockRun> = {}): MockRun {
     id: "run_export_test",
     title: "Food delivery platform",
     userPrompt: "Build a food delivery platform",
-    status: "completed",
+    status: "complete",
     updatedAt: "2026-07-14T10:00:00.000Z",
     messages: [],
     opsFollowUpEvaluated: true,

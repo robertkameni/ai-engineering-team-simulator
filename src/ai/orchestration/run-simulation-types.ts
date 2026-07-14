@@ -45,6 +45,7 @@ export interface DebateState {
   hasHadOpsFollowUpForCurrentReject: boolean;
   focusedOpsFollowUp: FocusedOpsFollowUpContext | null;
   opsFollowUpCheckpoint: OpsFollowUpCheckpoint | null;
+  opsFollowUpCheckpoints: OpsFollowUpCheckpoint[];
 }
 
 export interface TurnContext {

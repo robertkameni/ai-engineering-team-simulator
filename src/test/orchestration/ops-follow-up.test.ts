@@ -18,6 +18,7 @@ import {
   recordOpsFollowUpCheckpoint,
   resolveLastCorrectionRole,
   scheduleOpsFollowUpTurn,
+  selectOpsFollowUpSummary,
   shouldTriggerOpsFollowUp,
 } from "@/ai/orchestration/ops-follow-up";
 import { createReviewIssues } from "@/ai/orchestration/review-issue-tracker";
@@ -91,6 +92,7 @@ function buildBaseState(
     hasHadOpsFollowUpForCurrentReject: false,
     focusedOpsFollowUp: null,
     opsFollowUpCheckpoint: null,
+    opsFollowUpCheckpoints: [],
     ...overrides,
   };
 }
@@ -354,6 +356,9 @@ describe("ops follow-up observability checkpoint", () => {
     assert.equal(checkpoint?.opsFollowUpLastCorrectionRole, "architect");
     assert.equal(checkpoint?.opsFollowUpUnresolvedDevopsIssueCount >= 2, true);
     assert.equal(checkpoint?.opsFollowUpEvaluationTurn, 10);
+
+    assert.equal(state.opsFollowUpCheckpoints.length, 1);
+    assert.equal(state.opsFollowUpCheckpoints[0], checkpoint);
   });
 
   it("records skipped no-gap architect-path evaluation", () => {
@@ -374,6 +379,9 @@ describe("ops follow-up observability checkpoint", () => {
     );
     assert.equal(checkpoint?.opsFollowUpLastCorrectionRole, "architect");
     assert.equal(checkpoint?.opsFollowUpUnresolvedDevopsIssueCount, 0);
+
+    assert.equal(state.opsFollowUpCheckpoints.length, 1);
+    assert.equal(state.opsFollowUpCheckpoints[0], checkpoint);
   });
 
   it("records backend-path evaluation as out-of-scope for trigger", () => {
@@ -409,6 +417,131 @@ describe("ops follow-up observability checkpoint", () => {
     );
     assert.equal(checkpoint?.opsFollowUpLastCorrectionRole, "backend");
     assert.ok((checkpoint?.opsFollowUpUnresolvedDevopsIssueCount ?? 0) >= 2);
+
+    assert.equal(state.opsFollowUpCheckpoints.length, 1);
+    assert.equal(state.opsFollowUpCheckpoints[0], checkpoint);
+  });
+});
+
+describe("checkpoint history and selectOpsFollowUpSummary", () => {
+  it("selectOpsFollowUpSummary returns null for both when no checkpoints exist", () => {
+    const summary = selectOpsFollowUpSummary([]);
+    assert.equal(summary.last, null);
+    assert.equal(summary.relevantArchitect, null);
+  });
+
+  it("selectOpsFollowUpSummary returns the same reference for last and relevantArchitect when the only checkpoint is architect", () => {
+    const ctx = buildTurnContext("software");
+    const state = buildBaseState(ctx.roster.devops.name);
+
+    recordOpsFollowUpCheckpoint(state, ctx);
+
+    const summary = selectOpsFollowUpSummary(state.opsFollowUpCheckpoints);
+    assert.equal(summary.last?.opsFollowUpLastCorrectionRole, "architect");
+    assert.equal(summary.relevantArchitect?.opsFollowUpLastCorrectionRole, "architect");
+    assert.equal(summary.last, summary.relevantArchitect);
+  });
+
+  it("preserves architect checkpoint when a later frontend correction overwrites last", () => {
+    const ctx = buildTurnContext("software");
+
+    // Cycle 1: architect correction with DevOps gaps — trigger fires
+    const state = buildBaseState(ctx.roster.devops.name);
+    recordOpsFollowUpCheckpoint(state, ctx);
+
+    assert.equal(state.opsFollowUpCheckpoints.length, 1);
+    assert.equal(
+      state.opsFollowUpCheckpoints[0]!.opsFollowUpLastCorrectionRole,
+      "architect",
+    );
+    assert.equal(state.opsFollowUpCheckpoints[0]!.opsFollowUpTriggered, true);
+
+    // Cycle 2: frontend correction with no DevOps gaps
+    state.transcript = [
+      { role: "reviewer", agentName: "Marcus", content: "Second review" },
+      { role: "frontend", agentName: "Dana", content: "Frontend correction" },
+    ];
+    state.lastRejectFeedback = ARCHITECT_ONLY_FEEDBACK;
+    state.lastRejectTarget = "frontend";
+    state.turnCount = 14;
+
+    recordOpsFollowUpCheckpoint(state, ctx);
+
+    assert.equal(state.opsFollowUpCheckpoints.length, 2);
+    assert.equal(
+      state.opsFollowUpCheckpoints[1]!.opsFollowUpLastCorrectionRole,
+      "frontend",
+    );
+
+    const summary = selectOpsFollowUpSummary(state.opsFollowUpCheckpoints);
+
+    assert.equal(summary.last?.opsFollowUpLastCorrectionRole, "frontend");
+    assert.equal(summary.relevantArchitect?.opsFollowUpLastCorrectionRole, "architect");
+    assert.notEqual(summary.last, summary.relevantArchitect);
+
+    // The architect cycle is the one that triggered
+    assert.equal(summary.relevantArchitect?.opsFollowUpTriggered, true);
+    assert.equal(summary.relevantArchitect?.opsFollowUpEvaluationTurn, 10);
+
+    // The frontend cycle did not trigger — architect guard fires before gap check
+    assert.equal(summary.last?.opsFollowUpTriggered, false);
+    assert.equal(summary.last?.opsFollowUpSkipReason, "not_architect_correction_after_review");
+    assert.equal(summary.last?.opsFollowUpEvaluationTurn, 14);
+  });
+
+  it("returns null relevantArchitect when no architect correction occurred", () => {
+    const ctx = buildTurnContext("software");
+    const state = buildBaseState(ctx.roster.devops.name, {
+      transcript: [
+        { role: "reviewer", agentName: "Marcus", content: "Review" },
+        { role: "frontend", agentName: "Dana", content: "Frontend correction" },
+      ],
+      lastRejectTarget: "frontend",
+      lastRejectFeedback: ARCHITECT_ONLY_FEEDBACK,
+    });
+
+    recordOpsFollowUpCheckpoint(state, ctx);
+
+    const summary = selectOpsFollowUpSummary(state.opsFollowUpCheckpoints);
+    assert.equal(summary.last?.opsFollowUpLastCorrectionRole, "frontend");
+    assert.equal(summary.relevantArchitect, null);
+  });
+
+  it("selectOpsFollowUpSummary picks the most recent architect checkpoint when there are multiple", () => {
+    const ctx = buildTurnContext("software");
+
+    // Two architect correction cycles
+    const state = buildBaseState(ctx.roster.devops.name);
+    recordOpsFollowUpCheckpoint(state, ctx);
+
+    state.transcript = [
+      { role: "reviewer", agentName: "Marcus", content: "Second review" },
+      { role: "architect", agentName: "Skyler", content: "Architect second correction" },
+    ];
+    state.turnCount = 14;
+
+    recordOpsFollowUpCheckpoint(state, ctx);
+
+    assert.equal(state.opsFollowUpCheckpoints.length, 2);
+
+    const summary = selectOpsFollowUpSummary(state.opsFollowUpCheckpoints);
+    // Both last and relevantArchitect should be the second architect checkpoint
+    assert.equal(summary.last, summary.relevantArchitect);
+    assert.equal(summary.last?.opsFollowUpEvaluationTurn, 14);
+  });
+
+  it("architectCheckpoint from selectOpsFollowUpSummary is undefined (not separate) when architect is last correction", () => {
+    const ctx = buildTurnContext("software");
+    const state = buildBaseState(ctx.roster.devops.name);
+
+    recordOpsFollowUpCheckpoint(state, ctx);
+
+    const summary = selectOpsFollowUpSummary(state.opsFollowUpCheckpoints);
+    // When architect IS the last correction, relevantArchitect === last — no separate field needed
+    const architectCheckpoint =
+      summary.relevantArchitect !== summary.last ? summary.relevantArchitect : undefined;
+
+    assert.equal(architectCheckpoint, undefined);
   });
 });
 

@@ -72,6 +72,8 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
         ? record.openReviewIssueCount
         : undefined;
 
+    const opsFollowUpFields = parseOpsFollowUpFields(record);
+
     return {
       debateOutcome,
       turnCount,
@@ -81,7 +83,7 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
       crossValidationFailed,
       hasTruncatedCriticalTurn,
       openReviewIssueCount,
-      ...parseOpsFollowUpFields(record),
+      ...opsFollowUpFields,
     };
   } catch {
     return null;
@@ -128,5 +130,6 @@ export function mergeRunSummarySynthesisTelemetry(
       existing?.opsFollowUpUnresolvedDevopsIssueCount,
     opsFollowUpLastCorrectionRole: existing?.opsFollowUpLastCorrectionRole,
     opsFollowUpEvaluationTurn: existing?.opsFollowUpEvaluationTurn,
+    opsFollowUpArchitectCheckpoint: existing?.opsFollowUpArchitectCheckpoint,
   });
 }

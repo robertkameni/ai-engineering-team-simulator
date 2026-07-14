@@ -402,6 +402,8 @@ async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
     stackValidationFailed: summaryPayload?.stackValidationFailed === true,
     crossValidationFailed: summaryPayload?.crossValidationFailed === true,
     ...opsFollowUp,
+    opsFollowUpArchitectCheckpoint:
+      summaryPayload?.opsFollowUpArchitectCheckpoint ?? null,
   };
 }
 

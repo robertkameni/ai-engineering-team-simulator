@@ -319,6 +319,31 @@ export function isOpsFollowUpEligible(
   return false;
 }
 
+export interface OpsFollowUpSummary {
+  readonly last: OpsFollowUpCheckpoint | null;
+  readonly relevantArchitect: OpsFollowUpCheckpoint | null;
+}
+
+export function selectOpsFollowUpSummary(
+  checkpoints: readonly OpsFollowUpCheckpoint[],
+): OpsFollowUpSummary {
+  if (checkpoints.length === 0) {
+    return { last: null, relevantArchitect: null };
+  }
+
+  const last = checkpoints[checkpoints.length - 1] ?? null;
+
+  let relevantArchitect: OpsFollowUpCheckpoint | null = null;
+  for (let i = checkpoints.length - 1; i >= 0; i -= 1) {
+    if (checkpoints[i]?.opsFollowUpLastCorrectionRole === "architect") {
+      relevantArchitect = checkpoints[i] ?? null;
+      break;
+    }
+  }
+
+  return { last, relevantArchitect };
+}
+
 export function recordOpsFollowUpCheckpoint(
   state: DebateState,
   ctx: TurnContext,
@@ -339,6 +364,7 @@ export function recordOpsFollowUpCheckpoint(
     opsFollowUpEvaluationTurn: state.turnCount,
   };
 
+  state.opsFollowUpCheckpoints.push(checkpoint);
   state.opsFollowUpCheckpoint = checkpoint;
   return evaluation;
 }
@@ -418,4 +444,7 @@ export function scheduleOpsFollowUpTurn(
   state.returnToReviewer = true;
 }
 
-export { inferIssueOwnerFromConcern, matchesOperationalCategory } from "@/ai/orchestration/issue-ownership";
+export {
+  inferIssueOwnerFromConcern,
+  matchesOperationalCategory,
+} from "@/ai/orchestration/issue-ownership";
