@@ -1,15 +1,20 @@
 import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 
+import { hasCompleteSentenceEnding } from "@/ai/orchestration/agent-output-completion";
+
 const SOFTWARE_ARCHITECT_MIN_CHARS = 800;
 const SOFTWARE_ARCHITECT_MIN_HEADINGS = 3;
 const PHYSICAL_ARCHITECT_MIN_CHARS = 180;
 const PHYSICAL_ARCHITECT_MIN_HEADINGS = 2;
 const PM_MIN_HEADINGS = 3;
+const BACKEND_MIN_ENDPOINTS = 4;
 
 const OUT_OF_SCOPE_HEADING = /^##\s+.*out of scope/im;
 const BACKEND_STACK_HEADING = /^##\s+.*stack/im;
+const BACKEND_DATA_APIS_HEADING = /^##\s+.*data\s*&?\s*apis/im;
 const BACKEND_RISKS_HEADING = /^##\s+.*backend risks/im;
+const BACKEND_ENDPOINT_HEADING = /\*\*Endpoint\s+\d+:/gi;
 const DEVOPS_MONITORING_HEADING = /^##\s+.*monitoring/im;
 const DEVOPS_RISKS_HEADING = /^##\s+.*risks/im;
 
@@ -33,7 +38,19 @@ export function isBackendDeliverableInsufficient(text: string): boolean {
   if (!BACKEND_STACK_HEADING.test(trimmed)) {
     return true;
   }
-  return !BACKEND_RISKS_HEADING.test(trimmed);
+  if (!BACKEND_DATA_APIS_HEADING.test(trimmed)) {
+    return true;
+  }
+  if (!BACKEND_RISKS_HEADING.test(trimmed)) {
+    return true;
+  }
+
+  const endpointCount = (trimmed.match(BACKEND_ENDPOINT_HEADING) ?? []).length;
+  if (endpointCount < BACKEND_MIN_ENDPOINTS) {
+    return true;
+  }
+
+  return !hasCompleteSentenceEnding(trimmed);
 }
 
 export function isDevOpsDeliverableInsufficient(text: string): boolean {
@@ -78,7 +95,11 @@ export function buildPmInsufficientContinuationPrompt(): string {
 }
 
 export function buildBackendInsufficientContinuationPrompt(): string {
-  return `CRITICAL — Your backend plan is incomplete. Finish ## Stack & Layout and ## Data & APIs if needed, then complete ## Backend Risks with named bottlenecks and mitigations. End with a complete sentence.`;
+  return `CRITICAL — Your backend plan is incomplete. Finish ## Stack & Layout and ## Data & APIs with at least four **Endpoint N:** blocks (create, complete task, upload document, list active onboardings), then complete ## Backend Risks with named bottlenecks and mitigations. End with a complete sentence.`;
+}
+
+export function buildArchitectInsufficientContinuationPrompt(): string {
+  return `CRITICAL — Your architecture deliverable is incomplete. Finish all mandatory ## sections (Architecture, Data Model, APIs & Integration, Async Write Atomicity, Decisions & Risks) and end the final paragraph with a complete sentence. Do not repeat completed sections.`;
 }
 
 export function buildDevOpsInsufficientContinuationPrompt(): string {
@@ -100,6 +121,9 @@ export function buildRoleInsufficientContinuationPrompt(
   if (role === "frontend") {
     return buildFrontendInsufficientContinuationPrompt();
   }
+  if (role === "architect") {
+    return buildArchitectInsufficientContinuationPrompt();
+  }
   return null;
 }
 
@@ -113,8 +137,9 @@ export function isSoftwareArchitectDeliverableInsufficient(text: string): boolea
   const headings = countMarkdownSectionHeadings(trimmed);
   const longEnough = trimmed.length >= SOFTWARE_ARCHITECT_MIN_CHARS;
   const enoughHeadings = headings >= SOFTWARE_ARCHITECT_MIN_HEADINGS;
+  const completeEnding = hasCompleteSentenceEnding(trimmed);
 
-  if (longEnough && enoughHeadings) {
+  if (longEnough && enoughHeadings && completeEnding) {
     return false;
   }
 
@@ -126,7 +151,7 @@ export function isSoftwareArchitectDeliverableInsufficient(text: string): boolea
     return true;
   }
 
-  return false;
+  return !completeEnding;
 }
 
 function isPhysicalArchitectDeliverableInsufficient(text: string): boolean {
@@ -159,6 +184,10 @@ export function isFrontendDeliverableInsufficient(text: string): boolean {
   }
 
   if (!FRONTEND_RISKS_HEADING.test(trimmed)) {
+    return true;
+  }
+
+  if (!hasCompleteSentenceEnding(trimmed)) {
     return true;
   }
 

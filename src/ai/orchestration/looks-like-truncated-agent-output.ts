@@ -1,9 +1,14 @@
 import type { SimulationAgentRole } from "@/ai/agents/config";
 
+import {
+  hasCompleteSentenceEnding,
+  isIncompleteSpecLine,
+  isShortWordFragment,
+  lastNonEmptyLine,
+} from "@/ai/orchestration/agent-output-completion";
+
 const DECISION_TAG_AT_END =
   /\[(?:APPROVE|REJECT:\s*(?:pm|architect|backend|frontend|devops))\]\s*$/i;
-
-const CLEAN_TERMINATORS = /[.!?…:;»")\]]\s*$/u;
 
 const OPEN_INLINE_CODE_AT_END = /`[^`\n]+$/;
 
@@ -23,17 +28,6 @@ const FRONTEND_RISKS_HEADING = /^##\s+.*(?:Frontend Risks|Risques frontend|Risqu
 
 function hasFrontendRisksSection(text: string): boolean {
   return FRONTEND_RISKS_HEADING.test(text);
-}
-
-function lastNonEmptyLine(text: string): string {
-  const lines = text.trim().split("\n");
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index]?.trim() ?? "";
-    if (line.length > 0) {
-      return line;
-    }
-  }
-  return "";
 }
 
 /** Heuristic: model hit maxOutputTokens or stopped mid-thought. */
@@ -81,11 +75,19 @@ export function looksLikeTruncatedAgentOutput(
     return true;
   }
 
+  if (isIncompleteSpecLine(lastLine)) {
+    return true;
+  }
+
   if (lastLine.length >= 8 && /\([^)\n]*$/.test(lastLine) && lastLine.includes("(")) {
     return true;
   }
 
   if (role === "frontend" && trimmed.length >= 120 && !hasFrontendRisksSection(trimmed)) {
+    return true;
+  }
+
+  if (isShortWordFragment(lastLine)) {
     return true;
   }
 
@@ -97,7 +99,7 @@ export function looksLikeTruncatedAgentOutput(
     return false;
   }
 
-  if (CLEAN_TERMINATORS.test(trimmed)) {
+  if (hasCompleteSentenceEnding(trimmed)) {
     return false;
   }
 

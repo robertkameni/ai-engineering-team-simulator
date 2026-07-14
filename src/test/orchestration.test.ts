@@ -279,6 +279,24 @@ describe("looksLikeTruncatedAgentOutput", () => {
     ].join("\n");
     assert.equal(looksLikeTruncatedAgentOutput(missingRisks, "frontend"), true);
   });
+
+  it("detects incomplete API spec lines and short word fragments", () => {
+    assert.equal(
+      looksLikeTruncatedAgentOutput(
+        "## Data & APIs\n\n**Endpoint 4: List Active Onboardings**\n\n- Method and path:",
+        "backend",
+      ),
+      true,
+    );
+
+    assert.equal(
+      looksLikeTruncatedAgentOutput(
+        "## Async Write Atomicity\n\nThe idempotent handler re",
+        "architect",
+      ),
+      true,
+    );
+  });
 });
 
 describe("isSoftwareArchitectDeliverableInsufficient", () => {
@@ -301,6 +319,21 @@ describe("isSoftwareArchitectDeliverableInsufficient", () => {
     ];
     const text = `${sections.join("\n\n")}\n\n${"Detail padding. ".repeat(55)}`;
     assert.equal(isSoftwareArchitectDeliverableInsufficient(text), false);
+  });
+
+  it("flags architecture that ends mid-word despite enough sections", () => {
+    const sections = [
+      "## Architecture",
+      "Monolith with API tier.",
+      "## Data Model",
+      "PostgreSQL entities.",
+      "## APIs & Integration",
+      "REST with idempotency keys.",
+      "## Decisions & Risks",
+      "Chose Fastify over Express for throughput.",
+    ];
+    const text = `${sections.join("\n\n")}\n\n${"Detail padding. ".repeat(55)}The idempotent handler re`;
+    assert.equal(isSoftwareArchitectDeliverableInsufficient(text), true);
   });
 
   it("uses template-specific rules", () => {

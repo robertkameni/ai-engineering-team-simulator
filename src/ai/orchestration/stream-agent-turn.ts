@@ -420,7 +420,7 @@ async function retryRoleDeliverableIfNeeded(
     fullText,
   } = params;
 
-  if (role !== "pm" && role !== "backend" && role !== "devops") {
+  if (role !== "pm" && role !== "backend" && role !== "devops" && role !== "architect") {
     return fullText;
   }
 
