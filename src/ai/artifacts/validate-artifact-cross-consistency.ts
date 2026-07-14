@@ -34,6 +34,98 @@ const OPEN_GAP_CLAIM_PATTERNS: readonly OpenGapClaimPattern[] = [
 const EXPLICIT_OPEN_GAP_LANGUAGE =
   /\b(unresolved|open gap|reviewer flagged|not yet adopted|recommended only|provisional)\b/i;
 
+const GENERIC_GAP_STOP_WORDS = new Set([
+  "reviewer",
+  "unresolved",
+  "disagree",
+  "teammate",
+  "teammates",
+  "mitigation",
+  "exists",
+  "prior",
+  "message",
+  "messages",
+  "marked",
+  "flagged",
+  "blast",
+  "radius",
+  "significant",
+]);
+
+const GENERIC_GAP_CONTEXT_RADIUS = 120;
+const GENERIC_GAP_MIN_KEYWORDS = 2;
+
+function extractGenericGapKeywords(excerpt: string): string[] {
+  const matches = excerpt.toLowerCase().match(/\b[a-z][a-z0-9_-]{4,}\b/g) ?? [];
+  const keywords: string[] = [];
+
+  for (const word of matches) {
+    if (GENERIC_GAP_STOP_WORDS.has(word)) {
+      continue;
+    }
+    if (!keywords.includes(word)) {
+      keywords.push(word);
+    }
+    if (keywords.length >= 5) {
+      break;
+    }
+  }
+
+  return keywords;
+}
+
+function findGenericFalseResolutionViolations(
+  documentText: string,
+  openGaps: readonly ReviewOpenGap[],
+): string[] {
+  const violations: string[] = [];
+  const lowerDocumentText = documentText.toLowerCase();
+
+  for (const gap of openGaps) {
+    if (gap.topicKey !== "generic") {
+      continue;
+    }
+
+    const keywords = extractGenericGapKeywords(gap.excerpt);
+    if (keywords.length < GENERIC_GAP_MIN_KEYWORDS) {
+      continue;
+    }
+
+    const matchedKeywords = keywords.filter((keyword) =>
+      lowerDocumentText.includes(keyword),
+    );
+    if (matchedKeywords.length < GENERIC_GAP_MIN_KEYWORDS) {
+      continue;
+    }
+
+    const firstMatchIndex = matchedKeywords
+      .map((keyword) => lowerDocumentText.indexOf(keyword))
+      .filter((index) => index >= 0)
+      .sort((left, right) => left - right)[0];
+
+    if (firstMatchIndex == null) {
+      continue;
+    }
+
+    const contextStart = Math.max(0, firstMatchIndex - GENERIC_GAP_CONTEXT_RADIUS);
+    const contextEnd = Math.min(
+      documentText.length,
+      firstMatchIndex + GENERIC_GAP_CONTEXT_RADIUS,
+    );
+    const context = documentText.slice(contextStart, contextEnd);
+
+    if (EXPLICIT_OPEN_GAP_LANGUAGE.test(context)) {
+      continue;
+    }
+
+    violations.push(
+      `claims resolved generic open gap but reviewer marked it unresolved: "${gap.excerpt.slice(0, 80)}"`,
+    );
+  }
+
+  return violations;
+}
+
 export function findFalseResolutionViolations(
   documentText: string,
   openGaps: readonly ReviewOpenGap[],
@@ -63,6 +155,8 @@ export function findFalseResolutionViolations(
       `claims resolved "${topicKey}" but reviewer marked it UNRESOLVED in the debate`,
     );
   }
+
+  violations.push(...findGenericFalseResolutionViolations(documentText, openGaps));
 
   return [...new Set(violations)];
 }
@@ -106,6 +200,19 @@ export function buildCrossConsistencyFixPrompt(
     "Remove any language implying these are implemented, mitigated, or already present.",
     "Describe them only as open gaps, recommendations, or reviewer-flagged unresolved items.",
     ...violations.map((violation) => `- ${violation}`),
+  ].join("\n");
+}
+
+export function buildDeterministicCrossConsistencyFixPrompt(
+  violations: readonly string[],
+  openGaps: readonly ReviewOpenGap[],
+): string {
+  const gapLines = openGaps.map((gap) => `- ${gap.excerpt}`);
+
+  return [
+    buildCrossConsistencyFixPrompt(violations),
+    "Unresolved reviewer gaps (never describe as implemented):",
+    ...gapLines,
   ].join("\n");
 }
 

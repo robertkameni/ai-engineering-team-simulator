@@ -37,6 +37,8 @@ export function useSimulationStream() {
   const [debateOutcome, setDebateOutcome] = useState<DebateExitOutcome | null>(
     null,
   );
+  const [stackValidationFailed, setStackValidationFailed] = useState(false);
+  const [crossValidationFailed, setCrossValidationFailed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const activeMessageIdRef = useRef<string | null>(null);
 
@@ -46,6 +48,8 @@ export function useSimulationStream() {
     setArtifacts,
     setArtifactsStatus,
     setDebateOutcome,
+    setStackValidationFailed,
+    setCrossValidationFailed,
   };
 
   const recoverAfterDrop = useCallback(
@@ -69,6 +73,8 @@ export function useSimulationStream() {
       setArtifacts,
       setArtifactsStatus,
       setDebateOutcome,
+      setStackValidationFailed,
+      setCrossValidationFailed,
       setStatus,
       setError,
       setActiveAgent,
@@ -104,6 +110,8 @@ export function useSimulationStream() {
         setArtifactsStatus("pending");
         setTeamRoster(null);
         setDebateOutcome(null);
+        setStackValidationFailed(false);
+        setCrossValidationFailed(false);
       }
       activeMessageIdRef.current = null;
 
@@ -165,6 +173,8 @@ export function useSimulationStream() {
           setArtifactsStatus,
           setArtifacts,
           setDebateOutcome,
+          setStackValidationFailed,
+          setCrossValidationFailed,
           router,
         });
 
@@ -262,6 +272,8 @@ export function useSimulationStream() {
     setArtifactsStatus("idle");
     setTeamRoster(null);
     setDebateOutcome(null);
+    setStackValidationFailed(false);
+    setCrossValidationFailed(false);
   }, []);
 
   return {
@@ -274,6 +286,8 @@ export function useSimulationStream() {
     artifactsStatus: panelArtifactsStatus,
     teamRoster,
     debateOutcome,
+    stackValidationFailed,
+    crossValidationFailed,
     start,
     cancel,
   };

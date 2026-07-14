@@ -9,6 +9,11 @@ import {
   debateOutcomeWarningMessage,
   isUnapprovedDebateOutcome,
 } from "@/features/artifacts/artifact-panel-phase";
+import {
+  hasSynthesisValidationWarnings,
+  parseSynthesisValidationFlags,
+  synthesisValidationWarningMessage,
+} from "@/features/artifacts/synthesis-validation";
 import { getArtifactTabConfig } from "@/features/artifacts/artifact-tab-styles";
 import type { MockRun } from "@/features/agents/types";
 import { hasRecordedRunUsage } from "@/lib/ai/run-usage";
@@ -87,6 +92,18 @@ function appendMetadata(lines: string[], ctx: RunExportContext): void {
       lines.push("**Debate outcome:** " + label, "");
     }
   }
+
+  const synthesisValidation = parseSynthesisValidationFlags(
+    run.stackValidationFailed,
+    run.crossValidationFailed,
+  );
+  if (hasSynthesisValidationWarnings(synthesisValidation)) {
+    lines.push(
+      "**Artifact validation:** " +
+        synthesisValidationWarningMessage(synthesisValidation),
+      "",
+    );
+  }
 }
 
 function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
@@ -136,6 +153,18 @@ function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
           "</p>",
       );
     }
+  }
+
+  const synthesisValidation = parseSynthesisValidationFlags(
+    run.stackValidationFailed,
+    run.crossValidationFailed,
+  );
+  if (hasSynthesisValidationWarnings(synthesisValidation)) {
+    parts.push(
+      '<div class="export-warning"><strong>Artifact validation:</strong> ' +
+        escapeHtml(synthesisValidationWarningMessage(synthesisValidation)) +
+        "</div>",
+    );
   }
 }
 

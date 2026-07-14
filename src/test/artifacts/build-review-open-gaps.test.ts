@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { createSimulationRoster } from "@/ai/agents/roster";
 import {
   buildOpenGapsDirective,
   extractReviewOpenGaps,
 } from "@/ai/artifacts/build-review-open-gaps";
+
+const roster = createSimulationRoster("software");
 
 describe("extractReviewOpenGaps", () => {
   it("extracts UNRESOLVED reviewer items with topic keys", () => {
@@ -17,7 +20,7 @@ describe("extractReviewOpenGaps", () => {
           "Skyler's outbox pattern has a crash window. Mitigation: claimed_by column.",
         ].join("\n"),
       },
-    ]);
+    ], roster);
 
     assert.equal(gaps.length, 1);
     assert.equal(gaps[0]!.topicKey, "outbox_claimed_by");
@@ -32,7 +35,7 @@ describe("extractReviewOpenGaps", () => {
         content:
           "**Disagree**. Marcus lacks the session expiry warning. The blast radius is significant.",
       },
-    ]);
+    ], roster);
 
     assert.equal(gaps.length, 1);
     assert.equal(gaps[0]!.topicKey, "session_expiry_warning");
@@ -50,7 +53,7 @@ describe("extractReviewOpenGaps", () => {
         agentName: "Blake",
         content: "**Agree**. All mitigations exist in prior teammate messages. [APPROVE]",
       },
-    ]);
+    ], roster);
 
     assert.equal(gaps.length, 0);
   });

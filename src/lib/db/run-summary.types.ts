@@ -8,10 +8,12 @@ export interface RunSummaryPayload {
   readonly synthesisVersion?: number;
   readonly consistencyRetries?: number;
   readonly stackValidationFailed?: boolean;
+  readonly crossValidationFailed?: boolean;
 }
 
 export interface RunSummarySynthesisTelemetry {
   readonly synthesisVersion: number;
   readonly consistencyRetries: number;
   readonly stackValidationFailed?: boolean;
+  readonly crossValidationFailed?: boolean;
 }

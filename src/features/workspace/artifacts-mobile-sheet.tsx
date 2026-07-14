@@ -19,6 +19,8 @@ interface ArtifactsMobileSheetProps {
   activeAgent?: AgentRole | null;
   teamRoster?: TeamRosterPreview | null;
   debateOutcome?: DebateExitOutcome | null;
+  stackValidationFailed?: boolean;
+  crossValidationFailed?: boolean;
 }
 
 export function ArtifactsMobileSheet({
@@ -33,6 +35,8 @@ export function ArtifactsMobileSheet({
   activeAgent = null,
   teamRoster = null,
   debateOutcome = null,
+  stackValidationFailed = false,
+  crossValidationFailed = false,
 }: ArtifactsMobileSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -56,6 +60,8 @@ export function ArtifactsMobileSheet({
           activeAgent={activeAgent}
           teamRoster={teamRoster}
           debateOutcome={debateOutcome}
+          stackValidationFailed={stackValidationFailed}
+          crossValidationFailed={crossValidationFailed}
         />
       </SheetContent>
     </Sheet>

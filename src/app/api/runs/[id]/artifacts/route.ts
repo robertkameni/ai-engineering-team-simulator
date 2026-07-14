@@ -1,4 +1,5 @@
 import { parseDebateOutcomeFromRunSummary } from "@/ai/orchestration/reviewer-decision";
+import { parseRunSummary } from "@/lib/db/run-summary";
 import { handleRegenerateArtifactsPost } from "@/lib/api/handle-regenerate-artifacts-post";
 import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
 import { mapDbArtifactsToRunArtifacts } from "@/lib/db/artifacts";
@@ -32,10 +33,14 @@ export async function GET(_request: Request, { params }: RouteParams) {
     toAppArtifactStatus(run.artifactStatus),
   );
 
+  const summaryPayload = parseRunSummary(run.summary);
+
   return Response.json({
     artifacts,
     status: panelStatus,
     debateOutcome: parseDebateOutcomeFromRunSummary(run.summary),
+    stackValidationFailed: summaryPayload?.stackValidationFailed === true,
+    crossValidationFailed: summaryPayload?.crossValidationFailed === true,
   });
 }
 

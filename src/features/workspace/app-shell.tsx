@@ -29,6 +29,8 @@ interface AppShellProps {
   activeAgent?: AgentRole | null;
   teamRoster?: TeamRosterPreview | null;
   debateOutcome?: DebateExitOutcome | null;
+  stackValidationFailed?: boolean;
+  crossValidationFailed?: boolean;
 }
 
 export function AppShell({
@@ -43,6 +45,8 @@ export function AppShell({
   activeAgent = null,
   teamRoster = null,
   debateOutcome = null,
+  stackValidationFailed = false,
+  crossValidationFailed = false,
 }: AppShellProps) {
   const pathname = usePathname();
   const isWide = useMinWidth(960);
@@ -83,6 +87,8 @@ export function AppShell({
     activeAgent,
     teamRoster,
     debateOutcome,
+    stackValidationFailed,
+    crossValidationFailed,
   };
 
   return (

@@ -22,12 +22,17 @@ import {
     getArtifactTabConfig,
 } from "@/features/artifacts/artifact-tab-styles";
 import { ArtifactDebateWarningBanner } from "@/features/artifacts/artifact-debate-warning-banner";
+import { ArtifactSynthesisWarningBanner } from "@/features/artifacts/artifact-synthesis-warning-banner";
 import {
     artifactPanelSubtitle,
     countRunArtifacts,
     isUnapprovedDebateOutcome,
     shouldShowArtifactTabs,
 } from "@/features/artifacts/artifact-panel-phase";
+import {
+  hasSynthesisValidationWarnings,
+  parseSynthesisValidationFlags,
+} from "@/features/artifacts/synthesis-validation";
 import type {
     ArtifactsPanelStatus,
     DebateProgress,
@@ -48,6 +53,8 @@ interface ArtifactPanelProps {
   activeAgent?: AgentRole | null;
   teamRoster?: TeamRosterPreview | null;
   debateOutcome?: DebateExitOutcome | null;
+  stackValidationFailed?: boolean;
+  crossValidationFailed?: boolean;
 }
 
 export function ArtifactPanel({
@@ -61,6 +68,8 @@ export function ArtifactPanel({
   activeAgent = null,
   teamRoster = null,
   debateOutcome = null,
+  stackValidationFailed = false,
+  crossValidationFailed = false,
 }: ArtifactPanelProps) {
   const [panelArtifacts, setPanelArtifacts] = useState(artifacts);
 
@@ -84,6 +93,13 @@ export function ArtifactPanel({
   );
   const showDebateWarning =
     isUnapprovedDebateOutcome(debateOutcome) &&
+    (status === "ready" || status === "generating");
+  const synthesisValidation = parseSynthesisValidationFlags(
+    stackValidationFailed,
+    crossValidationFailed,
+  );
+  const showSynthesisWarning =
+    hasSynthesisValidationWarnings(synthesisValidation) &&
     (status === "ready" || status === "generating");
   const artifactTabs = getArtifactTabConfig(teamRoster?.templateId ?? "software");
 
@@ -126,6 +142,10 @@ export function ArtifactPanel({
 
       {showDebateWarning ? (
         <ArtifactDebateWarningBanner debateOutcome={debateOutcome} />
+      ) : null}
+
+      {showSynthesisWarning ? (
+        <ArtifactSynthesisWarningBanner synthesisValidation={synthesisValidation} />
       ) : null}
 
       {showTabs ? (

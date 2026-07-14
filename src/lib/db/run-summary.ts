@@ -53,12 +53,18 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
         ? record.stackValidationFailed
         : undefined;
 
+    const crossValidationFailed =
+      typeof record.crossValidationFailed === "boolean"
+        ? record.crossValidationFailed
+        : undefined;
+
     return {
       debateOutcome,
       turnCount,
       synthesisVersion,
       consistencyRetries,
       stackValidationFailed,
+      crossValidationFailed,
     };
   } catch {
     return null;
@@ -77,5 +83,6 @@ export function mergeRunSummarySynthesisTelemetry(
     synthesisVersion: telemetry.synthesisVersion,
     consistencyRetries: telemetry.consistencyRetries,
     stackValidationFailed: telemetry.stackValidationFailed,
+    crossValidationFailed: telemetry.crossValidationFailed,
   });
 }

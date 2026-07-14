@@ -30,6 +30,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
     debateOutcome: run.debateOutcome,
     teamRoster:
       teamRosterRecord != null ? rosterToPreview(teamRosterRecord) : null,
+    stackValidationFailed: run.stackValidationFailed === true,
+    crossValidationFailed: run.crossValidationFailed === true,
   });
 }
 

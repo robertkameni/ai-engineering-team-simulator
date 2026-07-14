@@ -21,6 +21,8 @@ interface SavedRunMobileSheetsProps {
   regenerateRunId?: string;
   canRegenerateArtifacts: boolean;
   debateOutcome?: DebateExitOutcome | null;
+  stackValidationFailed?: boolean;
+  crossValidationFailed?: boolean;
   children: React.ReactNode;
 }
 
@@ -33,6 +35,8 @@ export function SavedRunMobileSheets({
   regenerateRunId,
   canRegenerateArtifacts,
   debateOutcome = null,
+  stackValidationFailed = false,
+  crossValidationFailed = false,
   children,
 }: SavedRunMobileSheetsProps) {
   const {
@@ -60,6 +64,8 @@ export function SavedRunMobileSheets({
     regenerateRunId,
     canRegenerateArtifacts,
     debateOutcome,
+    stackValidationFailed,
+    crossValidationFailed,
   };
 
   return (

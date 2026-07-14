@@ -202,6 +202,7 @@ export async function regenerateRunArtifacts(
         synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
         consistencyRetries: synthesisResult.consistencyRetries,
         stackValidationFailed: synthesisResult.stackValidationFailed,
+        crossValidationFailed: synthesisResult.crossValidationFailed,
       }),
     );
     await updateArtifactStatus(runId, "ready");

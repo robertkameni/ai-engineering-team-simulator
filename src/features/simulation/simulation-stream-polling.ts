@@ -17,6 +17,8 @@ type RunProgressResponse = {
   artifactsStatus: ArtifactsPanelStatus;
   debateOutcome: DebateExitOutcome | null;
   teamRoster: TeamRosterPreview | null;
+  stackValidationFailed?: boolean;
+  crossValidationFailed?: boolean;
 };
 
 type ArtifactsFetchResult =
@@ -25,6 +27,8 @@ type ArtifactsFetchResult =
       artifacts: PartialRunArtifacts | null;
       status: ArtifactsPanelStatus;
       debateOutcome: DebateExitOutcome | null;
+      stackValidationFailed: boolean;
+      crossValidationFailed: boolean;
     }
   | { ok: false; retryable: boolean };
 
@@ -100,6 +104,8 @@ async function fetchArtifactsState(
     artifacts: PartialRunArtifacts | null;
     status: ArtifactsPanelStatus;
     debateOutcome?: DebateExitOutcome | null;
+    stackValidationFailed?: boolean;
+    crossValidationFailed?: boolean;
   };
 
   return {
@@ -107,6 +113,8 @@ async function fetchArtifactsState(
     artifacts: data.artifacts,
     status: data.status,
     debateOutcome: data.debateOutcome ?? null,
+    stackValidationFailed: data.stackValidationFailed === true,
+    crossValidationFailed: data.crossValidationFailed === true,
   };
 }
 
@@ -135,7 +143,20 @@ export type ArtifactPollSetters = {
   setArtifacts: (artifacts: PartialRunArtifacts | null) => void;
   setArtifactsStatus: (status: ArtifactsPanelStatus) => void;
   setDebateOutcome: (outcome: DebateExitOutcome | null) => void;
+  setStackValidationFailed: (failed: boolean) => void;
+  setCrossValidationFailed: (failed: boolean) => void;
 };
+
+function applyArtifactsFetchResult(
+  setters: ArtifactPollSetters,
+  result: Extract<ArtifactsFetchResult, { ok: true }>,
+): void {
+  setters.setArtifacts(result.artifacts);
+  setters.setArtifactsStatus(result.status);
+  setters.setDebateOutcome(result.debateOutcome);
+  setters.setStackValidationFailed(result.stackValidationFailed);
+  setters.setCrossValidationFailed(result.crossValidationFailed);
+}
 
 export async function pollArtifactsUntilSettled(
   id: string,
@@ -168,9 +189,7 @@ export async function pollArtifactsUntilSettled(
     }
 
     if (isActive()) {
-      setters.setArtifacts(result.artifacts);
-      setters.setArtifactsStatus(result.status);
-      setters.setDebateOutcome(result.debateOutcome);
+      applyArtifactsFetchResult(setters, result);
     }
 
     if (result.status === "ready" || result.status === "unavailable") {
@@ -190,9 +209,7 @@ export async function pollArtifactsUntilSettled(
   if (!isActive()) return null;
 
   if (finalResult.ok) {
-    setters.setArtifacts(finalResult.artifacts);
-    setters.setArtifactsStatus(finalResult.status);
-    setters.setDebateOutcome(finalResult.debateOutcome);
+    applyArtifactsFetchResult(setters, finalResult);
     return finalResult.status;
   }
 
@@ -241,6 +258,8 @@ export async function recoverRunAfterStreamDrop(
       setters.setArtifacts(progress.artifacts);
       setters.setArtifactsStatus(progress.artifactsStatus);
       setters.setDebateOutcome(progress.debateOutcome);
+      setters.setStackValidationFailed(progress.stackValidationFailed === true);
+      setters.setCrossValidationFailed(progress.crossValidationFailed === true);
 
       if (progress.status === "complete") {
         setters.setStatus("complete");

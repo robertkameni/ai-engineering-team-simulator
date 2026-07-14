@@ -3,6 +3,7 @@ import { BlueprintTabContent } from "@/features/artifacts/blueprint-tab-content"
 import { ArtifactPanelPlaceholder } from "@/features/artifacts/artifact-panel-placeholder";
 import { RegenerateArtifactsButton } from "@/features/artifacts/regenerate-artifacts-button";
 import { ArtifactDebateWarningBanner } from "@/features/artifacts/artifact-debate-warning-banner";
+import { ArtifactSynthesisWarningBanner } from "@/features/artifacts/artifact-synthesis-warning-banner";
 import {
     artifactPanelSubtitle,
     countRunArtifacts,
@@ -10,6 +11,10 @@ import {
     isUnapprovedDebateOutcome,
     shouldShowArtifactTabs,
 } from "@/features/artifacts/artifact-panel-phase";
+import {
+  hasSynthesisValidationWarnings,
+  parseSynthesisValidationFlags,
+} from "@/features/artifacts/synthesis-validation";
 import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skeleton";
 import { ARTIFACT_TAB_LIST_CLASS, ARTIFACT_TAB_TRIGGER_STATIC, getArtifactTabConfig } from "@/features/artifacts/artifact-tab-styles";
 import type {
@@ -28,6 +33,8 @@ interface ArtifactPanelStaticProps {
   debateMessages?: { role: AgentRole; isStreaming?: boolean; agentTitle?: string }[];
   teamRoster?: TeamRosterPreview | null;
   debateOutcome?: DebateExitOutcome | null;
+  stackValidationFailed?: boolean;
+  crossValidationFailed?: boolean;
 }
 
 /** Server artifact panel — CSS tabs + native scroll (no Radix). */
@@ -39,6 +46,8 @@ export function ArtifactPanelStatic({
   debateMessages = [],
   teamRoster = null,
   debateOutcome = null,
+  stackValidationFailed = false,
+  crossValidationFailed = false,
 }: ArtifactPanelStaticProps) {
   const showTabs = shouldShowArtifactTabs(status, artifacts);
   const showRegenerate = canRegenerateArtifacts && regenerateRunId != null;
@@ -52,6 +61,13 @@ export function ArtifactPanelStatic({
   );
   const showDebateWarning =
     isUnapprovedDebateOutcome(debateOutcome) &&
+    (status === "ready" || status === "generating");
+  const synthesisValidation = parseSynthesisValidationFlags(
+    stackValidationFailed,
+    crossValidationFailed,
+  );
+  const showSynthesisWarning =
+    hasSynthesisValidationWarnings(synthesisValidation) &&
     (status === "ready" || status === "generating");
   const artifactTabs = getArtifactTabConfig(teamRoster?.templateId ?? "software");
 
@@ -77,6 +93,10 @@ export function ArtifactPanelStatic({
 
       {showDebateWarning ? (
         <ArtifactDebateWarningBanner debateOutcome={debateOutcome} />
+      ) : null}
+
+      {showSynthesisWarning ? (
+        <ArtifactSynthesisWarningBanner synthesisValidation={synthesisValidation} />
       ) : null}
 
       {showTabs ? (

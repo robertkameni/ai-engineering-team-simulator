@@ -43,6 +43,8 @@ export function SimulationWorkspace({
     artifactsStatus,
     teamRoster,
     debateOutcome,
+    stackValidationFailed,
+    crossValidationFailed,
     start,
   } = useSimulationStream();
 
@@ -125,6 +127,8 @@ export function SimulationWorkspace({
       artifacts,
       artifactsStatus,
       debateOutcome,
+      stackValidationFailed,
+      crossValidationFailed,
     }),
     [
       runId,
@@ -135,6 +139,8 @@ export function SimulationWorkspace({
       artifacts,
       artifactsStatus,
       debateOutcome,
+      stackValidationFailed,
+      crossValidationFailed,
     ],
   );
 
@@ -150,6 +156,8 @@ export function SimulationWorkspace({
       activeAgent={activeAgent}
       teamRoster={teamRoster}
       debateOutcome={debateOutcome}
+      stackValidationFailed={stackValidationFailed}
+      crossValidationFailed={crossValidationFailed}
     >
       <WorkspaceHeader
         title={displayTitle}

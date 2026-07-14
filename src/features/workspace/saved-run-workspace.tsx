@@ -47,6 +47,8 @@ export function SavedRunWorkspace({
       regenerateRunId={regenerateRunId}
       canRegenerateArtifacts={canRegenerateArtifacts}
       debateOutcome={run.debateOutcome ?? null}
+      stackValidationFailed={run.stackValidationFailed === true}
+      crossValidationFailed={run.crossValidationFailed === true}
     >
       <AppShellFrame
         sidebar={
@@ -70,6 +72,8 @@ export function SavedRunWorkspace({
               }))}
               teamRoster={teamRoster}
               debateOutcome={run.debateOutcome ?? null}
+              stackValidationFailed={run.stackValidationFailed === true}
+              crossValidationFailed={run.crossValidationFailed === true}
             />
           ) : null
         }

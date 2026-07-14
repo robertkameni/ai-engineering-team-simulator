@@ -4,6 +4,7 @@ import type { Message } from "@/generated/prisma/client";
 import type { TeamRoster } from "@/ai/agents/roster";
 import { isSimulationAgent, type SimulationAgentRole } from "@/ai/agents/config";
 import { parseDebateOutcomeFromRunSummary } from "@/ai/orchestration/reviewer-decision";
+import { parseRunSummary } from "@/lib/db/run-summary";
 import type { AgentRole, SimulationMessage } from "@/features/agents/types";
 import { getPersonaBase } from "@/features/agents/personas";
 import { formatMessageTime, formatRelativeTime } from "@/lib/format-time";
@@ -367,6 +368,8 @@ async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
   const artifactStatus = toAppArtifactStatus(run.artifactStatus);
   const artifactsStatus = deriveArtifactsPanelStatus(runStatus, artifactStatus);
 
+  const summaryPayload = parseRunSummary(run.summary);
+
   return {
     id: run.id,
     title,
@@ -379,6 +382,8 @@ async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
     artifacts,
     artifactsStatus,
     debateOutcome: parseDebateOutcomeFromRunSummary(run.summary),
+    stackValidationFailed: summaryPayload?.stackValidationFailed === true,
+    crossValidationFailed: summaryPayload?.crossValidationFailed === true,
   };
 }
 

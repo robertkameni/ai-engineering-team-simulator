@@ -1,3 +1,5 @@
+import type { SimulationAgentRole } from "@/ai/agents/config";
+import type { TeamRoster } from "@/ai/agents/roster";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import type {
   ReviewOpenGap,
@@ -15,6 +17,7 @@ const ONLY_IN_REVIEW =
 
 export function extractReviewOpenGaps(
   transcript: readonly TranscriptEntry[],
+  roster: TeamRoster,
 ): ReviewOpenGap[] {
   const gapMap = new Map<string, ReviewOpenGap>();
 
@@ -35,7 +38,7 @@ export function extractReviewOpenGaps(
       }
 
       const topicKey = deriveTopicKey(excerpt);
-      const ownerRole = inferOwnerRole(block);
+      const ownerRole = inferOwnerRole(block, roster);
       const dedupeKey = `${topicKey}:${ownerRole ?? "none"}`;
 
       if (!gapMap.has(dedupeKey)) {
@@ -126,7 +129,10 @@ function deriveTopicKey(text: string): ReviewOpenGapTopicKey {
   return "generic";
 }
 
-function inferOwnerRole(block: string): ReviewOpenGap["ownerRole"] {
+function inferOwnerRole(
+  block: string,
+  roster: TeamRoster,
+): ReviewOpenGap["ownerRole"] {
   const roleMatch = block.match(
     /\*\*(?:\d+\.\s*)?(pm|architect|backend|frontend|devops)\*\*/i,
   );
@@ -134,20 +140,13 @@ function inferOwnerRole(block: string): ReviewOpenGap["ownerRole"] {
     return roleMatch[1]!.toLowerCase() as ReviewOpenGap["ownerRole"];
   }
 
-  const nameMatch = block.match(
-    /\*\*(?:\d+\.\s*)?(Skyler|Harper|Marcus|Riley|Alex)\*\*/i,
-  );
-  if (!nameMatch) {
-    return null;
+  const lowerBlock = block.toLowerCase();
+  for (const role of ["pm", "architect", "backend", "frontend", "devops"] as const) {
+    const memberName = roster[role].name.toLowerCase();
+    if (lowerBlock.includes(memberName)) {
+      return role;
+    }
   }
 
-  const nameToRole: Record<string, NonNullable<ReviewOpenGap["ownerRole"]>> = {
-    alex: "pm",
-    harper: "architect",
-    skyler: "backend",
-    marcus: "frontend",
-    riley: "devops",
-  };
-
-  return nameToRole[nameMatch[1]!.toLowerCase()] ?? null;
+  return null;
 }

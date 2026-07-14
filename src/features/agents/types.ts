@@ -57,6 +57,8 @@ export interface MockRun {
   artifacts?: PartialRunArtifacts | null;
   artifactsStatus?: ArtifactsPanelStatus;
   debateOutcome?: DebateExitOutcome | null;
+  stackValidationFailed?: boolean;
+  crossValidationFailed?: boolean;
 }
 
 export interface MockArtifactSection {

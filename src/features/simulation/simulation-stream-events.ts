@@ -37,6 +37,8 @@ export function createSimulationStreamEventHandler(
     setArtifacts: context.setArtifacts,
     setArtifactsStatus: context.setArtifactsStatus,
     setDebateOutcome: context.setDebateOutcome,
+    setStackValidationFailed: context.setStackValidationFailed,
+    setCrossValidationFailed: context.setCrossValidationFailed,
   };
 
   return async (event: SimulationStreamEvent) => {

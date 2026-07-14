@@ -23,6 +23,7 @@ describe("run summary helpers", () => {
       synthesisVersion: undefined,
       consistencyRetries: undefined,
       stackValidationFailed: undefined,
+      crossValidationFailed: undefined,
     });
   });
 
@@ -36,6 +37,7 @@ describe("run summary helpers", () => {
       synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
       consistencyRetries: 1,
       stackValidationFailed: true,
+      crossValidationFailed: true,
     });
 
     assert.deepEqual(parseRunSummary(merged), {
@@ -44,6 +46,7 @@ describe("run summary helpers", () => {
       synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
       consistencyRetries: 1,
       stackValidationFailed: true,
+      crossValidationFailed: true,
     });
   });
 });

@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import type { ReviewOpenGap } from "@/ai/artifacts/build-review-open-gaps.types";
 import {
+  buildDeterministicCrossConsistencyFixPrompt,
   findFalseResolutionViolations,
   validateArtifactCrossConsistency,
 } from "@/ai/artifacts/validate-artifact-cross-consistency";
@@ -61,5 +62,32 @@ describe("validateArtifactCrossConsistency", () => {
     );
 
     assert.equal(violations.length, 0);
+  });
+
+  it("flags generic open gaps that appear resolved in architecture", () => {
+    const violations = findFalseResolutionViolations(
+      "The webhook signature rotation workflow is fully implemented with nightly key rollover.",
+      [
+        {
+          topicKey: "generic",
+          excerpt:
+            "Webhook signature rotation workflow remains UNRESOLVED in the debate",
+          ownerRole: "backend",
+        },
+      ],
+    );
+
+    assert.equal(violations.length, 1);
+    assert.match(violations[0]!, /generic open gap/);
+  });
+
+  it("includes open gap excerpts in the deterministic cross fix prompt", () => {
+    const prompt = buildDeterministicCrossConsistencyFixPrompt(
+      ['architecture: claims resolved "outbox_claimed_by" but reviewer marked it UNRESOLVED in the debate'],
+      [OUTBOX_OPEN_GAP],
+    );
+
+    assert.match(prompt, /CRITICAL cross-artifact consistency fix/);
+    assert.match(prompt, /Outbox poller crash window/);
   });
 });
