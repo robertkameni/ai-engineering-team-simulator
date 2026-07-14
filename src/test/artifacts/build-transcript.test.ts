@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { buildCanonicalTranscriptForArtifacts } from "@/ai/artifacts/build-transcript";
+import { buildCanonicalTranscriptForArtifacts, prepareArtifactTranscript } from "@/ai/artifacts/build-transcript";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 
 describe("buildCanonicalTranscriptForArtifacts", () => {
@@ -27,5 +27,23 @@ describe("buildCanonicalTranscriptForArtifacts", () => {
         "reviewer:Approve",
       ],
     );
+  });
+
+  it("includes merged correction content in the canonical backend message", () => {
+    const transcript: TranscriptEntry[] = [
+      { role: "backend", agentName: "Sam", content: "Backend v1 API surface." },
+      { role: "reviewer", agentName: "Nico", content: "Reject backend" },
+      {
+        role: "backend",
+        agentName: "Sam",
+        content: "## Changes\n\nDeferred SCIM to v1.5.",
+      },
+    ];
+
+    const canonical = prepareArtifactTranscript(transcript);
+
+    assert.equal(canonical.length, 2);
+    assert.match(canonical[1]!.content, /Backend v1 API surface/);
+    assert.match(canonical[1]!.content, /Deferred SCIM to v1\.5/);
   });
 });

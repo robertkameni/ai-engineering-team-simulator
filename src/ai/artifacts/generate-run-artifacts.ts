@@ -1,7 +1,9 @@
 import { generateText, Output } from "ai";
 
 import { sectionGuidelinesForArtifact } from "@/ai/artifacts/artifact-templates";
+import { buildConsensusDirectives } from "@/ai/artifacts/build-consensus-directives";
 import { buildTranscriptForArtifacts } from "@/ai/artifacts/build-transcript";
+import { mergeCorrectionTurns } from "@/ai/artifacts/merge-correction-turns";
 import { buildSimulationStackReferenceDirective } from "@/ai/context/simulation-stack-reference";
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
@@ -28,11 +30,35 @@ import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 
 const ARTIFACT_MODEL = "deepseek-v4-flash" as const;
 
+const ARTIFACT_SYNTHESIS_ORDER = [
+  "requirements",
+  "architecture",
+  "implementation",
+  "blueprint",
+  "review",
+] as const satisfies readonly ArtifactType[];
+
 const UNAPPROVED_DEBATE_NOTICE =
   "DEBATE_STATUS: unapproved_cap — The simulation ended without an explicit [APPROVE]. Summarize open risks and label recommendations as provisional.";
 
 function needsUnapprovedDebateNotice(outcome: DebateExitOutcome | null): boolean {
   return outcome === "cap_reached" || outcome === "unknown_reject_fallback";
+}
+
+function artifactUsesStackReference(type: ArtifactType): boolean {
+  return (
+    type === "requirements" ||
+    type === "architecture" ||
+    type === "implementation" ||
+    type === "blueprint"
+  );
+}
+
+function resolveSynthesisOrder(
+  artifactTypes: readonly ArtifactType[],
+): ArtifactType[] {
+  const requested = new Set(artifactTypes);
+  return ARTIFACT_SYNTHESIS_ORDER.filter((type) => requested.has(type));
 }
 
 const SOFTWARE_ARTIFACT_FOCUS: Record<ArtifactType, string> = {
@@ -70,9 +96,64 @@ function artifactFocusForTemplate(
   return focus[type];
 }
 
+function buildStackReferenceBlock(type: ArtifactType): string {
+  if (!artifactUsesStackReference(type)) {
+    return "";
+  }
+
+  const directive = buildSimulationStackReferenceDirective();
+  if (type === "blueprint") {
+    return `${directive}\n\nBlueprint rule: dependency versions MUST match the verified stack reference and the implementation artifact. Never cite stale major versions when a newer verified version is listed.\n\n`;
+  }
+
+  if (type === "requirements") {
+    return `${directive}\n\nRequirements rule: when the debate revised v1 scope, align feature bullets with the resolved consensus — not original PM proposals that were deferred or replaced.\n\n`;
+  }
+
+  return `${directive}\n\n`;
+}
+
+function buildPriorArtifactsPrompt(
+  type: ArtifactType,
+  priorArtifacts: Partial<RunArtifactsOutput>,
+): string {
+  const priorTypes = ARTIFACT_SYNTHESIS_ORDER.filter(
+    (artifactType) =>
+      artifactType !== type && priorArtifacts[artifactType] != null,
+  );
+
+  if (priorTypes.length === 0) {
+    return "";
+  }
+
+  const sections = priorTypes.map((artifactType) => {
+    const document = priorArtifacts[artifactType]!;
+    return `### ${artifactType}\n${JSON.stringify(document.sections)}`;
+  });
+
+  return [
+    "## Prior artifacts (authoritative — stay consistent)",
+    "",
+    ...sections,
+    "",
+  ].join("\n");
+}
+
+function buildArtifactPrompt(
+  transcriptPrompt: string,
+  consensusDirectives: string,
+  priorArtifactsPrompt: string,
+): string {
+  return [
+    transcriptPrompt,
+    consensusDirectives.trim() ? `\n\n${consensusDirectives.trim()}` : "",
+    priorArtifactsPrompt.trim() ? `\n\n${priorArtifactsPrompt.trim()}` : "",
+  ].join("");
+}
+
 async function generateArtifactDocument(
   type: ArtifactType,
-  transcriptPrompt: string,
+  prompt: string,
   templateId: TeamTemplateId,
   productIdea: string,
   usageAccumulator?: RunUsageAccumulator,
@@ -92,9 +173,11 @@ async function generateArtifactDocument(
     ? `- The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}\n- 3–6 bullets per section; each bullet describes a concrete, copy-paste-ready detail in prose: exact version numbers, full file paths, SQL column types, API method+path pairs, environment variable names with descriptions, TypeScript interface signatures, or component prop types.\n- Describe everything in prose — never use code blocks. For example, instead of copying a SQL query verbatim, describe it as "SELECT expense_splits.member_id, SUM(share_cents) FROM expense_splits JOIN expenses ON expense_splits.expense_id = expenses.id WHERE expenses.group_id = $1 GROUP BY expense_splits.member_id."\n- Each bullet should be a self-contained technical specification item — not a narrative sentence.`
     : `- The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}\n- 4–6 bullets per section; each bullet is 1–2 complete sentences with concrete detail (up to ~50 words per bullet).`;
 
+  const stackReferenceBlock = buildStackReferenceBlock(type);
+
   const system = `${unapprovedNotice}You are a technical writer producing the "${type}" deliverable from a team debate.
 
-${type === "implementation" || type === "architecture" ? `${buildSimulationStackReferenceDirective()}\n\n` : ""}Focus: ${focus}
+${stackReferenceBlock}Focus: ${focus}
 
 Output rules:
 ${sectionRules}
@@ -102,7 +185,8 @@ ${sectionRules}
 - Write as a polished internal document — NOT meeting notes.
 - Do NOT append speaker names to bullets (no "(Name)" suffixes).
 - Synthesize consensus; note disagreement only in the review artifact.
-- When the same role spoke more than once, only their latest message is authoritative — ignore superseded earlier turns.
+- When prior artifacts are provided, stay consistent with them. Do not reintroduce features deferred in the resolved consensus.
+- When the same role spoke more than once, their merged latest message is authoritative.
 - Omit sections with no substance from the debate.
 - **No code blocks or code fences** (\`\`\`). This is a specification document for developers to implement from. Describe everything in prose. Use inline backticks only for single terms like file names, env vars, or function names.`;
 
@@ -114,7 +198,7 @@ ${sectionRules}
     const structured = await generateText({
       model: getDeepSeekModel(ARTIFACT_MODEL),
       system,
-      prompt: transcriptPrompt,
+      prompt,
       maxOutputTokens: 2400,
       temperature: 0.2,
       output: Output.object({ schema: artifactDocumentSchema }),
@@ -151,7 +235,7 @@ ${sectionRules}
     system: `${system}
 
 Respond with ONLY a JSON object: { "sections": [{ "title": string, "items": string[] }] }`,
-    prompt: transcriptPrompt,
+    prompt,
     maxOutputTokens: 2400,
     temperature: 0.2,
     providerOptions: {
@@ -214,6 +298,8 @@ export async function generateRunArtifacts({
 }): Promise<Partial<RunArtifactsOutput>> {
   const templateId = roster.templateId;
   const debateOutcome = parseDebateOutcomeFromRunSummary(runSummary ?? null);
+  const mergedTranscript = mergeCorrectionTurns(transcript);
+  const consensusDirectives = buildConsensusDirectives(mergedTranscript);
   const transcriptPrompt = buildTranscriptForArtifacts(
     productIdea,
     transcript,
@@ -224,28 +310,33 @@ export async function generateRunArtifacts({
     assertSimulationWithinBudget(usageAccumulator);
   }
 
-  const parallelEntries = await Promise.all(
-    artifactTypes.map(async (type) => {
-      if (usageAccumulator) {
-        assertSimulationWithinBudget(usageAccumulator);
-      }
+  const synthesisOrder = resolveSynthesisOrder(artifactTypes);
+  const output: Partial<RunArtifactsOutput> = {};
 
-      const document = await generateArtifactDocument(
-        type,
-        transcriptPrompt,
-        templateId,
-        productIdea,
-        usageAccumulator,
-        debateOutcome,
-      );
-      await onArtifactComplete?.(type, document);
-      return [type, document] as const;
-    }),
-  );
+  for (const type of synthesisOrder) {
+    if (usageAccumulator) {
+      assertSimulationWithinBudget(usageAccumulator);
+    }
 
-  const entries: [ArtifactType, ArtifactDocument][] = parallelEntries.map(
-    (entry) => [entry[0], entry[1]],
-  );
+    const priorArtifactsPrompt = buildPriorArtifactsPrompt(type, output);
+    const prompt = buildArtifactPrompt(
+      transcriptPrompt,
+      consensusDirectives,
+      priorArtifactsPrompt,
+    );
 
-  return Object.fromEntries(entries) as Partial<RunArtifactsOutput>;
+    const document = await generateArtifactDocument(
+      type,
+      prompt,
+      templateId,
+      productIdea,
+      usageAccumulator,
+      debateOutcome,
+    );
+
+    output[type] = document;
+    await onArtifactComplete?.(type, document);
+  }
+
+  return output;
 }

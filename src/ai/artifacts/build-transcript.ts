@@ -2,6 +2,8 @@ import type { TeamRoster } from "@/ai/agents/roster";
 import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 
+import { mergeCorrectionTurns } from "@/ai/artifacts/merge-correction-turns";
+
 /** Drops superseded pipeline turns; keeps all reviewer messages. */
 export function buildCanonicalTranscriptForArtifacts(
   transcript: TranscriptEntry[],
@@ -23,12 +25,18 @@ export function buildCanonicalTranscriptForArtifacts(
   });
 }
 
+export function prepareArtifactTranscript(
+  transcript: readonly TranscriptEntry[],
+): TranscriptEntry[] {
+  return buildCanonicalTranscriptForArtifacts(mergeCorrectionTurns(transcript));
+}
+
 export function buildTranscriptForArtifacts(
   productIdea: string,
   transcript: TranscriptEntry[],
   roster: TeamRoster,
 ): string {
-  const canonicalTranscript = buildCanonicalTranscriptForArtifacts(transcript);
+  const canonicalTranscript = prepareArtifactTranscript(transcript);
   const teamLine = SIMULATION_AGENT_ORDER.map(
     (role) => `${roster[role].name} (${roster[role].title})`,
   ).join(", ");
@@ -40,5 +48,5 @@ export function buildTranscriptForArtifacts(
     )
     .join("\n\n---\n\n");
 
-  return `## Product idea\n\n${productIdea.trim()}\n\n## Team\n\n${teamLine}\n\n## Discussion (canonical — latest message per role)\n\n${messages}`;
+  return `## Product idea\n\n${productIdea.trim()}\n\n## Team\n\n${teamLine}\n\n## Discussion (canonical — merged corrections, latest message per role)\n\n${messages}`;
 }
