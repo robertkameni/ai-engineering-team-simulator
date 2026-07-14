@@ -2,6 +2,7 @@ import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
 import { isStoredSimulationAgentRole } from "@/ai/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 import { generateRunArtifacts } from "@/ai/artifacts/generate-run-artifacts";
+import type { RegenerateRunArtifactsResult } from "@/ai/artifacts/regenerate-run-artifacts.types";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import {
   assertSimulationWithinBudget,
@@ -37,19 +38,6 @@ import {
   requireRunAccess,
   type RunOwnershipScope,
 } from "@/lib/auth/run-ownership";
-
-export type RegenerateRunArtifactsError =
-  | "not_found"
-  | "forbidden"
-  | "no_messages"
-  | "run_in_progress"
-  | "generation_active"
-  | "generation_failed"
-  | "budget_exceeded";
-
-export type RegenerateRunArtifactsResult =
-  | { ok: true; artifacts: PartialRunArtifacts; }
-  | { ok: false; error: RegenerateRunArtifactsError; message?: string; };
 
 function buildRosterFromMessages(
   messages: { agentRole: string; agentName: string | null; }[],

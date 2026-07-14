@@ -15,7 +15,7 @@ import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { MockRun } from "@/features/agents/types";
 import type { RunStatus } from "@/features/agents/types";
 import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
-import type { DebateProgress } from "@/features/artifacts/artifact-panel-phase";
+import type { DebateProgress } from "@/features/artifacts/types";
 
 interface WorkspaceHeaderProps {
   title: string;

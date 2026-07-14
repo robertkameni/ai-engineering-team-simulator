@@ -3,14 +3,9 @@ import { ARTIFACT_TYPES, CORE_ARTIFACT_TYPES } from "@/features/artifacts/artifa
 import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
 import type {
   ArtifactsPanelStatus,
+  DebateProgress,
   PartialRunArtifacts,
 } from "@/features/artifacts/types";
-
-export interface DebateProgress {
-  completed: number;
-  total: number;
-  activeRole: AgentRole | null;
-}
 
 export function isUnapprovedDebateOutcome(
   outcome: DebateExitOutcome | null | undefined,
@@ -93,9 +88,6 @@ export function artifactPanelSubtitle(
     case "ready":
       if (isUnapprovedDebateOutcome(debateOutcome)) {
         return "Phase 3 · Finished with open risks (unapproved)";
-      }
-      if (artifactCount != null && artifactCount < ARTIFACT_TYPES.length) {
-        return "Phase 3 · ready — generate blueprint on demand";
       }
       return "Phase 3 · ready to review";
     case "unavailable":

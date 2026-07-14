@@ -1,12 +1,106 @@
+import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 
 const SOFTWARE_ARCHITECT_MIN_CHARS = 800;
 const SOFTWARE_ARCHITECT_MIN_HEADINGS = 3;
 const PHYSICAL_ARCHITECT_MIN_CHARS = 180;
 const PHYSICAL_ARCHITECT_MIN_HEADINGS = 2;
+const PM_MIN_HEADINGS = 3;
+
+const OUT_OF_SCOPE_HEADING = /^##\s+.*out of scope/im;
+const BACKEND_STACK_HEADING = /^##\s+.*stack/im;
+const BACKEND_RISKS_HEADING = /^##\s+.*backend risks/im;
+const DEVOPS_MONITORING_HEADING = /^##\s+.*monitoring/im;
+const DEVOPS_RISKS_HEADING = /^##\s+.*risks/im;
 
 function countMarkdownSectionHeadings(text: string): number {
   return (text.match(/^##\s+/gm) ?? []).length;
+}
+
+export function isPmDeliverableInsufficient(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || countMarkdownSectionHeadings(trimmed) < PM_MIN_HEADINGS) {
+    return true;
+  }
+  return !OUT_OF_SCOPE_HEADING.test(trimmed);
+}
+
+export function isBackendDeliverableInsufficient(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length < 200) {
+    return true;
+  }
+  if (!BACKEND_STACK_HEADING.test(trimmed)) {
+    return true;
+  }
+  return !BACKEND_RISKS_HEADING.test(trimmed);
+}
+
+export function isDevOpsDeliverableInsufficient(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length < 200) {
+    return true;
+  }
+  if (!DEVOPS_MONITORING_HEADING.test(trimmed)) {
+    return true;
+  }
+  if (!DEVOPS_RISKS_HEADING.test(trimmed)) {
+    return true;
+  }
+  return !/\bbackup\b/i.test(trimmed);
+}
+
+export function isRoleDeliverableInsufficient(
+  role: SimulationAgentRole,
+  text: string,
+  templateId: TeamTemplateId,
+): boolean {
+  if (role === "pm") {
+    return isPmDeliverableInsufficient(text);
+  }
+  if (role === "backend") {
+    return isBackendDeliverableInsufficient(text);
+  }
+  if (role === "devops") {
+    return isDevOpsDeliverableInsufficient(text);
+  }
+  if (role === "frontend") {
+    return isFrontendDeliverableInsufficient(text);
+  }
+  if (role === "architect") {
+    return isArchitectDeliverableInsufficient(text, templateId);
+  }
+  return false;
+}
+
+export function buildPmInsufficientContinuationPrompt(): string {
+  return `CRITICAL — Your PM brief is incomplete. Include all mandatory ## sections (scope, users, core features, user stories, out of scope, success metrics) and end with a complete sentence. Do not repeat completed sections.`;
+}
+
+export function buildBackendInsufficientContinuationPrompt(): string {
+  return `CRITICAL — Your backend plan is incomplete. Finish ## Stack & Layout and ## Data & APIs if needed, then complete ## Backend Risks with named bottlenecks and mitigations. End with a complete sentence.`;
+}
+
+export function buildDevOpsInsufficientContinuationPrompt(): string {
+  return `CRITICAL — Your DevOps plan is incomplete. Complete ## Monitoring & Rollback, ## Automated Backup (with schedule, storage, restore steps), and ## Risks. End with a complete sentence.`;
+}
+
+export function buildRoleInsufficientContinuationPrompt(
+  role: SimulationAgentRole,
+): string | null {
+  if (role === "pm") {
+    return buildPmInsufficientContinuationPrompt();
+  }
+  if (role === "backend") {
+    return buildBackendInsufficientContinuationPrompt();
+  }
+  if (role === "devops") {
+    return buildDevOpsInsufficientContinuationPrompt();
+  }
+  if (role === "frontend") {
+    return buildFrontendInsufficientContinuationPrompt();
+  }
+  return null;
 }
 
 /** Software/hybrid architect must ship multi-section architecture, not tool preamble only. */

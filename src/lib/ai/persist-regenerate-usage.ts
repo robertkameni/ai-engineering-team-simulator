@@ -1,7 +1,7 @@
 import "server-only";
 
 import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
-import type { RegenerateRunArtifactsResult } from "@/ai/artifacts/regenerate-run-artifacts";
+import type { RegenerateRunArtifactsResult } from "@/ai/artifacts/regenerate-run-artifacts.types";
 import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
 import {
   createRunUsageAccumulator,

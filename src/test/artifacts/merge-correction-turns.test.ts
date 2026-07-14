@@ -22,8 +22,8 @@ describe("mergeCorrectionTurns", () => {
     const merged = mergeCorrectionTurns(transcript);
 
     assert.equal(merged.length, 2);
-    assert.match(merged[1]!.content, /Backend v1 with full API plan/);
-    assert.match(merged[1]!.content, /Deferred SCIM to v1\.5/);
+    assert.match(merged[0]!.content, /Backend v1 with full API plan/);
+    assert.match(merged[0]!.content, /Deferred SCIM to v1\.5/);
   });
 
   it("leaves non-correction turns unchanged", () => {

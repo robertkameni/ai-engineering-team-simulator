@@ -1,4 +1,4 @@
-import type { RegenerateRunArtifactsResult } from "@/ai/artifacts/regenerate-run-artifacts";
+import type { RegenerateRunArtifactsResult } from "@/ai/artifacts/regenerate-run-artifacts.types";
 import { runAccessDeniedResponse } from "@/lib/auth/run-access-denied-response";
 import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
 import type { RateLimitResult } from "@/lib/rate-limit-config";

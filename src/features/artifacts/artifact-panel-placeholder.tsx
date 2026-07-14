@@ -2,7 +2,7 @@
 
 import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skeleton";
 import { RegenerateArtifactsButton } from "@/features/artifacts/regenerate-artifacts-button";
-import type { DebateProgress } from "@/features/artifacts/artifact-panel-phase";
+import type { DebateProgress } from "@/features/artifacts/types";
 import { DebateProgressStepper } from "@/features/artifacts/debate-progress-stepper";
 import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
 import type { AgentRole } from "@/features/agents/types";

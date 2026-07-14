@@ -14,6 +14,11 @@ const INCOMPLETE_LIST_BULLET =
 
 const INCOMPLETE_COMPONENT_HEADING = /\*\*Component \d+:/i;
 
+const CONTINUATION_SECTION_HEADING = /^##\s+.*\((?:continued|suite)\)/im;
+
+const TRUNCATION_META_COMMENTARY =
+  /\btruncation artifact\b|The duplicate sentence at the end is a truncation/i;
+
 const FRONTEND_RISKS_HEADING = /^##\s+.*(?:Frontend Risks|Risques frontend|Risques FE)/im;
 
 function hasFrontendRisksSection(text: string): boolean {
@@ -65,6 +70,14 @@ export function looksLikeTruncatedAgentOutput(
   }
 
   if (INCOMPLETE_COMPONENT_HEADING.test(lastLine)) {
+    return true;
+  }
+
+  if (CONTINUATION_SECTION_HEADING.test(trimmed)) {
+    return true;
+  }
+
+  if (TRUNCATION_META_COMMENTARY.test(trimmed)) {
     return true;
   }
 

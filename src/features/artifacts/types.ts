@@ -1,4 +1,11 @@
 import type { ArtifactType } from "@/features/artifacts/artifact-constants";
+import type { AgentRole } from "@/features/agents/types";
+
+export interface DebateProgress {
+  readonly completed: number;
+  readonly total: number;
+  readonly activeRole: AgentRole | null;
+}
 
 export interface ArtifactSectionGroup {
   title: string;

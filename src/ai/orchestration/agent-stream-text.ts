@@ -38,6 +38,19 @@ function stripLeadingMetaCommentary(text: string): string {
   return text.replace(LEADING_META_COMMENTARY, "");
 }
 
+const TRUNCATION_META_PATTERNS = [
+  /\n[^\n]*\btruncation artifact\b[^\n]*/gi,
+  /\n[^\n]*The duplicate sentence at the end is a truncation[^\n]*/gi,
+];
+
+function stripTruncationMetaCommentary(text: string): string {
+  let result = text;
+  for (const pattern of TRUNCATION_META_PATTERNS) {
+    result = result.replace(pattern, "");
+  }
+  return result.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export function hasCompletedOpeningBlock(fullText: string): boolean {
   return /\n\n/.test(fullText) || /^##\s/m.test(fullText);
 }
@@ -73,6 +86,7 @@ export function normalizeAgentPersistedText(
   fullText: string,
 ): string {
   let text = stripLeadingMetaCommentary(fullText);
+  text = stripTruncationMetaCommentary(text);
   text = stripInlineToolNarration(text);
   if (role === "architect") {
     text = stripToolOnlyOpeningBlock(text);

@@ -3,7 +3,7 @@
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { ArtifactPanel } from "@/features/artifacts/artifact-panel";
 import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
-import type { DebateProgress } from "@/features/artifacts/artifact-panel-phase";
+import type { DebateProgress } from "@/features/artifacts/types";
 import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
 

@@ -3,7 +3,12 @@ import { generateText, Output } from "ai";
 import { sectionGuidelinesForArtifact } from "@/ai/artifacts/artifact-templates";
 import { buildConsensusDirectives } from "@/ai/artifacts/build-consensus-directives";
 import { buildTranscriptForArtifacts } from "@/ai/artifacts/build-transcript";
+import type { RetryStackInconsistentArtifactsParams } from "@/ai/artifacts/generate-run-artifacts.types";
 import { mergeCorrectionTurns } from "@/ai/artifacts/merge-correction-turns";
+import {
+  buildStackConsistencyFixPrompt,
+  validateArtifactStackConsistency,
+} from "@/ai/artifacts/validate-artifact-consistency";
 import { buildSimulationStackReferenceDirective } from "@/ai/context/simulation-stack-reference";
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
@@ -158,6 +163,7 @@ async function generateArtifactDocument(
   productIdea: string,
   usageAccumulator?: RunUsageAccumulator,
   debateOutcome?: DebateExitOutcome | null,
+  additionalSystemNotice?: string,
 ): Promise<ArtifactDocument> {
   const sectionGuidelines = sectionGuidelinesForArtifact(type, templateId);
   const focus = artifactFocusForTemplate(type, templateId);
@@ -175,7 +181,7 @@ async function generateArtifactDocument(
 
   const stackReferenceBlock = buildStackReferenceBlock(type);
 
-  const system = `${unapprovedNotice}You are a technical writer producing the "${type}" deliverable from a team debate.
+  const system = `${unapprovedNotice}${additionalSystemNotice ? `${additionalSystemNotice}\n\n` : ""}You are a technical writer producing the "${type}" deliverable from a team debate.
 
 ${stackReferenceBlock}Focus: ${focus}
 
@@ -276,6 +282,68 @@ function extractJsonObject(text: string): unknown {
   }
 }
 
+function resolveStackRetryTypes(violations: readonly string[]): ArtifactType[] {
+  const retryTypes = new Set<ArtifactType>();
+  for (const violation of violations) {
+    if (violation.startsWith("implementation:")) {
+      retryTypes.add("implementation");
+    }
+    if (violation.startsWith("blueprint:")) {
+      retryTypes.add("blueprint");
+    }
+  }
+  return ARTIFACT_SYNTHESIS_ORDER.filter((type) => retryTypes.has(type));
+}
+
+async function retryStackInconsistentArtifacts(
+  params: RetryStackInconsistentArtifactsParams,
+): Promise<void> {
+  const {
+    output,
+    transcriptPrompt,
+    consensusDirectives,
+    templateId,
+    productIdea,
+    usageAccumulator,
+    debateOutcome,
+    onArtifactComplete,
+  } = params;
+
+  const violations = validateArtifactStackConsistency(output);
+  if (violations.length === 0) {
+    return;
+  }
+
+  const fixNotice = buildStackConsistencyFixPrompt(violations);
+  const retryTypes = resolveStackRetryTypes(violations);
+
+  for (const type of retryTypes) {
+    if (usageAccumulator) {
+      assertSimulationWithinBudget(usageAccumulator);
+    }
+
+    const priorArtifactsPrompt = buildPriorArtifactsPrompt(type, output);
+    const prompt = buildArtifactPrompt(
+      transcriptPrompt,
+      consensusDirectives,
+      priorArtifactsPrompt,
+    );
+
+    const document = await generateArtifactDocument(
+      type,
+      prompt,
+      templateId,
+      productIdea,
+      usageAccumulator,
+      debateOutcome,
+      fixNotice,
+    );
+
+    output[type] = document;
+    await onArtifactComplete?.(type, document);
+  }
+}
+
 export async function generateRunArtifacts({
   productIdea,
   transcript,
@@ -337,6 +405,17 @@ export async function generateRunArtifacts({
     output[type] = document;
     await onArtifactComplete?.(type, document);
   }
+
+  await retryStackInconsistentArtifacts({
+    output,
+    transcriptPrompt,
+    consensusDirectives,
+    templateId,
+    productIdea,
+    usageAccumulator,
+    debateOutcome: debateOutcome ?? null,
+    onArtifactComplete,
+  });
 
   return output;
 }

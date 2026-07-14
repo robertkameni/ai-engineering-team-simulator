@@ -1,4 +1,4 @@
-import type { DebateProgress } from "@/features/artifacts/artifact-panel-phase";
+import type { DebateProgress } from "@/features/artifacts/types";
 import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";

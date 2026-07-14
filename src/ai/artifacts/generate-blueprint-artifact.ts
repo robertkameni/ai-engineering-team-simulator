@@ -1,6 +1,7 @@
 import "server-only";
 
 import { generateRunArtifacts } from "@/ai/artifacts/generate-run-artifacts";
+import type { GenerateBlueprintArtifactResult } from "@/ai/artifacts/generate-blueprint-artifact.types";
 import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
 import { isStoredSimulationAgentRole } from "@/ai/config";
 import type { TeamRoster } from "@/ai/agents/roster";
@@ -26,19 +27,6 @@ import {
   requireRunAccess,
   type RunOwnershipScope,
 } from "@/lib/auth/run-ownership";
-
-export type GenerateBlueprintArtifactError =
-  | "not_found"
-  | "forbidden"
-  | "no_messages"
-  | "run_in_progress"
-  | "already_ready"
-  | "generation_failed"
-  | "budget_exceeded";
-
-export type GenerateBlueprintArtifactResult =
-  | { ok: true; artifacts: PartialRunArtifacts; }
-  | { ok: false; error: GenerateBlueprintArtifactError; message?: string; };
 
 function buildRosterFromMessages(
   messages: { agentRole: string; agentName: string | null; }[],

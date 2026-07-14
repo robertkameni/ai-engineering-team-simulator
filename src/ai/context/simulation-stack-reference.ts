@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-interface PackageManifest {
-  readonly dependencies?: Readonly<Record<string, string>>;
-  readonly devDependencies?: Readonly<Record<string, string>>;
-}
+import type {
+  PackageManifest,
+  VerifiedStackSnapshot,
+} from "@/ai/context/simulation-stack-reference.types";
 
 const STACK_PACKAGE_KEYS = [
   "next",
@@ -34,6 +34,25 @@ function readPackageVersions(): ReadonlyMap<string, string> {
   }
 
   return versions;
+}
+
+function parseMajorVersion(versionRange: string | undefined): number | null {
+  if (!versionRange) {
+    return null;
+  }
+  const match = versionRange.match(/(\d+)/);
+  if (!match) {
+    return null;
+  }
+  return Number.parseInt(match[1]!, 10);
+}
+
+export function getVerifiedStackSnapshot(): VerifiedStackSnapshot {
+  const versions = readPackageVersions();
+  return {
+    nextMajor: parseMajorVersion(versions.get("next")),
+    prismaMajor: parseMajorVersion(versions.get("prisma")),
+  };
 }
 
 export function buildSimulationStackReferenceDirective(): string {

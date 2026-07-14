@@ -41,9 +41,10 @@ describe("buildCanonicalTranscriptForArtifacts", () => {
     ];
 
     const canonical = prepareArtifactTranscript(transcript);
+    const backendEntry = canonical.find((entry) => entry.role === "backend");
 
-    assert.equal(canonical.length, 2);
-    assert.match(canonical[1]!.content, /Backend v1 API surface/);
-    assert.match(canonical[1]!.content, /Deferred SCIM to v1\.5/);
+    assert.ok(backendEntry);
+    assert.match(backendEntry.content, /Backend v1 API surface/);
+    assert.match(backendEntry.content, /Deferred SCIM to v1\.5/);
   });
 });

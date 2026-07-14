@@ -27,10 +27,10 @@ import {
     countRunArtifacts,
     isUnapprovedDebateOutcome,
     shouldShowArtifactTabs,
-    type DebateProgress,
 } from "@/features/artifacts/artifact-panel-phase";
 import type {
     ArtifactsPanelStatus,
+    DebateProgress,
     PartialRunArtifacts,
 } from "@/features/artifacts/types";
 import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
