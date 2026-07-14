@@ -1,0 +1,65 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+
+import type { ReviewOpenGap } from "@/ai/artifacts/build-review-open-gaps.types";
+import {
+  findFalseResolutionViolations,
+  validateArtifactCrossConsistency,
+} from "@/ai/artifacts/validate-artifact-cross-consistency";
+
+const OUTBOX_OPEN_GAP: ReviewOpenGap = {
+  topicKey: "outbox_claimed_by",
+  excerpt: "Outbox poller crash window (UNRESOLVED)",
+  ownerRole: "backend",
+};
+
+describe("validateArtifactCrossConsistency", () => {
+  it("flags architecture that claims claimed_by when reviewer left it unresolved", () => {
+    const violations = validateArtifactCrossConsistency(
+      {
+        architecture: {
+          sections: [
+            {
+              title: "APIs & Integration",
+              items: [
+                "The outbox table has a claimed_by column with heartbeat timestamp for crash recovery.",
+              ],
+            },
+          ],
+        },
+      },
+      [OUTBOX_OPEN_GAP],
+    );
+
+    assert.equal(violations.length, 1);
+    assert.match(violations[0]!, /architecture:/);
+    assert.match(violations[0]!, /outbox_claimed_by/);
+  });
+
+  it("allows architecture that explicitly marks the gap as unresolved", () => {
+    const violations = findFalseResolutionViolations(
+      "Reviewer flagged an open gap: outbox claimed_by reclamation is unresolved and only recommended.",
+      [OUTBOX_OPEN_GAP],
+    );
+
+    assert.equal(violations.length, 0);
+  });
+
+  it("returns no violations when there are no reviewer open gaps", () => {
+    const violations = validateArtifactCrossConsistency(
+      {
+        architecture: {
+          sections: [
+            {
+              title: "Decisions",
+              items: ["Uses claimed_by on the outbox table."],
+            },
+          ],
+        },
+      },
+      [],
+    );
+
+    assert.equal(violations.length, 0);
+  });
+});

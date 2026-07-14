@@ -1,3 +1,4 @@
+import type { ReviewOpenGap } from "@/ai/artifacts/build-review-open-gaps.types";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { DebateExitOutcome } from "@/ai/orchestration/reviewer-decision";
 import type {
@@ -12,10 +13,11 @@ export interface GenerateRunArtifactsResult {
   readonly consistencyRetries: number;
 }
 
-export interface RetryStackInconsistentArtifactsParams {
+export interface ArtifactSynthesisRetryContext {
   readonly output: Partial<RunArtifactsOutput>;
   readonly transcriptPrompt: string;
   readonly consensusDirectives: string;
+  readonly openGapsDirective: string;
   readonly templateId: TeamTemplateId;
   readonly productIdea: string;
   readonly usageAccumulator?: RunUsageAccumulator;
@@ -24,4 +26,12 @@ export interface RetryStackInconsistentArtifactsParams {
     type: ArtifactType,
     document: ArtifactDocument,
   ) => Promise<void> | void;
+}
+
+export interface RetryStackInconsistentArtifactsParams
+  extends ArtifactSynthesisRetryContext {}
+
+export interface RetryCrossInconsistentArtifactsParams
+  extends ArtifactSynthesisRetryContext {
+  readonly openGaps: readonly ReviewOpenGap[];
 }

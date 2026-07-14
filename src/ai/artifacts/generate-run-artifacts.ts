@@ -2,12 +2,22 @@ import { generateText, Output } from "ai";
 
 import { sectionGuidelinesForArtifact } from "@/ai/artifacts/artifact-templates";
 import { buildConsensusDirectives } from "@/ai/artifacts/build-consensus-directives";
+import {
+  buildOpenGapsDirective,
+  extractReviewOpenGaps,
+} from "@/ai/artifacts/build-review-open-gaps";
 import { buildTranscriptForArtifacts } from "@/ai/artifacts/build-transcript";
 import type {
   GenerateRunArtifactsResult,
+  RetryCrossInconsistentArtifactsParams,
   RetryStackInconsistentArtifactsParams,
 } from "@/ai/artifacts/generate-run-artifacts.types";
 import { mergeCorrectionTurns } from "@/ai/artifacts/merge-correction-turns";
+import {
+  buildCrossConsistencyFixPrompt,
+  resolveCrossRetryTypes,
+  validateArtifactCrossConsistency,
+} from "@/ai/artifacts/validate-artifact-cross-consistency";
 import {
   buildStackConsistencyFixPrompt,
   validateArtifactStackConsistency,
@@ -150,13 +160,30 @@ function buildPriorArtifactsPrompt(
 function buildArtifactPrompt(
   transcriptPrompt: string,
   consensusDirectives: string,
+  openGapsDirective: string,
   priorArtifactsPrompt: string,
 ): string {
   return [
     transcriptPrompt,
     consensusDirectives.trim() ? `\n\n${consensusDirectives.trim()}` : "",
+    openGapsDirective.trim() ? `\n\n${openGapsDirective.trim()}` : "",
     priorArtifactsPrompt.trim() ? `\n\n${priorArtifactsPrompt.trim()}` : "",
   ].join("");
+}
+
+function buildOpenGapsSystemRule(type: ArtifactType): string {
+  if (
+    type !== "architecture" &&
+    type !== "implementation" &&
+    type !== "blueprint"
+  ) {
+    return "";
+  }
+
+  return [
+    "Open-gap rule: When reviewer open gaps are listed in the prompt, never describe those items as implemented, mitigated, or already present.",
+    "Use \"recommended\", \"proposed\", \"open gap\", or \"reviewer flagged — unresolved\" for those topics.",
+  ].join(" ");
 }
 
 async function generateArtifactDocument(
@@ -183,6 +210,7 @@ async function generateArtifactDocument(
     : `- The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}\n- 4–6 bullets per section; each bullet is 1–2 complete sentences with concrete detail (up to ~50 words per bullet).`;
 
   const stackReferenceBlock = buildStackReferenceBlock(type);
+  const openGapsSystemRule = buildOpenGapsSystemRule(type);
 
   const system = `${unapprovedNotice}${additionalSystemNotice ? `${additionalSystemNotice}\n\n` : ""}You are a technical writer producing the "${type}" deliverable from a team debate.
 
@@ -191,7 +219,7 @@ ${stackReferenceBlock}Focus: ${focus}
 Output rules:
 ${sectionRules}
 - ${languageDirective}
-- Write as a polished internal document — NOT meeting notes.
+${openGapsSystemRule ? `- ${openGapsSystemRule}\n` : ""}- Write as a polished internal document — NOT meeting notes.
 - Do NOT append speaker names to bullets (no "(Name)" suffixes).
 - Synthesize consensus; note disagreement only in the review artifact.
 - When prior artifacts are provided, stay consistent with them. Do not reintroduce features deferred in the resolved consensus.
@@ -305,6 +333,7 @@ async function retryStackInconsistentArtifacts(
     output,
     transcriptPrompt,
     consensusDirectives,
+    openGapsDirective,
     templateId,
     productIdea,
     usageAccumulator,
@@ -329,6 +358,61 @@ async function retryStackInconsistentArtifacts(
     const prompt = buildArtifactPrompt(
       transcriptPrompt,
       consensusDirectives,
+      openGapsDirective,
+      priorArtifactsPrompt,
+    );
+
+    const document = await generateArtifactDocument(
+      type,
+      prompt,
+      templateId,
+      productIdea,
+      usageAccumulator,
+      debateOutcome,
+      fixNotice,
+    );
+
+    output[type] = document;
+    await onArtifactComplete?.(type, document);
+  }
+
+  return retryTypes.length;
+}
+
+async function retryCrossInconsistentArtifacts(
+  params: RetryCrossInconsistentArtifactsParams,
+): Promise<number> {
+  const {
+    output,
+    openGaps,
+    transcriptPrompt,
+    consensusDirectives,
+    openGapsDirective,
+    templateId,
+    productIdea,
+    usageAccumulator,
+    debateOutcome,
+    onArtifactComplete,
+  } = params;
+
+  const violations = validateArtifactCrossConsistency(output, openGaps);
+  if (violations.length === 0) {
+    return 0;
+  }
+
+  const fixNotice = buildCrossConsistencyFixPrompt(violations);
+  const retryTypes = resolveCrossRetryTypes(violations);
+
+  for (const type of retryTypes) {
+    if (usageAccumulator) {
+      assertSimulationWithinBudget(usageAccumulator);
+    }
+
+    const priorArtifactsPrompt = buildPriorArtifactsPrompt(type, output);
+    const prompt = buildArtifactPrompt(
+      transcriptPrompt,
+      consensusDirectives,
+      openGapsDirective,
       priorArtifactsPrompt,
     );
 
@@ -372,6 +456,8 @@ export async function generateRunArtifacts({
   const templateId = roster.templateId;
   const debateOutcome = parseDebateOutcomeFromRunSummary(runSummary ?? null);
   const mergedTranscript = mergeCorrectionTurns(transcript);
+  const openGaps = extractReviewOpenGaps(mergedTranscript);
+  const openGapsDirective = buildOpenGapsDirective(openGaps);
   const consensusDirectives = buildConsensusDirectives(mergedTranscript);
   const transcriptPrompt = buildTranscriptForArtifacts(
     productIdea,
@@ -395,6 +481,7 @@ export async function generateRunArtifacts({
     const prompt = buildArtifactPrompt(
       transcriptPrompt,
       consensusDirectives,
+      openGapsDirective,
       priorArtifactsPrompt,
     );
 
@@ -411,10 +498,11 @@ export async function generateRunArtifacts({
     await onArtifactComplete?.(type, document);
   }
 
-  const consistencyRetries = await retryStackInconsistentArtifacts({
+  const stackRetries = await retryStackInconsistentArtifacts({
     output,
     transcriptPrompt,
     consensusDirectives,
+    openGapsDirective,
     templateId,
     productIdea,
     usageAccumulator,
@@ -422,5 +510,18 @@ export async function generateRunArtifacts({
     onArtifactComplete,
   });
 
-  return { artifacts: output, consistencyRetries };
+  const crossRetries = await retryCrossInconsistentArtifacts({
+    output,
+    openGaps,
+    transcriptPrompt,
+    consensusDirectives,
+    openGapsDirective,
+    templateId,
+    productIdea,
+    usageAccumulator,
+    debateOutcome: debateOutcome ?? null,
+    onArtifactComplete,
+  });
+
+  return { artifacts: output, consistencyRetries: stackRetries + crossRetries };
 }
