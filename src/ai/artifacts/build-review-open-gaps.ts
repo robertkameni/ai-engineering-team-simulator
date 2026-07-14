@@ -1,5 +1,6 @@
 import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TeamRoster } from "@/ai/agents/roster";
+import { inferIssueOwnerFromConcern } from "@/ai/orchestration/issue-ownership";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import type {
   ReviewOpenGap,
@@ -133,20 +134,5 @@ function inferOwnerRole(
   block: string,
   roster: TeamRoster,
 ): ReviewOpenGap["ownerRole"] {
-  const roleMatch = block.match(
-    /\*\*(?:\d+\.\s*)?(pm|architect|backend|frontend|devops)\*\*/i,
-  );
-  if (roleMatch) {
-    return roleMatch[1]!.toLowerCase() as ReviewOpenGap["ownerRole"];
-  }
-
-  const lowerBlock = block.toLowerCase();
-  for (const role of ["pm", "architect", "backend", "frontend", "devops"] as const) {
-    const memberName = roster[role].name.toLowerCase();
-    if (lowerBlock.includes(memberName)) {
-      return role;
-    }
-  }
-
-  return null;
+  return inferIssueOwnerFromConcern(block, roster, "architect");
 }

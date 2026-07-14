@@ -4,6 +4,7 @@ import type { Message } from "@/generated/prisma/client";
 import type { TeamRoster } from "@/ai/agents/roster";
 import { isSimulationAgent, type SimulationAgentRole } from "@/ai/agents/config";
 import { parseDebateOutcomeFromRunSummary } from "@/ai/orchestration/reviewer-decision";
+import { opsFollowUpFieldsFromCheckpoint } from "@/lib/db/ops-follow-up-summary";
 import { parseRunSummary } from "@/lib/db/run-summary";
 import type { AgentRole, SimulationMessage } from "@/features/agents/types";
 import { getPersonaBase } from "@/features/agents/personas";
@@ -369,6 +370,22 @@ async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
   const artifactsStatus = deriveArtifactsPanelStatus(runStatus, artifactStatus);
 
   const summaryPayload = parseRunSummary(run.summary);
+  const opsFollowUp = opsFollowUpFieldsFromCheckpoint(
+    summaryPayload?.opsFollowUpEvaluated
+      ? {
+          opsFollowUpEvaluated: summaryPayload.opsFollowUpEvaluated,
+          opsFollowUpTriggered: summaryPayload.opsFollowUpTriggered ?? false,
+          opsFollowUpSkipReason: summaryPayload.opsFollowUpSkipReason ?? null,
+          opsFollowUpEligible: summaryPayload.opsFollowUpEligible ?? false,
+          opsFollowUpUnresolvedDevopsIssueCount:
+            summaryPayload.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+          opsFollowUpLastCorrectionRole:
+            summaryPayload.opsFollowUpLastCorrectionRole ?? null,
+          opsFollowUpEvaluationTurn:
+            summaryPayload.opsFollowUpEvaluationTurn ?? null,
+        }
+      : null,
+  );
 
   return {
     id: run.id,
@@ -384,6 +401,7 @@ async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
     debateOutcome: parseDebateOutcomeFromRunSummary(run.summary),
     stackValidationFailed: summaryPayload?.stackValidationFailed === true,
     crossValidationFailed: summaryPayload?.crossValidationFailed === true,
+    ...opsFollowUp,
   };
 }
 

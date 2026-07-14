@@ -1,30 +1,22 @@
-// STRUCTURED RESOLUTION TRACKING
-// REVIEW ISSUE STATE
-//
-// Tracks reviewer-identified issues as structured items with explicit lifecycle
-// states across correction cycles. Replaces unstructured feedback circulation
-// with a typed, traceable issue model.
-
 import type { SimulationAgentRole } from "@/ai/agents/config";
+import type { TeamRoster } from "@/ai/agents/roster";
+import {
+  inferIssueOwnerFromConcern,
+  inferIssueSeverity,
+  type IssueSeverity,
+} from "@/ai/orchestration/issue-ownership";
 
 export type IssueStatus = "open" | "attempted" | "addressed" | "still_open" | "failed_validation";
 
 export interface ReviewIssue {
-  /** Unique identifier within a run (derived from topic key + index). */
   id: string;
-  /** The role the reviewer flagged as needing correction. */
   targetRole: SimulationAgentRole;
-  /** Keywords extracted from the concern text for matching. */
   keywords: string[];
-  /** Shortened excerpt of the original reviewer concern. */
   excerpt: string;
-  /** Current lifecycle state. */
   status: IssueStatus;
-  /** Which rejection cycle created this issue (0-indexed). */
+  severity: IssueSeverity;
   createdOnCycle: number;
-  /** Which correction turn last attempted to address this (turn count). */
   lastAttemptedOnTurn: number | null;
-  /** Which turn last confirmed this as still open (turn count). */
   lastConfirmedOnTurn: number | null;
 }
 
@@ -73,13 +65,11 @@ function buildDedupeKey(targetRole: SimulationAgentRole, keywords: string[]): st
   return `${targetRole}:${key}`;
 }
 
-/** Returns issues that reference the given role and concern text. */
 function findForRole(
   issues: ReviewIssue[],
   targetRole: SimulationAgentRole,
   concernText: string,
 ): ReviewIssue[] {
-  // Normalize concern text identically to how createReviewIssues does it
   const normalized = normalizeExcerpt(concernText);
   const concernKeywords = extractKeywords(normalized);
   const dedupeKey = buildDedupeKey(targetRole, concernKeywords);
@@ -97,18 +87,13 @@ function findForRole(
   });
 }
 
-/**
- * Creates new issues from reviewer rejection feedback.
- * Deduplicates against existing issues for the same role.
- *
- * STRUCTURED RESOLUTION TRACKING
- */
 export function createReviewIssues(
   existingIssues: ReviewIssue[],
-  targetRole: SimulationAgentRole,
+  rejectRole: SimulationAgentRole,
   feedbackText: string,
   cycleIndex: number,
   turnCount: number,
+  roster: TeamRoster,
 ): ReviewIssue[] {
   const concerns = feedbackText
     .split("\n")
@@ -126,9 +111,9 @@ export function createReviewIssues(
   const newIssues: ReviewIssue[] = [];
 
   for (const concern of concerns) {
-    const existing = findForRole(existingIssues, targetRole, concern);
+    const issueOwner = inferIssueOwnerFromConcern(concern, roster, rejectRole);
+    const existing = findForRole(existingIssues, issueOwner, concern);
     if (existing.length > 0) {
-      // Reactivate existing issues as still open
       for (const issue of existing) {
         issue.status = "still_open";
         issue.lastConfirmedOnTurn = turnCount;
@@ -144,10 +129,11 @@ export function createReviewIssues(
 
     newIssues.push({
       id: nextId(),
-      targetRole,
+      targetRole: issueOwner,
       keywords,
       excerpt: normalizeExcerpt(concern),
       status: "open",
+      severity: inferIssueSeverity(concern),
       createdOnCycle: cycleIndex,
       lastAttemptedOnTurn: null,
       lastConfirmedOnTurn: turnCount,
@@ -157,11 +143,6 @@ export function createReviewIssues(
   return newIssues;
 }
 
-/**
- * Marks issues for a given role as attempted when a correction turn is produced.
- *
- * REVIEW ISSUE STATE — correction attempt
- */
 export function markIssuesAttempted(
   issues: ReviewIssue[],
   targetRole: SimulationAgentRole,
@@ -178,11 +159,6 @@ export function markIssuesAttempted(
   }
 }
 
-/**
- * Marks issues as failed when a correction turn fails validation.
- *
- * REVIEW ISSUE STATE — validation failure
- */
 export function markIssuesFailedValidation(
   issues: ReviewIssue[],
   targetRole: SimulationAgentRole,
@@ -197,11 +173,6 @@ export function markIssuesFailedValidation(
   }
 }
 
-/**
- * Marks issues as addressed when the reviewer approves the run.
- *
- * REVIEW ISSUE STATE — resolution
- */
 export function markIssuesAddressed(issues: ReviewIssue[]): void {
   for (const issue of issues) {
     if (issue.status !== "addressed") {

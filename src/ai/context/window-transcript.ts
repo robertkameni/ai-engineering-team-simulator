@@ -14,6 +14,7 @@ export interface WindowedTranscript {
 export function shouldUseFullTranscript(debateContext: DebateTurnContext): boolean {
   return Boolean(
     debateContext.correction ||
+    debateContext.focusedOpsFollowUp ||
     debateContext.isReReview ||
     (debateContext.architectRevisionCritiques?.length ?? 0) > 0,
   );

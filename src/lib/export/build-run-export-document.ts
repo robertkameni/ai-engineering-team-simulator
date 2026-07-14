@@ -18,6 +18,11 @@ import { getArtifactTabConfig } from "@/features/artifacts/artifact-tab-styles";
 import type { MockRun } from "@/features/agents/types";
 import { hasRecordedRunUsage } from "@/lib/ai/run-usage";
 import {
+  appendOpsFollowUpMetadataHtml,
+  appendOpsFollowUpMetadataLines,
+  opsFollowUpFieldsFromCheckpoint,
+} from "@/lib/db/ops-follow-up-summary";
+import {
   parseMessageBlocks,
   type MessageBlock,
 } from "@/features/simulation/parse-message-blocks";
@@ -25,6 +30,24 @@ import {
 export interface RunExportContext {
   run: MockRun;
   templateId?: TeamTemplateId;
+}
+
+function resolveRunOpsFollowUpFields(run: MockRun) {
+  return opsFollowUpFieldsFromCheckpoint(
+    run.opsFollowUpEvaluated
+      ? {
+          opsFollowUpEvaluated: run.opsFollowUpEvaluated,
+          opsFollowUpTriggered: run.opsFollowUpTriggered ?? false,
+          opsFollowUpSkipReason: run.opsFollowUpSkipReason ?? null,
+          opsFollowUpEligible: run.opsFollowUpEligible ?? false,
+          opsFollowUpUnresolvedDevopsIssueCount:
+            run.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+          opsFollowUpLastCorrectionRole:
+            run.opsFollowUpLastCorrectionRole ?? null,
+          opsFollowUpEvaluationTurn: run.opsFollowUpEvaluationTurn ?? null,
+        }
+      : null,
+  );
 }
 
 function resolveTemplateId(templateId?: TeamTemplateId): TeamTemplateId {
@@ -104,6 +127,8 @@ function appendMetadata(lines: string[], ctx: RunExportContext): void {
       "",
     );
   }
+
+  appendOpsFollowUpMetadataLines(lines, resolveRunOpsFollowUpFields(run));
 }
 
 function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
@@ -166,6 +191,8 @@ function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
         "</div>",
     );
   }
+
+  appendOpsFollowUpMetadataHtml(parts, resolveRunOpsFollowUpFields(run));
 }
 
 function blocksToMarkdown(blocks: MessageBlock[]): string[] {

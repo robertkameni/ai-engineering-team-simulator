@@ -16,6 +16,12 @@ export interface DebateTurnContext {
     feedback: string;
     targetRole: SimulationAgentRole;
   };
+  focusedOpsFollowUp?: {
+    reviewerName: string;
+    blockers: readonly string[];
+    reviewerFeedback: string;
+    architectCorrectionExcerpt?: string | null;
+  };
   isReReview?: boolean;
   hasTeamDisagreement?: boolean;
   architectRevisionCritiques?: string[];

@@ -8,6 +8,16 @@ import {
   RUN_SUMMARY_SYNTHESIS_VERSION,
 } from "@/lib/db/run-summary";
 
+const DEFAULT_OPS_FIELDS = {
+  opsFollowUpEvaluated: false,
+  opsFollowUpTriggered: false,
+  opsFollowUpSkipReason: null,
+  opsFollowUpEligible: false,
+  opsFollowUpUnresolvedDevopsIssueCount: 0,
+  opsFollowUpLastCorrectionRole: null,
+  opsFollowUpEvaluationTurn: null,
+} as const;
+
 describe("run summary helpers", () => {
   it("builds and parses debate-only summary payloads", () => {
     const summary = buildRunSummaryPayload({
@@ -26,7 +36,45 @@ describe("run summary helpers", () => {
       crossValidationFailed: undefined,
       hasTruncatedCriticalTurn: undefined,
       openReviewIssueCount: undefined,
+      ...DEFAULT_OPS_FIELDS,
     });
+  });
+
+  it("parses ops follow-up observability fields from summary payloads", () => {
+    const summary = buildRunSummaryPayload({
+      debateOutcome: "approved",
+      turnCount: 11,
+      opsFollowUpEvaluated: true,
+      opsFollowUpTriggered: true,
+      opsFollowUpSkipReason: null,
+      opsFollowUpEligible: true,
+      opsFollowUpUnresolvedDevopsIssueCount: 2,
+      opsFollowUpLastCorrectionRole: "architect",
+      opsFollowUpEvaluationTurn: 11,
+    });
+
+    const parsed = parseRunSummary(summary);
+
+    assert.equal(parsed?.opsFollowUpEvaluated, true);
+    assert.equal(parsed?.opsFollowUpTriggered, true);
+    assert.equal(parsed?.opsFollowUpSkipReason, null);
+    assert.equal(parsed?.opsFollowUpEligible, true);
+    assert.equal(parsed?.opsFollowUpUnresolvedDevopsIssueCount, 2);
+    assert.equal(parsed?.opsFollowUpLastCorrectionRole, "architect");
+    assert.equal(parsed?.opsFollowUpEvaluationTurn, 11);
+  });
+
+  it("treats legacy triggered-only summaries as evaluated", () => {
+    const summary = buildRunSummaryPayload({
+      debateOutcome: "approved",
+      turnCount: 11,
+      opsFollowUpTriggered: true,
+    });
+
+    const parsed = parseRunSummary(summary);
+
+    assert.equal(parsed?.opsFollowUpEvaluated, true);
+    assert.equal(parsed?.opsFollowUpTriggered, true);
   });
 
   it("merges synthesis telemetry without dropping debate fields", () => {
@@ -51,7 +99,32 @@ describe("run summary helpers", () => {
       crossValidationFailed: true,
       hasTruncatedCriticalTurn: undefined,
       openReviewIssueCount: undefined,
+      ...DEFAULT_OPS_FIELDS,
     });
+  });
+
+  it("preserves ops follow-up fields when merging synthesis telemetry", () => {
+    const existing = buildRunSummaryPayload({
+      debateOutcome: "approved",
+      turnCount: 11,
+      opsFollowUpEvaluated: true,
+      opsFollowUpTriggered: false,
+      opsFollowUpSkipReason: "no_unresolved_devops_issues",
+      opsFollowUpEligible: false,
+      opsFollowUpUnresolvedDevopsIssueCount: 0,
+      opsFollowUpLastCorrectionRole: "architect",
+      opsFollowUpEvaluationTurn: 11,
+    });
+
+    const merged = mergeRunSummarySynthesisTelemetry(existing, {
+      synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
+      consistencyRetries: 0,
+    });
+
+    const parsed = parseRunSummary(merged);
+    assert.equal(parsed?.opsFollowUpEvaluated, true);
+    assert.equal(parsed?.opsFollowUpSkipReason, "no_unresolved_devops_issues");
+    assert.equal(parsed?.opsFollowUpLastCorrectionRole, "architect");
   });
 
   it("accumulates validation failures and retries for partial synthesis", () => {
@@ -87,6 +160,7 @@ describe("run summary helpers", () => {
       crossValidationFailed: true,
       hasTruncatedCriticalTurn: undefined,
       openReviewIssueCount: undefined,
+      ...DEFAULT_OPS_FIELDS,
     });
   });
 });

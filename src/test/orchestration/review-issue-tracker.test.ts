@@ -1,11 +1,7 @@
-// Phase 2C — Structured resolution tracking tests
-//
-// STRUCTURED RESOLUTION TRACKING
-// REVIEW ISSUE STATE
-
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { createSimulationRoster } from "@/ai/agents/roster";
 import {
   createReviewIssues,
   markIssuesAttempted,
@@ -21,25 +17,52 @@ const FEEDBACK_WITH_CONCERNS = `**Disagree** The caching strategy needs clarific
 
 **Refine** The API contract for user endpoints is inconsistent with the proposed data model.`;
 
+const SOFTWARE_ROSTER = createSimulationRoster("software");
+
 describe("createReviewIssues", () => {
   it("creates issues from reviewer rejection feedback", () => {
-    const issues = createReviewIssues([], "backend", FEEDBACK_WITH_CONCERNS, 0, 3);
+    const issues = createReviewIssues(
+      [],
+      "backend",
+      FEEDBACK_WITH_CONCERNS,
+      0,
+      3,
+      SOFTWARE_ROSTER,
+    );
 
     assert.ok(issues.length >= 2, `Expected at least 2 issues, got ${issues.length}`);
     for (const issue of issues) {
-      assert.strictEqual(issue.targetRole, "backend");
       assert.strictEqual(issue.status, "open");
       assert.strictEqual(issue.createdOnCycle, 0);
       assert.strictEqual(issue.lastConfirmedOnTurn, 3);
       assert.ok(issue.id.startsWith("ri_"));
       assert.ok(issue.keywords.length >= 2);
       assert.ok(issue.excerpt.length > 0);
+      assert.ok(issue.severity === "blocker" || issue.severity === "concern");
     }
 
     assert.ok(
       issues.some((i) => i.excerpt.toLowerCase().includes("caching")),
       "Expected a caching-related issue",
     );
+    assert.ok(
+      issues.some((i) => i.targetRole === "devops"),
+      "Expected operational observability gap to route to devops",
+    );
+  });
+
+  it("assigns per-line ownership when reviewer rejects architect with mixed gaps", () => {
+    const feedback = `
+**Disagree** Service boundary between billing and analytics is unclear.
+
+**UNRESOLVED** ${SOFTWARE_ROSTER.devops.name}'s backup restore workflow is missing from the deployment plan.
+
+**Refine** The API pagination contract is inconsistent with the frontend dashboard needs.
+`;
+    const issues = createReviewIssues([], "architect", feedback, 0, 8, SOFTWARE_ROSTER);
+
+    assert.ok(issues.some((issue) => issue.targetRole === "architect"));
+    assert.ok(issues.some((issue) => issue.targetRole === "devops"));
   });
 
   it("reactivates existing issues as still_open when the same concern reappears", () => {
@@ -50,6 +73,7 @@ describe("createReviewIssues", () => {
         keywords: ["caching", "strategy", "clarification"],
         excerpt: "The caching strategy needs clarification",
         status: "attempted",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: 4,
         lastConfirmedOnTurn: 1,
@@ -62,6 +86,7 @@ describe("createReviewIssues", () => {
       "**Disagree** The caching strategy needs clarification.",
       1,
       7,
+      SOFTWARE_ROSTER,
     );
 
     assert.strictEqual(newIssues.length, 0, "Should not create duplicates");
@@ -73,10 +98,11 @@ describe("createReviewIssues", () => {
     const existing: ReviewIssue[] = [
       {
         id: "ri_1",
-        targetRole: "backend",
+        targetRole: "devops",
         keywords: ["observability", "tooling", "finalized"],
         excerpt: "Observability tooling was not finalized",
         status: "attempted",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: 3,
         lastConfirmedOnTurn: 0,
@@ -89,6 +115,7 @@ describe("createReviewIssues", () => {
       "**UNRESOLVED** Observability tooling was not finalized.",
       1,
       6,
+      SOFTWARE_ROSTER,
     );
 
     assert.strictEqual(newIssues.length, 0, "Should not create duplicates");
@@ -105,6 +132,7 @@ describe("markIssuesAttempted", () => {
         keywords: ["caching"],
         excerpt: "Caching concern",
         status: "open",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: null,
         lastConfirmedOnTurn: 1,
@@ -115,6 +143,7 @@ describe("markIssuesAttempted", () => {
         keywords: ["api"],
         excerpt: "API concern",
         status: "open",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: null,
         lastConfirmedOnTurn: 1,
@@ -136,6 +165,7 @@ describe("markIssuesAttempted", () => {
         keywords: ["caching"],
         excerpt: "Caching concern",
         status: "still_open",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: null,
         lastConfirmedOnTurn: 1,
@@ -156,6 +186,7 @@ describe("markIssuesAttempted", () => {
         keywords: ["caching"],
         excerpt: "Caching concern",
         status: "addressed",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: 5,
         lastConfirmedOnTurn: 1,
@@ -177,6 +208,7 @@ describe("markIssuesFailedValidation", () => {
         keywords: ["caching"],
         excerpt: "Caching concern",
         status: "attempted",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: 5,
         lastConfirmedOnTurn: 1,
@@ -187,6 +219,7 @@ describe("markIssuesFailedValidation", () => {
         keywords: ["observability"],
         excerpt: "Observability concern",
         status: "open",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: null,
         lastConfirmedOnTurn: 1,
@@ -197,6 +230,7 @@ describe("markIssuesFailedValidation", () => {
         keywords: ["api"],
         excerpt: "API concern",
         status: "still_open",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: null,
         lastConfirmedOnTurn: 1,
@@ -218,6 +252,7 @@ describe("markIssuesFailedValidation", () => {
         keywords: ["caching"],
         excerpt: "Caching concern",
         status: "addressed",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: 5,
         lastConfirmedOnTurn: 1,
@@ -239,6 +274,7 @@ describe("markIssuesAddressed", () => {
         keywords: ["caching"],
         excerpt: "Caching concern",
         status: "open",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: null,
         lastConfirmedOnTurn: 1,
@@ -249,6 +285,7 @@ describe("markIssuesAddressed", () => {
         keywords: ["api"],
         excerpt: "API concern",
         status: "attempted",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: 5,
         lastConfirmedOnTurn: 1,
@@ -259,6 +296,7 @@ describe("markIssuesAddressed", () => {
         keywords: ["ui"],
         excerpt: "UI concern",
         status: "failed_validation",
+        severity: "blocker",
         createdOnCycle: 1,
         lastAttemptedOnTurn: 6,
         lastConfirmedOnTurn: 3,
@@ -282,6 +320,7 @@ describe("buildIssueSnapshot", () => {
         keywords: ["caching"],
         excerpt: "Caching concern",
         status: "open",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: null,
         lastConfirmedOnTurn: 1,
@@ -292,6 +331,7 @@ describe("buildIssueSnapshot", () => {
         keywords: ["observability"],
         excerpt: "Observability concern",
         status: "still_open",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: null,
         lastConfirmedOnTurn: 1,
@@ -302,6 +342,7 @@ describe("buildIssueSnapshot", () => {
         keywords: ["api"],
         excerpt: "API concern",
         status: "failed_validation",
+        severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: null,
         lastConfirmedOnTurn: 1,
@@ -312,6 +353,7 @@ describe("buildIssueSnapshot", () => {
         keywords: ["ui"],
         excerpt: "UI concern",
         status: "addressed",
+        severity: "concern",
         createdOnCycle: 1,
         lastAttemptedOnTurn: 6,
         lastConfirmedOnTurn: 3,
@@ -334,6 +376,10 @@ describe("buildIssueSnapshot", () => {
   });
 });
 
+const BACKEND_ONLY_LIFECYCLE_FEEDBACK = `**Disagree** The caching strategy needs clarification.
+
+**Refine** The API contract for user endpoints is inconsistent with the proposed data model.`;
+
 describe("structured issue lifecycle — end-to-end", () => {
   it("reviewer reject → correction attempt → failed validation → re-reject → addressed", () => {
     let allIssues: ReviewIssue[] = [];
@@ -342,9 +388,10 @@ describe("structured issue lifecycle — end-to-end", () => {
     const cycle0 = createReviewIssues(
       allIssues,
       "backend",
-      FEEDBACK_WITH_CONCERNS,
+      BACKEND_ONLY_LIFECYCLE_FEEDBACK,
       0,
       3,
+      SOFTWARE_ROSTER,
     );
     allIssues.push(...cycle0);
     assert.ok(allIssues.length >= 2);
@@ -368,9 +415,10 @@ describe("structured issue lifecycle — end-to-end", () => {
     const cycle1 = createReviewIssues(
       allIssues,
       "backend",
-      FEEDBACK_WITH_CONCERNS,
+      BACKEND_ONLY_LIFECYCLE_FEEDBACK,
       1,
       8,
+      SOFTWARE_ROSTER,
     );
     allIssues.push(...cycle1);
     assert.ok(

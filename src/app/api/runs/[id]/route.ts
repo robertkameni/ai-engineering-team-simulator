@@ -32,6 +32,14 @@ export async function GET(_request: Request, { params }: RouteParams) {
       teamRosterRecord != null ? rosterToPreview(teamRosterRecord) : null,
     stackValidationFailed: run.stackValidationFailed === true,
     crossValidationFailed: run.crossValidationFailed === true,
+    opsFollowUpEvaluated: run.opsFollowUpEvaluated === true,
+    opsFollowUpTriggered: run.opsFollowUpTriggered === true,
+    opsFollowUpSkipReason: run.opsFollowUpSkipReason ?? null,
+    opsFollowUpEligible: run.opsFollowUpEligible === true,
+    opsFollowUpUnresolvedDevopsIssueCount:
+      run.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+    opsFollowUpLastCorrectionRole: run.opsFollowUpLastCorrectionRole ?? null,
+    opsFollowUpEvaluationTurn: run.opsFollowUpEvaluationTurn ?? null,
   });
 }
 

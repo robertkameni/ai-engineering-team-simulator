@@ -3,6 +3,8 @@ import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import type { DebateExitOutcome } from "@/ai/orchestration/reviewer-decision";
+import type { FocusedOpsFollowUpContext } from "@/ai/orchestration/ops-follow-up";
+import type { OpsFollowUpCheckpoint } from "@/lib/db/ops-follow-up-summary";
 import type { ReviewIssue } from "@/ai/orchestration/review-issue-tracker";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
@@ -36,19 +38,13 @@ export interface DebateState {
   roleCorrectionCounts: Partial<Record<SimulationAgentRole, number>>;
   transcript: TranscriptEntry[];
   isArchitectRevision: boolean;
-  /** TRUNCATION APPROVAL GUARD — true if any critical-role turn was truncated. */
   hasTruncatedCriticalTurn: boolean;
-  /** STRUCTURED RESOLUTION TRACKING — structured issues across correction cycles. */
   reviewIssues: ReviewIssue[];
-  /** ARCHITECT GATE CLEANUP — true when the current reroute originated from
-   *  handleArchitectQualityGate rather than a real reviewer rejection.
-   *  Suppresses returnToReviewer in runDebateLoop so the pipeline continues
-   *  after architect re-contributes. */
   isGateReroute: boolean;
-  /** SOFTWARE EARLY REVIEW CHECKPOINT — true after an early reviewer
-   *  checkpoint has been inserted for software-template runs. Prevents
-   *  multiple early-review insertions in the same debate. */
   hasHadEarlyReview: boolean;
+  hasHadOpsFollowUpForCurrentReject: boolean;
+  focusedOpsFollowUp: FocusedOpsFollowUpContext | null;
+  opsFollowUpCheckpoint: OpsFollowUpCheckpoint | null;
 }
 
 export interface TurnContext {

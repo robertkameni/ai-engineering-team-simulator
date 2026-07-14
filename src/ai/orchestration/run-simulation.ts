@@ -59,6 +59,12 @@ import { assertNotAborted, isSimulationAborted } from "./simulation-abort";
 import { streamAgentTurn } from "./stream-agent-turn";
 import type { StreamAgentTurnResult } from "./stream-agent-turn";
 import {
+  markDevOpsOperationalIssuesAttempted,
+  scheduleOpsFollowUpTurn,
+  recordOpsFollowUpCheckpoint,
+} from "@/ai/orchestration/ops-follow-up";
+import { opsFollowUpFieldsFromCheckpoint } from "@/lib/db/ops-follow-up-summary";
+import {
   validateCorrectionTurn,
   type CorrectionValidationResult,
 } from "@/ai/orchestration/validate-correction-turn";
@@ -130,6 +136,9 @@ export async function runSimulation(
       reviewIssues: [],
       isGateReroute: false,
       hasHadEarlyReview: false,
+      hasHadOpsFollowUpForCurrentReject: false,
+      focusedOpsFollowUp: null,
+      opsFollowUpCheckpoint: null,
     };
 
     const ctx: TurnContext = {
@@ -155,6 +164,7 @@ export async function runSimulation(
         turnCount: state.turnCount,
         hasTruncatedCriticalTurn: state.hasTruncatedCriticalTurn || undefined,
         openReviewIssueCount: buildIssueSnapshot(state.reviewIssues).totalOpen || undefined,
+        ...opsFollowUpFieldsFromCheckpoint(state.opsFollowUpCheckpoint),
       }),
     );
 
@@ -224,6 +234,37 @@ async function runDebateLoop(
       state.nextRole = "reviewer";
       state.hasHadEarlyReview = true;
       continue;
+    }
+
+    if (directive.kind === "progress") {
+      const evaluation = recordOpsFollowUpCheckpoint(state, ctx);
+      const checkpoint = state.opsFollowUpCheckpoint;
+
+      if (evaluation?.shouldTrigger) {
+        console.info("OPS FOLLOW-UP CHECKPOINT triggered", {
+          runId: ctx.runId,
+          templateId: ctx.templateId,
+          turnCount: state.turnCount,
+          lastRejectTarget: state.lastRejectTarget,
+          unresolvedDevOpsIssueCount: evaluation.unresolvedDevOpsIssueCount,
+          blockers: evaluation.blockers,
+          lastCorrectionRole: checkpoint?.opsFollowUpLastCorrectionRole,
+        });
+        scheduleOpsFollowUpTurn(state, ctx, evaluation);
+        continue;
+      }
+
+      if (checkpoint?.opsFollowUpEvaluated) {
+        console.info("OPS FOLLOW-UP CHECKPOINT skipped", {
+          runId: ctx.runId,
+          templateId: ctx.templateId,
+          turnCount: state.turnCount,
+          skipReason: checkpoint.opsFollowUpSkipReason,
+          unresolvedDevOpsIssueCount: checkpoint.opsFollowUpUnresolvedDevopsIssueCount,
+          lastCorrectionRole: checkpoint.opsFollowUpLastCorrectionRole,
+          eligible: checkpoint.opsFollowUpEligible,
+        });
+      }
     }
 
     if (!applyLinearProgression(state)) {
@@ -362,6 +403,10 @@ function enrichDebateContext(
     );
     debateContext.architectRevisionCritiques = criticism.excerpts;
   }
+
+  if (role === "devops" && state.focusedOpsFollowUp) {
+    debateContext.focusedOpsFollowUp = state.focusedOpsFollowUp;
+  }
 }
 
 type ExecutedTurn =
@@ -414,15 +459,19 @@ async function runDebateTurn(
     return gateDirective;
   }
 
-  // CORRECTION LOOP FAILURE GUARD — validate correction turns before persisting
   const isCorrectionTurn = debateContext.correction != null;
   let correctionValidation: CorrectionValidationResult | null = null;
+
+  if (state.focusedOpsFollowUp && role === "devops") {
+    markDevOpsOperationalIssuesAttempted(
+      state.reviewIssues,
+      state.turnCount,
+    );
+  }
 
   if (isCorrectionTurn) {
     const targetRole = debateContext.correction!.targetRole;
 
-    // STRUCTURED RESOLUTION TRACKING — mark issues as attempted when
-    // the agent produces a correction turn for the rejected role.
     markIssuesAttempted(state.reviewIssues, targetRole, state.turnCount);
 
     const previousEntry = findLastTranscriptEntry(state.transcript, targetRole);
@@ -447,7 +496,6 @@ async function runDebateTurn(
           },
         );
 
-        // STRUCTURED RESOLUTION TRACKING — mark as failed
         markIssuesFailedValidation(state.reviewIssues, targetRole);
       }
     }
@@ -467,8 +515,11 @@ async function runDebateTurn(
     state.isArchitectRevision = false;
   }
 
-  // If the correction turn failed validation, skip normal re-review routing
-  // and force a synthetic re-reject to consume budget without proceeding
+  if (role === "devops" && state.focusedOpsFollowUp) {
+    state.focusedOpsFollowUp = null;
+  }
+
+  // Invalid corrections must not reach re-review.
   if (isCorrectionTurn && correctionValidation && !correctionValidation.isValid) {
     console.warn(
       `CORRECTION LOOP FAILURE: Blocking re-review for failed ${role} correction`,
@@ -629,11 +680,6 @@ async function handleArchitectQualityGate(
   return { kind: "reroute", targetRole: "architect" };
 }
 
-// TRUNCATION HANDLING FAILURE GUARD — persists the turn with optional
-// truncation and correction-failure flags carried through to downstream consumers.
-//
-// CRITICAL_ROLES are roles whose output is essential for a build-ready run.
-// If any of these roles produces a truncated turn, the run is downgraded.
 const CRITICAL_ROLES: Set<SimulationAgentRole> = new Set([
   "architect",
   "backend",
@@ -650,7 +696,6 @@ async function persistTurn(
   wasTruncated = false,
   correctionValidation?: CorrectionValidationResult | null,
 ): Promise<void> {
-  // TRUNCATION APPROVAL GUARD — track truncated critical turns
   if (wasTruncated && CRITICAL_ROLES.has(role)) {
     state.hasTruncatedCriticalTurn = true;
     console.warn(
@@ -708,11 +753,10 @@ function resolveReviewerOutcome(
   if (parsed.decision === "approve") {
     state.lastRejectFeedback = null;
     state.lastRejectTarget = null;
+    state.hasHadOpsFollowUpForCurrentReject = false;
+    state.focusedOpsFollowUp = null;
 
-    // TRUNCATION APPROVAL GUARD — reviewer issues [APPROVE] but
-    // one or more critical-role turns were truncated. The run is
-    // downgraded to degraded_truncated so artifacts/export reflect
-    // the incomplete state.
+    // Incomplete critical turns must not close as a full approval.
     if (state.hasTruncatedCriticalTurn) {
       console.warn(
         "TRUNCATION APPROVAL GUARD: reviewer approved but critical turns were truncated — downgrading to degraded_truncated",
@@ -722,19 +766,18 @@ function resolveReviewerOutcome(
       return { kind: "break", outcome: "degraded_truncated" };
     }
 
-    // STRUCTURED RESOLUTION TRACKING — mark all issues as addressed
     markIssuesAddressed(state.reviewIssues);
     return { kind: "break", outcome: "approved" };
   }
 
   if (parsed.decision === "reject" && parsed.rejectRole) {
-    // STRUCTURED RESOLUTION TRACKING — create/update issues from rejection
     const newIssues = createReviewIssues(
       state.reviewIssues,
       parsed.rejectRole,
       parsed.displayText,
       state.reviewerRejectionCount,
       state.turnCount,
+      ctx.roster,
     );
     state.reviewIssues.push(...newIssues);
 
@@ -786,6 +829,8 @@ function resolveReviewerOutcome(
     );
     state.lastRejectFeedback = parsed.displayText.trim() || null;
     state.lastRejectTarget = parsed.rejectRole;
+    state.hasHadOpsFollowUpForCurrentReject = false;
+    state.focusedOpsFollowUp = null;
     return { kind: "reroute", targetRole: parsed.rejectRole };
   }
 

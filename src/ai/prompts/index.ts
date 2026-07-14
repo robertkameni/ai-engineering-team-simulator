@@ -39,6 +39,7 @@ import {
   buildPhysicalTechnicalEngineerTurnPrompt,
 } from "@/ai/prompts/physical/technical-engineer";
 import { buildPmSystemPrompt, buildPmUserPrompt } from "@/ai/prompts/pm";
+import { buildFocusedOpsFollowUpPrompt } from "@/ai/orchestration/ops-follow-up";
 import {
   buildReviewerSystemPrompt,
   buildReviewerTurnPrompt,
@@ -206,6 +207,16 @@ export function getAgentTurnPrompt(
       correction.reviewerName,
       correction.feedback,
     );
+  }
+
+  const focusedOpsFollowUp = debateContext.focusedOpsFollowUp;
+  if (focusedOpsFollowUp && role === "devops") {
+    turnPrompt += buildFocusedOpsFollowUpPrompt({
+      reviewerName: focusedOpsFollowUp.reviewerName,
+      blockers: focusedOpsFollowUp.blockers,
+      reviewerFeedback: focusedOpsFollowUp.reviewerFeedback,
+      architectCorrectionExcerpt: focusedOpsFollowUp.architectCorrectionExcerpt ?? null,
+    });
   }
 
   return turnPrompt;

@@ -41,6 +41,15 @@ export async function GET(_request: Request, { params }: RouteParams) {
     debateOutcome: parseDebateOutcomeFromRunSummary(run.summary),
     stackValidationFailed: summaryPayload?.stackValidationFailed === true,
     crossValidationFailed: summaryPayload?.crossValidationFailed === true,
+    opsFollowUpEvaluated: summaryPayload?.opsFollowUpEvaluated === true,
+    opsFollowUpTriggered: summaryPayload?.opsFollowUpTriggered === true,
+    opsFollowUpSkipReason: summaryPayload?.opsFollowUpSkipReason ?? null,
+    opsFollowUpEligible: summaryPayload?.opsFollowUpEligible === true,
+    opsFollowUpUnresolvedDevopsIssueCount:
+      summaryPayload?.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+    opsFollowUpLastCorrectionRole:
+      summaryPayload?.opsFollowUpLastCorrectionRole ?? null,
+    opsFollowUpEvaluationTurn: summaryPayload?.opsFollowUpEvaluationTurn ?? null,
   });
 }
 

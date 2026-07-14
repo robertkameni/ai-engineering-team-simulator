@@ -3,6 +3,7 @@ import type {
   RunSummaryPayload,
   RunSummarySynthesisTelemetry,
 } from "@/lib/db/run-summary.types";
+import { parseOpsFollowUpFields } from "@/lib/db/ops-follow-up-summary";
 
 export const RUN_SUMMARY_SYNTHESIS_VERSION = 2;
 
@@ -80,6 +81,7 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
       crossValidationFailed,
       hasTruncatedCriticalTurn,
       openReviewIssueCount,
+      ...parseOpsFollowUpFields(record),
     };
   } catch {
     return null;
@@ -116,5 +118,15 @@ export function mergeRunSummarySynthesisTelemetry(
     consistencyRetries,
     stackValidationFailed,
     crossValidationFailed,
+    hasTruncatedCriticalTurn: existing?.hasTruncatedCriticalTurn,
+    openReviewIssueCount: existing?.openReviewIssueCount,
+    opsFollowUpEvaluated: existing?.opsFollowUpEvaluated,
+    opsFollowUpTriggered: existing?.opsFollowUpTriggered,
+    opsFollowUpSkipReason: existing?.opsFollowUpSkipReason,
+    opsFollowUpEligible: existing?.opsFollowUpEligible,
+    opsFollowUpUnresolvedDevopsIssueCount:
+      existing?.opsFollowUpUnresolvedDevopsIssueCount,
+    opsFollowUpLastCorrectionRole: existing?.opsFollowUpLastCorrectionRole,
+    opsFollowUpEvaluationTurn: existing?.opsFollowUpEvaluationTurn,
   });
 }
