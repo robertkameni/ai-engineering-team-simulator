@@ -133,7 +133,7 @@ export async function generateBlueprintArtifact(
   try {
     await touchRunActivity(runId);
 
-    const artifactOutput = await generateRunArtifacts({
+    const synthesisResult = await generateRunArtifacts({
       productIdea: run.userPrompt,
       transcript: mapMessagesToTranscript(simulationMessages),
       roster,
@@ -145,7 +145,7 @@ export async function generateBlueprintArtifact(
       },
     });
 
-    const blueprint = artifactOutput.blueprint;
+    const blueprint = synthesisResult.artifacts.blueprint;
     if (!blueprint) {
       return { ok: false, error: "generation_failed" };
     }

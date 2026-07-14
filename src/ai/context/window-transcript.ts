@@ -3,7 +3,7 @@ import { getTeamMember } from "@/ai/agents/roster";
 import type { DebateTurnContext } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 
-export const TRANSCRIPT_WINDOW_RECENT_COUNT = 4;
+export const TRANSCRIPT_WINDOW_RECENT_COUNT = 6;
 export const TRANSCRIPT_SUMMARY_EXCERPT_CHARS = 280;
 
 export interface WindowedTranscript {

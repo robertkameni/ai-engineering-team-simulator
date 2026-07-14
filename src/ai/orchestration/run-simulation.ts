@@ -35,6 +35,7 @@ import {
 import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import { updateArtifactStatus } from "@/lib/db/artifact-status";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
+import { buildRunSummaryPayload } from "@/lib/db/run-summary";
 import { saveTeamRoster } from "@/lib/db/team-roster";
 import {
   appendMessage,
@@ -131,7 +132,10 @@ export async function runSimulation(
 
     await updateRunSummary(
       run.id,
-      JSON.stringify({ debateOutcome: debateExitOutcome, turnCount: state.turnCount }),
+      buildRunSummaryPayload({
+        debateOutcome: debateExitOutcome,
+        turnCount: state.turnCount,
+      }),
     );
 
     await updateArtifactStatus(run.id, "pending");
@@ -179,10 +183,14 @@ async function runDebateLoop(
       continue;
     }
 
-    if (shouldTriggerArchitectRevision(state)) {
+    if (shouldTriggerArchitectRevision(state, ctx)) {
       state.isArchitectRevision = true;
       state.nextRole = "architect";
       state.returnToReviewer = true;
+      state.roleCorrectionCounts = incrementRoleCorrectionCount(
+        state.roleCorrectionCounts,
+        "architect",
+      );
       continue;
     }
 
@@ -195,8 +203,34 @@ async function runDebateLoop(
   return "cap_reached";
 }
 
-function shouldTriggerArchitectRevision(_state: DebateState): boolean {
-  return false;
+function shouldTriggerArchitectRevision(
+  state: DebateState,
+  ctx: TurnContext,
+): boolean {
+  if (state.nextRole !== "devops") {
+    return false;
+  }
+  if (state.isArchitectRevision) {
+    return false;
+  }
+  if (!canCorrectRole(state.roleCorrectionCounts, "architect")) {
+    return false;
+  }
+
+  const architectEntry = state.transcript.find((entry) => entry.role === "architect");
+  if (!architectEntry) {
+    return false;
+  }
+
+  const architect = getTeamMember(ctx.roster, "architect");
+  const critics: SimulationAgentRole[] = ["backend", "frontend", "devops"];
+  const criticism = detectPeerCriticism(
+    state.transcript,
+    architect.name,
+    critics,
+  );
+
+  return criticism.criticized;
 }
 
 function applyLinearProgression(state: DebateState): boolean {

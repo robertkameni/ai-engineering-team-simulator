@@ -3,7 +3,10 @@ import { generateText, Output } from "ai";
 import { sectionGuidelinesForArtifact } from "@/ai/artifacts/artifact-templates";
 import { buildConsensusDirectives } from "@/ai/artifacts/build-consensus-directives";
 import { buildTranscriptForArtifacts } from "@/ai/artifacts/build-transcript";
-import type { RetryStackInconsistentArtifactsParams } from "@/ai/artifacts/generate-run-artifacts.types";
+import type {
+  GenerateRunArtifactsResult,
+  RetryStackInconsistentArtifactsParams,
+} from "@/ai/artifacts/generate-run-artifacts.types";
 import { mergeCorrectionTurns } from "@/ai/artifacts/merge-correction-turns";
 import {
   buildStackConsistencyFixPrompt,
@@ -297,7 +300,7 @@ function resolveStackRetryTypes(violations: readonly string[]): ArtifactType[] {
 
 async function retryStackInconsistentArtifacts(
   params: RetryStackInconsistentArtifactsParams,
-): Promise<void> {
+): Promise<number> {
   const {
     output,
     transcriptPrompt,
@@ -311,7 +314,7 @@ async function retryStackInconsistentArtifacts(
 
   const violations = validateArtifactStackConsistency(output);
   if (violations.length === 0) {
-    return;
+    return 0;
   }
 
   const fixNotice = buildStackConsistencyFixPrompt(violations);
@@ -342,6 +345,8 @@ async function retryStackInconsistentArtifacts(
     output[type] = document;
     await onArtifactComplete?.(type, document);
   }
+
+  return retryTypes.length;
 }
 
 export async function generateRunArtifacts({
@@ -363,7 +368,7 @@ export async function generateRunArtifacts({
   usageAccumulator?: RunUsageAccumulator;
   runSummary?: string | null;
   artifactTypes?: readonly ArtifactType[];
-}): Promise<Partial<RunArtifactsOutput>> {
+}): Promise<GenerateRunArtifactsResult> {
   const templateId = roster.templateId;
   const debateOutcome = parseDebateOutcomeFromRunSummary(runSummary ?? null);
   const mergedTranscript = mergeCorrectionTurns(transcript);
@@ -406,7 +411,7 @@ export async function generateRunArtifacts({
     await onArtifactComplete?.(type, document);
   }
 
-  await retryStackInconsistentArtifacts({
+  const consistencyRetries = await retryStackInconsistentArtifacts({
     output,
     transcriptPrompt,
     consensusDirectives,
@@ -417,5 +422,5 @@ export async function generateRunArtifacts({
     onArtifactComplete,
   });
 
-  return output;
+  return { artifacts: output, consistencyRetries };
 }

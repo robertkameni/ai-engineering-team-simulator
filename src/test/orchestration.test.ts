@@ -366,7 +366,7 @@ describe("windowTranscriptForTurn", () => {
 
     assert.ok(windowed.omittedSummary?.includes("Earlier debate summary"));
     assert.equal(windowed.entries.length, TRANSCRIPT_WINDOW_RECENT_COUNT);
-    assert.equal(windowed.entries[0]?.content, "Message 5 with enough detail to matter.");
+    assert.equal(windowed.entries[0]?.content, "Message 3 with enough detail to matter.");
   });
 });
 

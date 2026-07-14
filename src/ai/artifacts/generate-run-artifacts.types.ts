@@ -7,6 +7,11 @@ import type {
 } from "@/features/artifacts/schemas";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 
+export interface GenerateRunArtifactsResult {
+  readonly artifacts: Partial<RunArtifactsOutput>;
+  readonly consistencyRetries: number;
+}
+
 export interface RetryStackInconsistentArtifactsParams {
   readonly output: Partial<RunArtifactsOutput>;
   readonly transcriptPrompt: string;

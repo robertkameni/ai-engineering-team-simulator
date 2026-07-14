@@ -25,7 +25,11 @@ import {
   toAppArtifactStatus,
   updateArtifactStatus,
 } from "@/lib/db/artifact-status";
-import { getRunWithMessages, touchRunActivity, updateRunStatus } from "@/lib/db/runs";
+import { getRunWithMessages, touchRunActivity, updateRunStatus, updateRunSummary } from "@/lib/db/runs";
+import {
+  mergeRunSummarySynthesisTelemetry,
+  RUN_SUMMARY_SYNTHESIS_VERSION,
+} from "@/lib/db/run-summary";
 import { reconcileStaleRunIfNeeded } from "@/lib/db/run-reconcile";
 import { toAppRunStatus } from "@/lib/db/run-status";
 import {
@@ -180,7 +184,7 @@ export async function regenerateRunArtifacts(
   try {
     await touchRunActivity(runId);
 
-    const artifactOutput = await generateRunArtifacts({
+    const synthesisResult = await generateRunArtifacts({
       productIdea: run.userPrompt,
       transcript: mapMessagesToTranscript(simulationMessages),
       roster,
@@ -191,7 +195,14 @@ export async function regenerateRunArtifacts(
         await saveSingleArtifact(runId, type, document);
       },
     });
-    const bundle = runArtifactsOutputToBundle(artifactOutput);
+    const bundle = runArtifactsOutputToBundle(synthesisResult.artifacts);
+    await updateRunSummary(
+      runId,
+      mergeRunSummarySynthesisTelemetry(run.summary, {
+        synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
+        consistencyRetries: synthesisResult.consistencyRetries,
+      }),
+    );
     await updateArtifactStatus(runId, "ready");
     if (status !== "complete") {
       await updateRunStatus(runId, "complete");

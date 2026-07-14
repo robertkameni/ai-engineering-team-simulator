@@ -9,6 +9,7 @@ import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import { dispatchCoreArtifactSynthesisWorker } from "@/lib/ai/schedule-artifact-synthesis";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
+import { buildRunSummaryPayload } from "@/lib/db/run-summary";
 import { setRunUsageTotals, updateRunSummary } from "@/lib/db/runs";
 import {
   encodeSimulationEvent,
@@ -105,7 +106,10 @@ export async function POST(request: Request) {
           if (runId) {
             await updateRunSummary(
               runId,
-              JSON.stringify({ debateOutcome: "aborted", turnCount: null }),
+              buildRunSummaryPayload({
+                debateOutcome: "aborted",
+                turnCount: null,
+              }),
             );
             await reconcileRunFailure(runId, {
               debateComplete: true,
