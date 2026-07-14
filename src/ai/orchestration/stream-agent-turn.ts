@@ -30,6 +30,13 @@ import type { AgentStreamRetryParams } from "@/ai/orchestration/stream-agent-tur
 import { assertNotAborted } from "./simulation-abort";
 import { collectAgentStream } from "./collect-agent-stream";
 
+export interface StreamAgentTurnResult {
+  text: string;
+  /** TRUNCATION HANDLING FAILURE GUARD — true if the final output
+   *  still appears truncated after all continuation/retry attempts. */
+  wasTruncated: boolean;
+}
+
 export async function streamAgentTurn({
   runId,
   role,
@@ -54,7 +61,7 @@ export async function streamAgentTurn({
   debateContext?: DebateTurnContext;
   send: (event: SimulationStreamEvent) => void;
   disableTools?: boolean;
-}): Promise<string> {
+}): Promise<StreamAgentTurnResult> {
   const config = getAgentConfig(role);
   const member = getTeamMember(roster, role);
 
@@ -260,7 +267,21 @@ export async function streamAgentTurn({
     send({ type: "agent_end", role });
   }
 
-  return fullText.trim();
+  // TRUNCATION HANDLING FAILURE GUARD
+  const trimmedText = fullText.trim();
+  const wasTruncated = looksLikeTruncatedAgentOutput(
+    normalizeAgentPersistedText(role, trimmedText),
+    role,
+  );
+
+  if (wasTruncated) {
+    console.warn(
+      `${role}: final output still appears truncated after all continuation attempts — marking turn as incomplete`,
+      { runId, role, textLength: trimmedText.length },
+    );
+  }
+
+  return { text: trimmedText, wasTruncated };
 }
 
 async function continueAgentStreamIfTruncated({

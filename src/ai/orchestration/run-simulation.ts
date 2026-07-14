@@ -49,6 +49,11 @@ import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
 import { assertNotAborted, isSimulationAborted } from "./simulation-abort";
 import { streamAgentTurn } from "./stream-agent-turn";
+import type { StreamAgentTurnResult } from "./stream-agent-turn";
+import {
+  validateCorrectionTurn,
+  type CorrectionValidationResult,
+} from "@/ai/orchestration/validate-correction-turn";
 import type {
   DebateState,
   RunSimulationOptions,
@@ -285,6 +290,10 @@ function enrichDebateContext(
   }
 }
 
+type ExecutedTurn =
+  | { kind: "break"; outcome: DebateExitOutcome; }
+  | { kind: "text"; fullText: string; wasTruncated: boolean; };
+
 async function runDebateTurn(
   state: DebateState,
   ctx: TurnContext,
@@ -331,10 +340,76 @@ async function runDebateTurn(
     return gateDirective;
   }
 
-  await persistTurn(role, contentToPersist, member.name, ctx, state);
+  // CORRECTION LOOP FAILURE GUARD — validate correction turns before persisting
+  const isCorrectionTurn = debateContext.correction != null;
+  let correctionValidation: CorrectionValidationResult | null = null;
+
+  if (isCorrectionTurn) {
+    const targetRole = debateContext.correction!.targetRole;
+    const previousEntry = findLastTranscriptEntry(state.transcript, targetRole);
+    const feedback = state.lastRejectFeedback ?? "";
+
+    if (previousEntry) {
+      correctionValidation = validateCorrectionTurn(
+        previousEntry.content,
+        contentToPersist,
+        feedback,
+        targetRole,
+      );
+
+      if (!correctionValidation.isValid) {
+        console.warn(
+          `CORRECTION LOOP FAILURE: ${role} correction rejected by validation gate`,
+          {
+            runId: ctx.runId,
+            role,
+            failureReason: correctionValidation.failureReason,
+            textSimilarity: correctionValidation.textSimilarity.toFixed(2),
+          },
+        );
+      }
+    }
+  }
+
+  await persistTurn(
+    role,
+    contentToPersist,
+    member.name,
+    ctx,
+    state,
+    turnResult.wasTruncated,
+    correctionValidation,
+  );
 
   if (state.isArchitectRevision) {
     state.isArchitectRevision = false;
+  }
+
+  // If the correction turn failed validation, skip normal re-review routing
+  // and force a synthetic re-reject to consume budget without proceeding
+  if (isCorrectionTurn && correctionValidation && !correctionValidation.isValid) {
+    console.warn(
+      `CORRECTION LOOP FAILURE: Blocking re-review for failed ${role} correction`,
+      {
+        runId: ctx.runId,
+        role,
+        failureReason: correctionValidation.failureReason,
+      },
+    );
+
+    if (hasExceededReviewerRejectionCap(state.reviewerRejectionCount)) {
+      return { kind: "break", outcome: "cap_reached" };
+    }
+
+    state.reviewerRejectionCount += 1;
+    if (state.lastRejectTarget) {
+      state.roleCorrectionCounts = incrementRoleCorrectionCount(
+        state.roleCorrectionCounts,
+        state.lastRejectTarget,
+      );
+    }
+
+    return { kind: "reroute", targetRole: state.lastRejectTarget ?? role };
   }
 
   return resolveReviewerOutcome(role, fullText, state, ctx);
@@ -348,12 +423,9 @@ async function executeDebateTurn(
   transcript: TranscriptEntry[],
   ctx: TurnContext,
   options?: { disableTools?: boolean; },
-): Promise<
-  | { kind: "break"; outcome: DebateExitOutcome; }
-  | { kind: "text"; fullText: string; }
-> {
+): Promise<ExecutedTurn> {
   try {
-    const fullText = await streamAgentTurn({
+    const result: StreamAgentTurnResult = await streamAgentTurn({
       runId: ctx.runId,
       role,
       productIdea: ctx.productIdea,
@@ -366,7 +438,7 @@ async function executeDebateTurn(
       send: ctx.notify,
       disableTools: options?.disableTools,
     });
-    return { kind: "text", fullText };
+    return { kind: "text", fullText: result.text, wasTruncated: result.wasTruncated };
   } catch (turnError) {
     if (isSimulationAborted(turnError) || isSimulationBudgetExceeded(turnError)) {
       throw turnError;
@@ -379,7 +451,7 @@ async function executeDebateTurn(
 
     console.error(`Agent turn failed (${role}):`, turnError);
     emitFallbackAgentTurn(role, name, title, AGENT_TURN_FALLBACK, ctx.notify);
-    return { kind: "text", fullText: AGENT_TURN_FALLBACK };
+    return { kind: "text", fullText: AGENT_TURN_FALLBACK, wasTruncated: false };
   }
 }
 
@@ -476,14 +548,27 @@ async function handleArchitectQualityGate(
   return { kind: "reroute", targetRole: "architect" };
 }
 
+// TRUNCATION HANDLING FAILURE GUARD — persists the turn with optional
+// truncation and correction-failure flags carried through to downstream consumers.
 async function persistTurn(
   role: SimulationAgentRole,
   contentToPersist: string,
   agentName: string,
   ctx: TurnContext,
   state: DebateState,
+  wasTruncated = false,
+  correctionValidation?: CorrectionValidationResult | null,
 ): Promise<void> {
-  state.transcript.push({ role, agentName, content: contentToPersist });
+  state.transcript.push({
+    role,
+    agentName,
+    content: contentToPersist,
+    isTruncated: wasTruncated || undefined,
+    isCorrectionFailed: correctionValidation
+      ? !correctionValidation.isValid || undefined
+      : undefined,
+    correctionFailureReason: correctionValidation?.failureReason || undefined,
+  });
 
   await appendMessage(
     ctx.runId,
@@ -494,6 +579,18 @@ async function persistTurn(
   );
 
   state.turnCount += 1;
+}
+
+function findLastTranscriptEntry(
+  transcript: TranscriptEntry[],
+  role: SimulationAgentRole,
+): TranscriptEntry | undefined {
+  for (let index = transcript.length - 1; index >= 0; index -= 1) {
+    if (transcript[index]?.role === role) {
+      return transcript[index];
+    }
+  }
+  return undefined;
 }
 
 function resolveReviewerOutcome(
@@ -519,6 +616,8 @@ function resolveReviewerOutcome(
       console.warn("Reviewer rejection cap reached, closing debate", {
         runId: ctx.runId,
         reviewerRejectionCount: state.reviewerRejectionCount,
+        maxReviewerRejectionCycles: 4,
+        perRoleCorrections: { ...state.roleCorrectionCounts },
       });
       return { kind: "break", outcome: "cap_reached" };
     }
@@ -527,6 +626,8 @@ function resolveReviewerOutcome(
       console.warn("Per-role correction cap reached, closing debate", {
         runId: ctx.runId,
         rejectRole: parsed.rejectRole,
+        maxPerRole: 2,
+        currentCount: state.roleCorrectionCounts[parsed.rejectRole] ?? 0,
       });
       return { kind: "break", outcome: "cap_reached" };
     }

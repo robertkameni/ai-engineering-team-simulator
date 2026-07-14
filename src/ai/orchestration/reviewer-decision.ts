@@ -12,8 +12,11 @@ export function canScheduleArchitectRevision(turnCount: number): boolean {
   return turnCount + MIN_TURNS_FOR_REVISION_FINISH <= MAX_SIMULATION_TURNS;
 }
 
-/** After this many reviewer [REJECT] decisions, debate exits with cap_reached. */
-export const MAX_REVIEWER_REJECTION_CYCLES = 2;
+/** After this many reviewer [REJECT] decisions, debate exits with cap_reached.
+ *  Raised from 2 → 4 to allow more granular per-role correction cycles
+ *  before global debate closure. Per-role caps (MAX_CORRECTIONS_PER_ROLE = 2)
+ *  still prevent individual roles from being corrected infinitely. */
+export const MAX_REVIEWER_REJECTION_CYCLES = 4;
 
 export function hasExceededReviewerRejectionCap(rejectionCount: number): boolean {
   return rejectionCount >= MAX_REVIEWER_REJECTION_CYCLES;

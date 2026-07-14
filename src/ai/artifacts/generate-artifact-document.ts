@@ -29,8 +29,9 @@ export const ARTIFACT_SYNTHESIS_ORDER = [
   "review",
 ] as const satisfies readonly ArtifactType[];
 
+// STATE CONSISTENCY BUG FIX — strengthened notice for all artifact types
 const UNAPPROVED_DEBATE_NOTICE =
-  "DEBATE_STATUS: unapproved_cap — The simulation ended without an explicit [APPROVE]. Summarize open risks and label recommendations as provisional.";
+  "DEBATE_STATUS: unapproved — The simulation ended without an explicit [APPROVE] (cap_reached or reviewer unresolved). This document MUST be conservative: do NOT describe open reviewer gaps as resolved, do NOT promote recommendations to implemented features, and label every recommendation, proposed mitigation, and risk item as provisional or recommended — never as finalized or shipped.";
 
 const SOFTWARE_ARTIFACT_FOCUS: Record<ArtifactType, string> = {
   requirements:
@@ -137,15 +138,9 @@ export function buildArtifactPrompt(
   ].join("");
 }
 
+// STATE CONSISTENCY BUG FIX — apply open-gap rule to all artifact types
+// so that no artifact silently resolves reviewer-flagged open items.
 function buildOpenGapsSystemRule(type: ArtifactType): string {
-  if (
-    type !== "architecture" &&
-    type !== "implementation" &&
-    type !== "blueprint"
-  ) {
-    return "";
-  }
-
   return [
     "Open-gap rule: When reviewer open gaps are listed in the prompt, never describe those items as implemented, mitigated, or already present.",
     "Use \"recommended\", \"proposed\", \"open gap\", or \"reviewer flagged — unresolved\" for those topics.",
@@ -182,15 +177,22 @@ export async function generateArtifactDocument(
   const focus = artifactFocusForTemplate(type, templateId);
   const languageDirective = buildArtifactLanguageDirective(productIdea);
 
-  const unapprovedNotice =
-    type === "review" && needsUnapprovedDebateNotice(debateOutcome ?? null)
-      ? `${UNAPPROVED_DEBATE_NOTICE}\n\n`
-      : "";
+  // STATE CONSISTENCY BUG FIX — all artifact types for unapproved runs
+  // must carry the provisional-status notice, not just the 'review' type.
+  const unapprovedNotice = needsUnapprovedDebateNotice(debateOutcome ?? null)
+    ? `${UNAPPROVED_DEBATE_NOTICE}\n\n`
+    : "";
 
+  const isUnapproved = needsUnapprovedDebateNotice(debateOutcome ?? null);
   const isBlueprint = type === "blueprint";
   const sectionRules = isBlueprint
     ? `- The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}\n- 3–6 bullets per section; each bullet describes a concrete, copy-paste-ready detail in prose: exact version numbers, full file paths, SQL column types, API method+path pairs, environment variable names with descriptions, TypeScript interface signatures, or component prop types.\n- Describe everything in prose — never use code blocks. For example, instead of copying a SQL query verbatim, describe it as "SELECT expense_splits.member_id, SUM(share_cents) FROM expense_splits JOIN expenses ON expense_splits.expense_id = expenses.id WHERE expenses.group_id = $1 GROUP BY expense_splits.member_id."\n- Each bullet should be a self-contained technical specification item — not a narrative sentence.`
     : `- The document must cover these topics (one section each, in a logical order): ${sectionGuidelines}\n- 4–6 bullets per section; each bullet is 1–2 complete sentences with concrete detail (up to ~50 words per bullet).`;
+
+  // STATE CONSISTENCY BUG FIX — conservative synthesis rule for unapproved runs
+  const consensusRule = isUnapproved
+    ? "Synthesize consensus where present; flag unresolved disagreements and open reviewer gaps in ALL artifact types. Do NOT resolve or close gaps that the debate left open."
+    : "Synthesize consensus; note disagreement only in the review artifact.";
 
   const stackReferenceBlock = buildStackReferenceBlock(type);
   const openGapsSystemRule = buildOpenGapsSystemRule(type);
@@ -204,7 +206,7 @@ ${sectionRules}
 - ${languageDirective}
 ${openGapsSystemRule ? `- ${openGapsSystemRule}\n` : ""}- Write as a polished internal document — NOT meeting notes.
 - Do NOT append speaker names to bullets (no "(Name)" suffixes).
-- Synthesize consensus; note disagreement only in the review artifact.
+- ${consensusRule}
 - When prior artifacts are provided, stay consistent with them. Do not reintroduce features deferred in the resolved consensus.
 - When the same role spoke more than once, their merged latest message is authoritative.
 - Omit sections with no substance from the debate.

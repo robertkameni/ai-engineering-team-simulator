@@ -69,6 +69,14 @@ describe("hasExceededReviewerRejectionCap", () => {
     assert.equal(hasExceededReviewerRejectionCap(MAX_REVIEWER_REJECTION_CYCLES), true);
     assert.equal(hasExceededReviewerRejectionCap(MAX_REVIEWER_REJECTION_CYCLES + 1), true);
   });
+
+  it("allows 4 rejection cycles (raised from 2 for more granular corrections)", () => {
+    assert.equal(MAX_REVIEWER_REJECTION_CYCLES, 4);
+    // Per-role correction cap still limits individual roles
+    assert.equal(MAX_CORRECTIONS_PER_ROLE, 2);
+    // A role can exhaust its per-role cap without tripping the global cap
+    assert.equal(hasExceededReviewerRejectionCap(3), false);
+  });
 });
 
 describe("parseReviewerDecision", () => {
