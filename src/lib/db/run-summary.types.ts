@@ -9,6 +9,11 @@ export interface RunSummaryPayload {
   readonly consistencyRetries?: number;
   readonly stackValidationFailed?: boolean;
   readonly crossValidationFailed?: boolean;
+  /** TRUNCATION APPROVAL GUARD — true when a critical-role turn was
+   *  truncated and the approval was downgraded to degraded_truncated. */
+  readonly hasTruncatedCriticalTurn?: boolean;
+  /** Number of open review issues remaining at debate close. */
+  readonly openReviewIssueCount?: number;
 }
 
 export interface RunSummarySynthesisTelemetry {

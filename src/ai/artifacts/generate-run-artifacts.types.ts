@@ -8,11 +8,22 @@ import type {
 } from "@/features/artifacts/schemas";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 
+export interface ArtifactTruthfulnessViolationEntry {
+  /** Which artifact type the violation applies to. */
+  artifactType: ArtifactType;
+  /** Human-readable violation description. */
+  message: string;
+  /** Affected section titles. */
+  sections: string[];
+}
+
 export interface GenerateRunArtifactsResult {
   readonly artifacts: Partial<RunArtifactsOutput>;
   readonly consistencyRetries: number;
   readonly stackValidationFailed: boolean;
   readonly crossValidationFailed: boolean;
+  /** ARTIFACT TRUTHFULNESS GUARD — violations found during post-generation check. */
+  readonly truthfulnessViolations: readonly ArtifactTruthfulnessViolationEntry[];
 }
 
 export interface StackRetryResult {

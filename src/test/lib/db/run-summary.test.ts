@@ -24,6 +24,8 @@ describe("run summary helpers", () => {
       consistencyRetries: undefined,
       stackValidationFailed: undefined,
       crossValidationFailed: undefined,
+      hasTruncatedCriticalTurn: undefined,
+      openReviewIssueCount: undefined,
     });
   });
 
@@ -47,6 +49,8 @@ describe("run summary helpers", () => {
       consistencyRetries: 1,
       stackValidationFailed: true,
       crossValidationFailed: true,
+      hasTruncatedCriticalTurn: undefined,
+      openReviewIssueCount: undefined,
     });
   });
 
@@ -81,6 +85,8 @@ describe("run summary helpers", () => {
       consistencyRetries: 3,
       stackValidationFailed: true,
       crossValidationFailed: true,
+      hasTruncatedCriticalTurn: undefined,
+      openReviewIssueCount: undefined,
     });
   });
 });

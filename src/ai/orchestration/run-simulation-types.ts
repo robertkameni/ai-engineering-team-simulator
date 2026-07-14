@@ -3,6 +3,7 @@ import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import type { DebateExitOutcome } from "@/ai/orchestration/reviewer-decision";
+import type { ReviewIssue } from "@/ai/orchestration/review-issue-tracker";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
@@ -35,6 +36,10 @@ export interface DebateState {
   roleCorrectionCounts: Partial<Record<SimulationAgentRole, number>>;
   transcript: TranscriptEntry[];
   isArchitectRevision: boolean;
+  /** TRUNCATION APPROVAL GUARD — true if any critical-role turn was truncated. */
+  hasTruncatedCriticalTurn: boolean;
+  /** STRUCTURED RESOLUTION TRACKING — structured issues across correction cycles. */
+  reviewIssues: ReviewIssue[];
 }
 
 export interface TurnContext {

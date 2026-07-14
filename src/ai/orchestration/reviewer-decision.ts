@@ -41,7 +41,10 @@ export type DebateExitOutcome =
   | "approved"
   | "cap_reached"
   | "unknown_reject_fallback"
-  | "reviewer_error";
+  | "reviewer_error"
+  /** TRUNCATION APPROVAL GUARD — reviewer issued [APPROVE] but one or more
+   *  critical-role turns were truncated. The approval is downgraded. */
+  | "degraded_truncated";
 
 export interface ParsedReviewerDecision {
   displayText: string;
@@ -273,6 +276,17 @@ export function isDebateComplete(messages: DebateMessage[]): boolean {
   return decision === "approve";
 }
 
+export function isUnapprovedDebateExitOutcome(
+  outcome: DebateExitOutcome | null | undefined,
+): outcome is "cap_reached" | "unknown_reject_fallback" | "reviewer_error" | "degraded_truncated" {
+  return (
+    outcome === "cap_reached" ||
+    outcome === "unknown_reject_fallback" ||
+    outcome === "reviewer_error" ||
+    outcome === "degraded_truncated"
+  );
+}
+
 export function parseDebateOutcomeFromRunSummary(
   summary: string | null,
 ): DebateExitOutcome | null {
@@ -292,7 +306,8 @@ export function parseDebateOutcomeFromRunSummary(
         outcome === "approved" ||
         outcome === "cap_reached" ||
         outcome === "unknown_reject_fallback" ||
-        outcome === "reviewer_error"
+        outcome === "reviewer_error" ||
+        outcome === "degraded_truncated"
       ) {
         return outcome;
       }

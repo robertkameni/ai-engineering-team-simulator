@@ -11,11 +11,12 @@ import type { SynthesisValidationFlags } from "@/features/artifacts/synthesis-va
 
 export function isUnapprovedDebateOutcome(
   outcome: DebateExitOutcome | null | undefined,
-): outcome is "cap_reached" | "unknown_reject_fallback" | "reviewer_error" {
+): outcome is "cap_reached" | "unknown_reject_fallback" | "reviewer_error" | "degraded_truncated" {
   return (
     outcome === "cap_reached" ||
     outcome === "unknown_reject_fallback" ||
-    outcome === "reviewer_error"
+    outcome === "reviewer_error" ||
+    outcome === "degraded_truncated"
   );
 }
 
@@ -29,6 +30,10 @@ export function debateOutcomeWarningMessage(outcome: DebateExitOutcome): string 
   if (outcome === "reviewer_error") {
     return "Reviewer turn failed unexpectedly. Debate was closed without review. Deliverables are unverified.";
   }
+  // TRUNCATION APPROVAL GUARD
+  if (outcome === "degraded_truncated") {
+    return "Reviewer approved but critical agent turns were truncated. Deliverables are degraded — some sections may be incomplete.";
+  }
   return "";
 }
 
@@ -37,6 +42,7 @@ export function debateOutcomeLabel(outcome: DebateExitOutcome): string {
   if (outcome === "cap_reached") return "Turn limit reached";
   if (outcome === "unknown_reject_fallback") return "Reviewer decision unclear";
   if (outcome === "reviewer_error") return "Reviewer error";
+  if (outcome === "degraded_truncated") return "Degraded — truncated turns";
   return outcome;
 }
 

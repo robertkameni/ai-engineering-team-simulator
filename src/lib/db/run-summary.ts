@@ -11,6 +11,7 @@ const VALID_DEBATE_OUTCOMES = new Set<string>([
   "cap_reached",
   "unknown_reject_fallback",
   "reviewer_error",
+  "degraded_truncated",
   "aborted",
 ]);
 
@@ -59,6 +60,16 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
         ? record.crossValidationFailed
         : undefined;
 
+    const hasTruncatedCriticalTurn =
+      typeof record.hasTruncatedCriticalTurn === "boolean"
+        ? record.hasTruncatedCriticalTurn
+        : undefined;
+
+    const openReviewIssueCount =
+      typeof record.openReviewIssueCount === "number"
+        ? record.openReviewIssueCount
+        : undefined;
+
     return {
       debateOutcome,
       turnCount,
@@ -66,6 +77,8 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
       consistencyRetries,
       stackValidationFailed,
       crossValidationFailed,
+      hasTruncatedCriticalTurn,
+      openReviewIssueCount,
     };
   } catch {
     return null;

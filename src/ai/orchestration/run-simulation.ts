@@ -33,6 +33,14 @@ import {
   resolveUnknownReviewerDecision,
   stripReviewerDecisionTag,
 } from "@/ai/orchestration/reviewer-decision";
+import {
+  createReviewIssues,
+  markIssuesAttempted,
+  markIssuesFailedValidation,
+  markIssuesAddressed,
+  buildIssueSnapshot,
+  type ReviewIssue,
+} from "@/ai/orchestration/review-issue-tracker";
 import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import { updateArtifactStatus } from "@/lib/db/artifact-status";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
@@ -118,6 +126,8 @@ export async function runSimulation(
       roleCorrectionCounts: {},
       transcript: [],
       isArchitectRevision: false,
+      hasTruncatedCriticalTurn: false,
+      reviewIssues: [],
     };
 
     const ctx: TurnContext = {
@@ -141,6 +151,8 @@ export async function runSimulation(
       buildRunSummaryPayload({
         debateOutcome: debateExitOutcome,
         turnCount: state.turnCount,
+        hasTruncatedCriticalTurn: state.hasTruncatedCriticalTurn || undefined,
+        openReviewIssueCount: buildIssueSnapshot(state.reviewIssues).totalOpen || undefined,
       }),
     );
 
@@ -346,6 +358,11 @@ async function runDebateTurn(
 
   if (isCorrectionTurn) {
     const targetRole = debateContext.correction!.targetRole;
+
+    // STRUCTURED RESOLUTION TRACKING — mark issues as attempted when
+    // the agent produces a correction turn for the rejected role.
+    markIssuesAttempted(state.reviewIssues, targetRole, state.turnCount);
+
     const previousEntry = findLastTranscriptEntry(state.transcript, targetRole);
     const feedback = state.lastRejectFeedback ?? "";
 
@@ -367,6 +384,9 @@ async function runDebateTurn(
             textSimilarity: correctionValidation.textSimilarity.toFixed(2),
           },
         );
+
+        // STRUCTURED RESOLUTION TRACKING — mark as failed
+        markIssuesFailedValidation(state.reviewIssues, targetRole);
       }
     }
   }
@@ -550,6 +570,16 @@ async function handleArchitectQualityGate(
 
 // TRUNCATION HANDLING FAILURE GUARD — persists the turn with optional
 // truncation and correction-failure flags carried through to downstream consumers.
+//
+// CRITICAL_ROLES are roles whose output is essential for a build-ready run.
+// If any of these roles produces a truncated turn, the run is downgraded.
+const CRITICAL_ROLES: Set<SimulationAgentRole> = new Set([
+  "architect",
+  "backend",
+  "frontend",
+  "reviewer",
+]);
+
 async function persistTurn(
   role: SimulationAgentRole,
   contentToPersist: string,
@@ -559,6 +589,15 @@ async function persistTurn(
   wasTruncated = false,
   correctionValidation?: CorrectionValidationResult | null,
 ): Promise<void> {
+  // TRUNCATION APPROVAL GUARD — track truncated critical turns
+  if (wasTruncated && CRITICAL_ROLES.has(role)) {
+    state.hasTruncatedCriticalTurn = true;
+    console.warn(
+      `TRUNCATION APPROVAL GUARD: critical role ${role} turn was truncated — run will be downgraded`,
+      { runId: ctx.runId, role, turnCount: state.turnCount },
+    );
+  }
+
   state.transcript.push({
     role,
     agentName,
@@ -608,16 +647,43 @@ function resolveReviewerOutcome(
   if (parsed.decision === "approve") {
     state.lastRejectFeedback = null;
     state.lastRejectTarget = null;
+
+    // TRUNCATION APPROVAL GUARD — reviewer issues [APPROVE] but
+    // one or more critical-role turns were truncated. The run is
+    // downgraded to degraded_truncated so artifacts/export reflect
+    // the incomplete state.
+    if (state.hasTruncatedCriticalTurn) {
+      console.warn(
+        "TRUNCATION APPROVAL GUARD: reviewer approved but critical turns were truncated — downgrading to degraded_truncated",
+        { runId: ctx.runId, turnCount: state.turnCount },
+      );
+      markIssuesAddressed(state.reviewIssues);
+      return { kind: "break", outcome: "degraded_truncated" };
+    }
+
+    // STRUCTURED RESOLUTION TRACKING — mark all issues as addressed
+    markIssuesAddressed(state.reviewIssues);
     return { kind: "break", outcome: "approved" };
   }
 
   if (parsed.decision === "reject" && parsed.rejectRole) {
+    // STRUCTURED RESOLUTION TRACKING — create/update issues from rejection
+    const newIssues = createReviewIssues(
+      state.reviewIssues,
+      parsed.rejectRole,
+      parsed.displayText,
+      state.reviewerRejectionCount,
+      state.turnCount,
+    );
+    state.reviewIssues.push(...newIssues);
+
     if (hasExceededReviewerRejectionCap(state.reviewerRejectionCount)) {
       console.warn("Reviewer rejection cap reached, closing debate", {
         runId: ctx.runId,
         reviewerRejectionCount: state.reviewerRejectionCount,
         maxReviewerRejectionCycles: 4,
         perRoleCorrections: { ...state.roleCorrectionCounts },
+        openIssues: buildIssueSnapshot(state.reviewIssues).totalOpen,
       });
       return { kind: "break", outcome: "cap_reached" };
     }
@@ -628,6 +694,7 @@ function resolveReviewerOutcome(
         rejectRole: parsed.rejectRole,
         maxPerRole: 2,
         currentCount: state.roleCorrectionCounts[parsed.rejectRole] ?? 0,
+        openIssues: buildIssueSnapshot(state.reviewIssues).totalOpen,
       });
       return { kind: "break", outcome: "cap_reached" };
     }
