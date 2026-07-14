@@ -51,5 +51,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   return Response.json({
     artifacts: result.artifacts,
     status: "ready",
+    stackValidationFailed: result.stackValidationFailed,
+    crossValidationFailed: result.crossValidationFailed,
   });
 }

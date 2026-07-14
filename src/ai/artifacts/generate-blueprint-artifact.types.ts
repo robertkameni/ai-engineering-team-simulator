@@ -10,5 +10,10 @@ export type GenerateBlueprintArtifactError =
   | "budget_exceeded";
 
 export type GenerateBlueprintArtifactResult =
-  | { ok: true; artifacts: PartialRunArtifacts; }
+  | {
+      ok: true;
+      artifacts: PartialRunArtifacts;
+      stackValidationFailed: boolean;
+      crossValidationFailed: boolean;
+    }
   | { ok: false; error: GenerateBlueprintArtifactError; message?: string; };

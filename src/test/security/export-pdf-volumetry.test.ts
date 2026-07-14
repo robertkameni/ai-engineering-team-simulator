@@ -37,6 +37,22 @@ describe("exportPdfPostBodySchema volumetry", () => {
     assert.equal(parsed.success, true);
   });
 
+  it("preserves synthesis validation flags on live export payloads", () => {
+    const parsed = exportPdfPostBodySchema.safeParse({
+      run: {
+        ...minimalValidExportBody().run,
+        stackValidationFailed: true,
+        crossValidationFailed: true,
+      },
+    });
+
+    assert.equal(parsed.success, true);
+    if (parsed.success) {
+      assert.equal(parsed.data.run.stackValidationFailed, true);
+      assert.equal(parsed.data.run.crossValidationFailed, true);
+    }
+  });
+
   it("rejects more than 50 transcript messages", () => {
     const messages = Array.from({ length: EXPORT_PDF_MAX_MESSAGES + 1 }, (_, i) => ({
       id: `msg-${i}`,

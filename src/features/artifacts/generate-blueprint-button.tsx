@@ -7,7 +7,13 @@ import type { PartialRunArtifacts } from "@/features/artifacts/types";
 
 interface GenerateBlueprintButtonProps {
   runId: string;
-  onGenerated: (artifacts: PartialRunArtifacts) => void;
+  onGenerated: (
+    artifacts: PartialRunArtifacts,
+    validationFlags?: {
+      stackValidationFailed: boolean;
+      crossValidationFailed: boolean;
+    },
+  ) => void;
 }
 
 export function GenerateBlueprintButton({
@@ -27,7 +33,13 @@ export function GenerateBlueprintButton({
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { artifacts?: PartialRunArtifacts; error?: string; message?: string }
+        | {
+            artifacts?: PartialRunArtifacts;
+            stackValidationFailed?: boolean;
+            crossValidationFailed?: boolean;
+            error?: string;
+            message?: string;
+          }
         | null;
 
       if (!response.ok) {
@@ -39,7 +51,10 @@ export function GenerateBlueprintButton({
       }
 
       if (payload?.artifacts) {
-        onGenerated(payload.artifacts);
+        onGenerated(payload.artifacts, {
+          stackValidationFailed: payload.stackValidationFailed === true,
+          crossValidationFailed: payload.crossValidationFailed === true,
+        });
       }
     } catch (generateError) {
       setError(

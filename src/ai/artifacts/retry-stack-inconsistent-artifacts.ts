@@ -1,19 +1,14 @@
-import {
-  ARTIFACT_SYNTHESIS_ORDER,
-  buildArtifactPrompt,
-  buildPriorArtifactsPrompt,
-  generateArtifactDocument,
-} from "@/ai/artifacts/generate-artifact-document";
+import { ARTIFACT_SYNTHESIS_ORDER } from "@/ai/artifacts/generate-artifact-document";
 import type {
   RetryStackInconsistentArtifactsParams,
   StackRetryResult,
 } from "@/ai/artifacts/generate-run-artifacts.types";
+import { regenerateArtifactsForViolations } from "@/ai/artifacts/regenerate-artifacts-for-violations";
 import {
   buildDeterministicStackConsistencyFixPrompt,
   buildStackConsistencyFixPrompt,
   validateArtifactStackConsistency,
 } from "@/ai/artifacts/validate-artifact-consistency";
-import { assertSimulationWithinBudget } from "@/ai/orchestration/simulation-budget";
 import type { ArtifactType } from "@/features/artifacts/schemas";
 
 function resolveStackRetryTypes(violations: readonly string[]): ArtifactType[] {
@@ -29,53 +24,6 @@ function resolveStackRetryTypes(violations: readonly string[]): ArtifactType[] {
   return ARTIFACT_SYNTHESIS_ORDER.filter((type) => retryTypes.has(type));
 }
 
-async function regenerateStackArtifactsForViolations(
-  params: RetryStackInconsistentArtifactsParams,
-  retryTypes: readonly ArtifactType[],
-  fixNotice: string,
-): Promise<number> {
-  const {
-    output,
-    transcriptPrompt,
-    consensusDirectives,
-    openGapsDirective,
-    templateId,
-    productIdea,
-    usageAccumulator,
-    debateOutcome,
-    onArtifactComplete,
-  } = params;
-
-  for (const type of retryTypes) {
-    if (usageAccumulator) {
-      assertSimulationWithinBudget(usageAccumulator);
-    }
-
-    const priorArtifactsPrompt = buildPriorArtifactsPrompt(type, output);
-    const prompt = buildArtifactPrompt(
-      transcriptPrompt,
-      consensusDirectives,
-      openGapsDirective,
-      priorArtifactsPrompt,
-    );
-
-    const document = await generateArtifactDocument(
-      type,
-      prompt,
-      templateId,
-      productIdea,
-      usageAccumulator,
-      debateOutcome,
-      fixNotice,
-    );
-
-    output[type] = document;
-    await onArtifactComplete?.(type, document);
-  }
-
-  return retryTypes.length;
-}
-
 export async function retryStackInconsistentArtifacts(
   params: RetryStackInconsistentArtifactsParams,
 ): Promise<StackRetryResult> {
@@ -86,7 +34,7 @@ export async function retryStackInconsistentArtifacts(
 
   let retryCount = 0;
 
-  retryCount += await regenerateStackArtifactsForViolations(
+  retryCount += await regenerateArtifactsForViolations(
     params,
     resolveStackRetryTypes(violations),
     buildStackConsistencyFixPrompt(violations),
@@ -97,7 +45,7 @@ export async function retryStackInconsistentArtifacts(
     return { retryCount, stackValidationFailed: false };
   }
 
-  retryCount += await regenerateStackArtifactsForViolations(
+  retryCount += await regenerateArtifactsForViolations(
     params,
     resolveStackRetryTypes(violations),
     buildDeterministicStackConsistencyFixPrompt(violations),

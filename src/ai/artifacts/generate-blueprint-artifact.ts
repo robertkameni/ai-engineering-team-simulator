@@ -15,7 +15,12 @@ import type { AgentRole } from "@/features/agents/types";
 import { getPersonaBase } from "@/features/agents/personas";
 import type { PartialRunArtifacts } from "@/features/artifacts/types";
 import { saveSingleArtifact } from "@/lib/db/artifacts";
-import { getRunWithMessages, touchRunActivity } from "@/lib/db/runs";
+import { getRunWithMessages, touchRunActivity, updateRunSummary } from "@/lib/db/runs";
+import {
+  mergeRunSummarySynthesisTelemetry,
+  parseRunSummary,
+  RUN_SUMMARY_SYNTHESIS_VERSION,
+} from "@/lib/db/run-summary";
 import { toAppRunStatus } from "@/lib/db/run-status";
 import {
   getTeamRoster,
@@ -150,9 +155,28 @@ export async function generateBlueprintArtifact(
       return { ok: false, error: "generation_failed" };
     }
 
+    const mergedSummary = mergeRunSummarySynthesisTelemetry(
+      run.summary,
+      {
+        synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
+        consistencyRetries: synthesisResult.consistencyRetries,
+        stackValidationFailed: synthesisResult.stackValidationFailed,
+        crossValidationFailed: synthesisResult.crossValidationFailed,
+      },
+      {
+        accumulateValidationFailures: true,
+        accumulateRetries: true,
+      },
+    );
+    await updateRunSummary(runId, mergedSummary);
+
+    const summaryPayload = parseRunSummary(mergedSummary);
+
     return {
       ok: true,
       artifacts: { blueprint: blueprint.sections },
+      stackValidationFailed: summaryPayload?.stackValidationFailed === true,
+      crossValidationFailed: summaryPayload?.crossValidationFailed === true,
     };
   } catch (error) {
     if (isSimulationBudgetExceeded(error)) {

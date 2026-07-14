@@ -6,6 +6,8 @@ import type {
   DebateProgress,
   PartialRunArtifacts,
 } from "@/features/artifacts/types";
+import { hasSynthesisValidationWarnings } from "@/features/artifacts/synthesis-validation";
+import type { SynthesisValidationFlags } from "@/features/artifacts/synthesis-validation.types";
 
 export function isUnapprovedDebateOutcome(
   outcome: DebateExitOutcome | null | undefined,
@@ -73,6 +75,7 @@ export function artifactPanelSubtitle(
   debateProgress?: DebateProgress,
   artifactCount?: number,
   debateOutcome?: DebateExitOutcome | null,
+  synthesisValidation?: SynthesisValidationFlags | null,
 ): string {
   switch (status) {
     case "pending":
@@ -88,6 +91,9 @@ export function artifactPanelSubtitle(
     case "ready":
       if (isUnapprovedDebateOutcome(debateOutcome)) {
         return "Phase 3 · Finished with open risks (unapproved)";
+      }
+      if (hasSynthesisValidationWarnings(synthesisValidation)) {
+        return "Phase 3 · ready with validation warnings";
       }
       return "Phase 3 · ready to review";
     case "unavailable":

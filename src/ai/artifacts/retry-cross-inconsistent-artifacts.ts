@@ -1,68 +1,14 @@
-import {
-  ARTIFACT_SYNTHESIS_ORDER,
-  buildArtifactPrompt,
-  buildPriorArtifactsPrompt,
-  generateArtifactDocument,
-} from "@/ai/artifacts/generate-artifact-document";
 import type {
   CrossRetryResult,
   RetryCrossInconsistentArtifactsParams,
 } from "@/ai/artifacts/generate-run-artifacts.types";
+import { regenerateArtifactsForViolations } from "@/ai/artifacts/regenerate-artifacts-for-violations";
 import {
   buildCrossConsistencyFixPrompt,
   buildDeterministicCrossConsistencyFixPrompt,
   resolveCrossRetryTypes,
   validateArtifactCrossConsistency,
 } from "@/ai/artifacts/validate-artifact-cross-consistency";
-import { assertSimulationWithinBudget } from "@/ai/orchestration/simulation-budget";
-import type { ArtifactType } from "@/features/artifacts/schemas";
-
-async function regenerateCrossArtifactsForViolations(
-  params: RetryCrossInconsistentArtifactsParams,
-  retryTypes: readonly ArtifactType[],
-  fixNotice: string,
-): Promise<number> {
-  const {
-    output,
-    transcriptPrompt,
-    consensusDirectives,
-    openGapsDirective,
-    templateId,
-    productIdea,
-    usageAccumulator,
-    debateOutcome,
-    onArtifactComplete,
-  } = params;
-
-  for (const type of retryTypes) {
-    if (usageAccumulator) {
-      assertSimulationWithinBudget(usageAccumulator);
-    }
-
-    const priorArtifactsPrompt = buildPriorArtifactsPrompt(type, output);
-    const prompt = buildArtifactPrompt(
-      transcriptPrompt,
-      consensusDirectives,
-      openGapsDirective,
-      priorArtifactsPrompt,
-    );
-
-    const document = await generateArtifactDocument(
-      type,
-      prompt,
-      templateId,
-      productIdea,
-      usageAccumulator,
-      debateOutcome,
-      fixNotice,
-    );
-
-    output[type] = document;
-    await onArtifactComplete?.(type, document);
-  }
-
-  return retryTypes.length;
-}
 
 export async function retryCrossInconsistentArtifacts(
   params: RetryCrossInconsistentArtifactsParams,
@@ -76,7 +22,7 @@ export async function retryCrossInconsistentArtifacts(
 
   let retryCount = 0;
 
-  retryCount += await regenerateCrossArtifactsForViolations(
+  retryCount += await regenerateArtifactsForViolations(
     params,
     resolveCrossRetryTypes(violations),
     buildCrossConsistencyFixPrompt(violations),
@@ -87,7 +33,7 @@ export async function retryCrossInconsistentArtifacts(
     return { retryCount, crossValidationFailed: false };
   }
 
-  retryCount += await regenerateCrossArtifactsForViolations(
+  retryCount += await regenerateArtifactsForViolations(
     params,
     resolveCrossRetryTypes(violations),
     buildDeterministicCrossConsistencyFixPrompt(violations, openGaps),

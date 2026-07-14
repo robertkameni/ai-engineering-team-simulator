@@ -34,6 +34,9 @@ const OPEN_GAP_CLAIM_PATTERNS: readonly OpenGapClaimPattern[] = [
 const EXPLICIT_OPEN_GAP_LANGUAGE =
   /\b(unresolved|open gap|reviewer flagged|not yet adopted|recommended only|provisional)\b/i;
 
+const GENERIC_IMPLEMENTATION_CLAIM_LANGUAGE =
+  /\b(implemented|shipped|includes|uses|deployed|delivered|built|enabled)\b/i;
+
 const GENERIC_GAP_STOP_WORDS = new Set([
   "reviewer",
   "unresolved",
@@ -115,6 +118,10 @@ function findGenericFalseResolutionViolations(
     const context = documentText.slice(contextStart, contextEnd);
 
     if (EXPLICIT_OPEN_GAP_LANGUAGE.test(context)) {
+      continue;
+    }
+
+    if (!GENERIC_IMPLEMENTATION_CLAIM_LANGUAGE.test(context)) {
       continue;
     }
 

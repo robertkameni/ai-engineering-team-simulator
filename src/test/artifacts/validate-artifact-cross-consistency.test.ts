@@ -81,6 +81,22 @@ describe("validateArtifactCrossConsistency", () => {
     assert.match(violations[0]!, /generic open gap/);
   });
 
+  it("ignores generic gaps when shared vocabulary lacks an implementation claim", () => {
+    const violations = findFalseResolutionViolations(
+      "The architecture discusses webhook signature rotation trade-offs without adopting a final workflow.",
+      [
+        {
+          topicKey: "generic",
+          excerpt:
+            "Webhook signature rotation workflow remains UNRESOLVED in the debate",
+          ownerRole: "backend",
+        },
+      ],
+    );
+
+    assert.equal(violations.length, 0);
+  });
+
   it("includes open gap excerpts in the deterministic cross fix prompt", () => {
     const prompt = buildDeterministicCrossConsistencyFixPrompt(
       ['architecture: claims resolved "outbox_claimed_by" but reviewer marked it UNRESOLVED in the debate'],

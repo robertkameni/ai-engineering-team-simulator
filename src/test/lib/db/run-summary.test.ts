@@ -49,4 +49,38 @@ describe("run summary helpers", () => {
       crossValidationFailed: true,
     });
   });
+
+  it("accumulates validation failures and retries for partial synthesis", () => {
+    const existing = buildRunSummaryPayload({
+      debateOutcome: "approved",
+      turnCount: 12,
+      synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
+      consistencyRetries: 2,
+      stackValidationFailed: false,
+      crossValidationFailed: true,
+    });
+
+    const merged = mergeRunSummarySynthesisTelemetry(
+      existing,
+      {
+        synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
+        consistencyRetries: 1,
+        stackValidationFailed: true,
+        crossValidationFailed: false,
+      },
+      {
+        accumulateValidationFailures: true,
+        accumulateRetries: true,
+      },
+    );
+
+    assert.deepEqual(parseRunSummary(merged), {
+      debateOutcome: "approved",
+      turnCount: 12,
+      synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
+      consistencyRetries: 3,
+      stackValidationFailed: true,
+      crossValidationFailed: true,
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import type {
+  MergeRunSummarySynthesisOptions,
   RunSummaryPayload,
   RunSummarySynthesisTelemetry,
 } from "@/lib/db/run-summary.types";
@@ -74,15 +75,32 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
 export function mergeRunSummarySynthesisTelemetry(
   existingSummary: string | null,
   telemetry: RunSummarySynthesisTelemetry,
+  options?: MergeRunSummarySynthesisOptions,
 ): string {
   const existing = parseRunSummary(existingSummary);
+  const shouldAccumulateFailures = options?.accumulateValidationFailures === true;
+  const shouldAccumulateRetries = options?.accumulateRetries === true;
+
+  const stackValidationFailed = shouldAccumulateFailures
+    ? existing?.stackValidationFailed === true ||
+      telemetry.stackValidationFailed === true
+    : telemetry.stackValidationFailed;
+
+  const crossValidationFailed = shouldAccumulateFailures
+    ? existing?.crossValidationFailed === true ||
+      telemetry.crossValidationFailed === true
+    : telemetry.crossValidationFailed;
+
+  const consistencyRetries = shouldAccumulateRetries
+    ? (existing?.consistencyRetries ?? 0) + telemetry.consistencyRetries
+    : telemetry.consistencyRetries;
 
   return buildRunSummaryPayload({
     debateOutcome: existing?.debateOutcome ?? null,
     turnCount: existing?.turnCount ?? null,
     synthesisVersion: telemetry.synthesisVersion,
-    consistencyRetries: telemetry.consistencyRetries,
-    stackValidationFailed: telemetry.stackValidationFailed,
-    crossValidationFailed: telemetry.crossValidationFailed,
+    consistencyRetries,
+    stackValidationFailed,
+    crossValidationFailed,
   });
 }

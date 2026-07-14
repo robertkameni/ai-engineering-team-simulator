@@ -72,32 +72,61 @@ export function ArtifactPanel({
   crossValidationFailed = false,
 }: ArtifactPanelProps) {
   const [panelArtifacts, setPanelArtifacts] = useState(artifacts);
+  const [localStackValidationFailed, setLocalStackValidationFailed] = useState(
+    stackValidationFailed,
+  );
+  const [localCrossValidationFailed, setLocalCrossValidationFailed] = useState(
+    crossValidationFailed,
+  );
 
   useEffect(() => {
     setPanelArtifacts(artifacts);
   }, [artifacts]);
 
-  const handleBlueprintGenerated = useCallback((generated: PartialRunArtifacts) => {
-    setPanelArtifacts((current) => ({ ...current, ...generated }));
-  }, []);
+  useEffect(() => {
+    setLocalStackValidationFailed(stackValidationFailed);
+    setLocalCrossValidationFailed(crossValidationFailed);
+  }, [stackValidationFailed, crossValidationFailed]);
+
+  const handleBlueprintGenerated = useCallback(
+    (
+      generated: PartialRunArtifacts,
+      validationFlags?: {
+        stackValidationFailed: boolean;
+        crossValidationFailed: boolean;
+      },
+    ) => {
+      setPanelArtifacts((current) => ({ ...current, ...generated }));
+      if (validationFlags) {
+        setLocalStackValidationFailed((current) =>
+          current || validationFlags.stackValidationFailed,
+        );
+        setLocalCrossValidationFailed((current) =>
+          current || validationFlags.crossValidationFailed,
+        );
+      }
+    },
+    [],
+  );
 
   const showTabs = shouldShowArtifactTabs(status, panelArtifacts);
   const isSheet = layout === "sheet";
   const showRegenerate = canRegenerateArtifacts && regenerateRunId != null;
   const artifactCount = countRunArtifacts(panelArtifacts);
+  const synthesisValidation = parseSynthesisValidationFlags(
+    localStackValidationFailed,
+    localCrossValidationFailed,
+  );
   const subtitle = artifactPanelSubtitle(
     status,
     debateProgress,
     artifactCount,
     debateOutcome,
+    synthesisValidation,
   );
   const showDebateWarning =
     isUnapprovedDebateOutcome(debateOutcome) &&
     (status === "ready" || status === "generating");
-  const synthesisValidation = parseSynthesisValidationFlags(
-    stackValidationFailed,
-    crossValidationFailed,
-  );
   const showSynthesisWarning =
     hasSynthesisValidationWarnings(synthesisValidation) &&
     (status === "ready" || status === "generating");

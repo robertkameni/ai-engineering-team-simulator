@@ -53,19 +53,20 @@ export function ArtifactPanelStatic({
   const showRegenerate = canRegenerateArtifacts && regenerateRunId != null;
   const debateProgress = debateProgressFromMessages(debateMessages, null);
   const artifactCount = countRunArtifacts(artifacts);
+  const synthesisValidation = parseSynthesisValidationFlags(
+    stackValidationFailed,
+    crossValidationFailed,
+  );
   const subtitle = artifactPanelSubtitle(
     status,
     debateProgress,
     artifactCount,
     debateOutcome,
+    synthesisValidation,
   );
   const showDebateWarning =
     isUnapprovedDebateOutcome(debateOutcome) &&
     (status === "ready" || status === "generating");
-  const synthesisValidation = parseSynthesisValidationFlags(
-    stackValidationFailed,
-    crossValidationFailed,
-  );
   const showSynthesisWarning =
     hasSynthesisValidationWarnings(synthesisValidation) &&
     (status === "ready" || status === "generating");

@@ -76,6 +76,8 @@ const mockRunSchema = z
       })
       .optional(),
     debateOutcome: debateOutcomeSchema.nullable().optional(),
+    stackValidationFailed: z.boolean().optional(),
+    crossValidationFailed: z.boolean().optional(),
   })
   .superRefine((run, ctx) => {
     const itemCount = countExportArtifactItems(run.artifacts);

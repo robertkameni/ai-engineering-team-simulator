@@ -17,3 +17,8 @@ export interface RunSummarySynthesisTelemetry {
   readonly stackValidationFailed?: boolean;
   readonly crossValidationFailed?: boolean;
 }
+
+export interface MergeRunSummarySynthesisOptions {
+  readonly accumulateValidationFailures?: boolean;
+  readonly accumulateRetries?: boolean;
+}
