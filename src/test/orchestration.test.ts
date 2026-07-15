@@ -319,7 +319,7 @@ describe("looksLikeTruncatedAgentOutput", () => {
 
     assert.equal(looksLikeTruncatedAgentOutput(truncatedComponent, "frontend"), true);
 
-    const missingRisks = [
+    const missingRisksCompleteProse = [
       "## UI & Routing",
       "",
       "App map with three route groups and nested layouts for dashboard views.",
@@ -328,7 +328,11 @@ describe("looksLikeTruncatedAgentOutput", () => {
       "",
       "Flow one covers magic-link onboarding from email click to checklist render.",
     ].join("\n");
-    assert.equal(looksLikeTruncatedAgentOutput(missingRisks, "frontend"), true);
+    // Missing Frontend Risks is a deliverable gap, not truncation by itself.
+    assert.equal(
+      looksLikeTruncatedAgentOutput(missingRisksCompleteProse, "frontend"),
+      false,
+    );
   });
 
   it("detects incomplete API spec lines and short word fragments", () => {

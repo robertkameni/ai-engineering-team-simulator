@@ -41,6 +41,10 @@ import {
   buildIssueSnapshot,
   type ReviewIssue,
 } from "@/ai/orchestration/review-issue-tracker";
+import {
+  hasCurrentCriticalTruncation,
+  syncHasTruncatedCriticalTurn,
+} from "@/ai/orchestration/truncation-approval-gate";
 import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import { updateArtifactStatus } from "@/lib/db/artifact-status";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
@@ -706,9 +710,8 @@ async function persistTurn(
   correctionValidation?: CorrectionValidationResult | null,
 ): Promise<void> {
   if (wasTruncated && CRITICAL_ROLES.has(role)) {
-    state.hasTruncatedCriticalTurn = true;
     console.warn(
-      `TRUNCATION APPROVAL GUARD: critical role ${role} turn was truncated — run will be downgraded`,
+      `TRUNCATION APPROVAL GUARD: critical role ${role} turn was truncated`,
       { runId: ctx.runId, role, turnCount: state.turnCount },
     );
   }
@@ -723,6 +726,9 @@ async function persistTurn(
       : undefined,
     correctionFailureReason: correctionValidation?.failureReason || undefined,
   });
+
+  // Recompute from latest critical turns — earlier truncation can recover.
+  syncHasTruncatedCriticalTurn(state, state.transcript);
 
   await appendMessage(
     ctx.runId,
@@ -765,10 +771,11 @@ function resolveReviewerOutcome(
     state.hasHadOpsFollowUpForCurrentReject = false;
     state.focusedOpsFollowUp = null;
 
-    // Incomplete critical turns must not close as a full approval.
-    if (state.hasTruncatedCriticalTurn) {
+    // Only degrade when a critical role's *latest* turn is still truncated.
+    syncHasTruncatedCriticalTurn(state, state.transcript);
+    if (hasCurrentCriticalTruncation(state.transcript)) {
       console.warn(
-        "TRUNCATION APPROVAL GUARD: reviewer approved but critical turns were truncated — downgrading to degraded_truncated",
+        "TRUNCATION APPROVAL GUARD: reviewer approved but latest critical turns are truncated — downgrading to degraded_truncated",
         { runId: ctx.runId, turnCount: state.turnCount },
       );
       markIssuesAddressed(state.reviewIssues);

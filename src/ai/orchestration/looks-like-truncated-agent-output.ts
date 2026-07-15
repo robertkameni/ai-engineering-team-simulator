@@ -97,6 +97,34 @@ function requiresSoftwareFrontendRisks(
   return role === "frontend" && options?.templateId !== "physical";
 }
 
+function hasIncompleteFrontendStructureSignals(
+  text: string,
+  lastLine: string,
+): boolean {
+  if (INCOMPLETE_LIST_BULLET.test(lastLine)) {
+    return true;
+  }
+  if (lastLine.startsWith("- Props:") && lastLine.length < 40) {
+    return true;
+  }
+  if (INCOMPLETE_COMPONENT_HEADING.test(lastLine)) {
+    return true;
+  }
+  if (isIncompleteSpecLine(lastLine)) {
+    return true;
+  }
+  if (isShortWordFragment(lastLine)) {
+    return true;
+  }
+  if (isIncompleteContinuedSection(text)) {
+    return true;
+  }
+  if (!hasCompleteSentenceEnding(text)) {
+    return true;
+  }
+  return false;
+}
+
 /** Heuristic: model hit maxOutputTokens or stopped mid-thought. */
 export function looksLikeTruncatedAgentOutput(
   text: string,
@@ -159,10 +187,13 @@ export function looksLikeTruncatedAgentOutput(
     return true;
   }
 
+  // Missing Frontend Risks alone is a deliverable-quality gap, not truncation,
+  // unless the turn also shows incomplete structure (cut mid-bullet/component).
   if (
     requiresSoftwareFrontendRisks(role, options) &&
     trimmed.length >= 120 &&
-    !hasFrontendRisksSection(trimmed)
+    !hasFrontendRisksSection(trimmed) &&
+    hasIncompleteFrontendStructureSignals(trimmed, lastLine)
   ) {
     return true;
   }

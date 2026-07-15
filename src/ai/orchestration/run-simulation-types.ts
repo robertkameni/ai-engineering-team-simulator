@@ -38,6 +38,7 @@ export interface DebateState {
   roleCorrectionCounts: Partial<Record<SimulationAgentRole, number>>;
   transcript: TranscriptEntry[];
   isArchitectRevision: boolean;
+  /** True when a critical role's *latest* turn is still truncated. */
   hasTruncatedCriticalTurn: boolean;
   reviewIssues: ReviewIssue[];
   isGateReroute: boolean;
