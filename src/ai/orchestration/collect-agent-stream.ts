@@ -85,7 +85,7 @@ export async function collectAgentStream({
       { role: "assistant" as const, content: continuationOf },
       {
         role: "user" as const,
-        content: buildTruncationContinuationPrompt(continuationOf),
+        content: buildTruncationContinuationPrompt(continuationOf, role),
       },
     ];
   }

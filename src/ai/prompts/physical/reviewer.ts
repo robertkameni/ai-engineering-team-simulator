@@ -25,6 +25,15 @@ Rules:
 ${buildDiscussionDepthRules(roster)}`;
 }
 
-export function buildPhysicalReviewerTurnPrompt(roster: TeamRoster): string {
-  return `Write a short review. Quote at least two claims from the previous agents. ${buildImplementationQuoteHint(roster)} Stay under 220 words. Reject any software drift. End with [APPROVE] or [REJECT: role] on its own last line (role = pm, architect, backend, frontend, or devops).`;
+export function buildPhysicalReviewerTurnPrompt(
+  roster: TeamRoster,
+  options?: { isReReview?: boolean; },
+): string {
+  const base = `Write a short review. Quote at least two claims from the previous agents. ${buildImplementationQuoteHint(roster)} Stay under 220 words. Reject any software drift. End with [APPROVE] or [REJECT: role] on its own last line (role = pm, architect, backend, frontend, or devops). Nothing may follow the tag.`;
+
+  if (options?.isReReview) {
+    return `${base}\n\nRE-REVIEW: If the rejected agent addressed your prior objections with concrete changes, issue [APPROVE] alone on the last line. Reject only when a named prior concern is still missing.`;
+  }
+
+  return base;
 }

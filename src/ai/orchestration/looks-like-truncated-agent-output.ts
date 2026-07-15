@@ -1,4 +1,5 @@
 import type { SimulationAgentRole } from "@/ai/agents/config";
+import type { TeamTemplateId } from "@/ai/agents/team-templates";
 
 import {
   hasCompleteSentenceEnding,
@@ -19,21 +20,88 @@ const INCOMPLETE_LIST_BULLET =
 
 const INCOMPLETE_COMPONENT_HEADING = /\*\*Component \d+:/i;
 
-const CONTINUATION_SECTION_HEADING = /^##\s+.*\((?:continued|suite)\)/im;
+const CONTINUED_HEADING =
+  /^##\s+.*\((?:continued|suite)\)\s*$/im;
 
 const TRUNCATION_META_COMMENTARY =
   /\btruncation artifact\b|The duplicate sentence at the end is a truncation/i;
 
-const FRONTEND_RISKS_HEADING = /^##\s+.*(?:Frontend Risks|Risques frontend|Risques FE)/im;
+const FRONTEND_RISKS_HEADING =
+  /^##\s+.*(?:Frontend Risks|Frontend Readiness|Risques frontend|Risques FE|Client Risks|FE Risks)\b/im;
 
-function hasFrontendRisksSection(text: string): boolean {
+const GLUED_MARKDOWN_HEADING = /[^\n#](#{2,3}\s+\S)/;
+
+const DUPLICATE_TAIL_MIN_CHARS = 80;
+
+export type TruncationCheckOptions = {
+  readonly templateId?: TeamTemplateId;
+};
+
+export function hasFrontendRisksSection(text: string): boolean {
   return FRONTEND_RISKS_HEADING.test(text);
+}
+
+export function hasGluedMarkdownHeading(text: string): boolean {
+  return GLUED_MARKDOWN_HEADING.test(text);
+}
+
+export function hasDuplicatedTrailingContent(text: string): boolean {
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph.length >= DUPLICATE_TAIL_MIN_CHARS);
+
+  if (paragraphs.length < 2) {
+    return false;
+  }
+
+  const lastParagraph = paragraphs[paragraphs.length - 1]!;
+  return paragraphs.slice(0, -1).some((paragraph) => paragraph === lastParagraph);
+}
+
+function lastMarkdownHeading(text: string): string | null {
+  const matches = text.match(/^##\s+.+$/gm);
+  if (!matches || matches.length === 0) {
+    return null;
+  }
+  return matches[matches.length - 1] ?? null;
+}
+
+function contentAfterLastHeading(text: string): string {
+  const matches = [...text.matchAll(/^##\s+.+$/gm)];
+  const lastMatch = matches[matches.length - 1];
+  if (!lastMatch || lastMatch.index === undefined) {
+    return text;
+  }
+  return text.slice(lastMatch.index + lastMatch[0].length).trim();
+}
+
+function isIncompleteContinuedSection(text: string): boolean {
+  const lastHeading = lastMarkdownHeading(text);
+  if (!lastHeading || !CONTINUED_HEADING.test(lastHeading)) {
+    return false;
+  }
+
+  const afterHeading = contentAfterLastHeading(text);
+  if (afterHeading.length < 40) {
+    return true;
+  }
+
+  return !hasCompleteSentenceEnding(afterHeading);
+}
+
+function requiresSoftwareFrontendRisks(
+  role: SimulationAgentRole,
+  options?: TruncationCheckOptions,
+): boolean {
+  return role === "frontend" && options?.templateId !== "physical";
 }
 
 /** Heuristic: model hit maxOutputTokens or stopped mid-thought. */
 export function looksLikeTruncatedAgentOutput(
   text: string,
   role: SimulationAgentRole,
+  options?: TruncationCheckOptions,
 ): boolean {
   const trimmed = text.trim();
   if (trimmed.length === 0) {
@@ -53,6 +121,14 @@ export function looksLikeTruncatedAgentOutput(
     return true;
   }
 
+  if (hasGluedMarkdownHeading(trimmed)) {
+    return true;
+  }
+
+  if (hasDuplicatedTrailingContent(trimmed)) {
+    return true;
+  }
+
   const lastLine = lastNonEmptyLine(trimmed);
 
   if (INCOMPLETE_LIST_BULLET.test(lastLine)) {
@@ -67,7 +143,7 @@ export function looksLikeTruncatedAgentOutput(
     return true;
   }
 
-  if (CONTINUATION_SECTION_HEADING.test(trimmed)) {
+  if (isIncompleteContinuedSection(trimmed)) {
     return true;
   }
 
@@ -83,7 +159,11 @@ export function looksLikeTruncatedAgentOutput(
     return true;
   }
 
-  if (role === "frontend" && trimmed.length >= 120 && !hasFrontendRisksSection(trimmed)) {
+  if (
+    requiresSoftwareFrontendRisks(role, options) &&
+    trimmed.length >= 120 &&
+    !hasFrontendRisksSection(trimmed)
+  ) {
     return true;
   }
 
@@ -117,9 +197,67 @@ export function looksLikeTruncatedAgentOutput(
   return false;
 }
 
-export function buildTruncationContinuationPrompt(tail: string): string {
+function stripOverlappingContinuationPrefix(
+  prior: string,
+  continuation: string,
+): string {
+  const priorTrimmed = prior.trimEnd();
+  const next = continuation.trimStart();
+  if (!priorTrimmed || !next) {
+    return next;
+  }
+
+  const maxOverlap = Math.min(400, priorTrimmed.length, next.length);
+  for (let size = maxOverlap; size >= 24; size -= 1) {
+    const priorSuffix = priorTrimmed.slice(-size);
+    if (next.startsWith(priorSuffix)) {
+      return next.slice(size).trimStart();
+    }
+  }
+
+  return next;
+}
+
+export function mergeContinuationText(
+  prior: string,
+  continuation: string,
+): string {
+  const base = prior.trimEnd();
+  const next = stripOverlappingContinuationPrefix(base, continuation);
+  if (!next) {
+    return base;
+  }
+  if (!base) {
+    return next;
+  }
+  return `${base}\n\n${next}`;
+}
+
+function finalSectionGuidance(role: SimulationAgentRole): string {
+  if (role === "frontend") {
+    return "Finish any incomplete component entry, then complete ## Frontend Risks with at least three concrete domain-specific risks and mitigations, then end with ## Frontend Readiness confirming the UI plan is implementable. End on a complete sentence.";
+  }
+  if (role === "backend") {
+    return "Complete ## Backend Risks with named bottlenecks and mitigations. End on a complete sentence.";
+  }
+  if (role === "devops") {
+    return "Complete ## Monitoring & Rollback and ## Risks. End on a complete sentence.";
+  }
+  if (role === "architect") {
+    return "Complete ## Decisions & Risks. End on a complete sentence.";
+  }
+  if (role === "reviewer") {
+    return "Finish recommendations briefly, then end with [APPROVE] or [REJECT: role] alone on the absolute last line.";
+  }
+  return "Complete your role's final mandatory section and end on a complete sentence.";
+}
+
+export function buildTruncationContinuationPrompt(
+  tail: string,
+  role: SimulationAgentRole = "frontend",
+): string {
   const excerpt = tail.trim().slice(-600);
-  return `Your previous team message was cut off by the output limit. Continue from the exact next token — do not repeat sentences or headings already written, do not add meta-commentary about limits. Close any open backticks, parentheses, or JSON. If you were listing component props, finish that component, then complete ## Frontend Risks (or your role's final mandatory section) with a complete sentence. Last characters of your prior message:
+  return `Your previous team message was cut off by the output limit. Continue from the exact next token — do not repeat sentences or headings already written, do not re-paste prior paragraphs, do not add meta-commentary about limits. Close any open backticks, parentheses, or JSON. ${finalSectionGuidance(role)} Last characters of your prior message:
 
 """${excerpt}"""`;
 }

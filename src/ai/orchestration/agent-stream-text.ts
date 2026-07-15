@@ -76,8 +76,9 @@ function mergeMergedRiskParagraphs(text: string): string {
 
 function normalizeMarkdownHeadings(text: string): string {
   return text
-    .replace(/([.!?…]["'»]?)\s*(##\s+)/g, "$1\n\n$2")
-    .replace(/([a-zà-ÿ0-9])(##\s+)/gi, "$1\n\n$2");
+    .replace(/([.!?…]["'»]?)\s*(#{2,3}\s+)/g, "$1\n\n$2")
+    .replace(/([^\n#])(#{2,3}\s+)/g, "$1\n\n$2")
+    .replace(/(#{2,3}\s+[^\n]+)\1/g, "$1");
 }
 
 /** Final persisted message after an agent turn completes. */

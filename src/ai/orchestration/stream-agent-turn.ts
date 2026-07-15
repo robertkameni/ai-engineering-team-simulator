@@ -19,6 +19,7 @@ import { normalizeAgentPersistedText } from "@/ai/orchestration/agent-stream-tex
 import {
   buildTruncationContinuationPrompt,
   looksLikeTruncatedAgentOutput,
+  mergeContinuationText,
 } from "@/ai/orchestration/looks-like-truncated-agent-output";
 import { buildArchitectToollessRetryUserPrompt } from "@/ai/prompts/architect";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
@@ -192,9 +193,9 @@ export async function streamAgentTurn({
       }
     }
 
-    if (role === "frontend") {
+    if (role === "frontend" && templateId !== "physical") {
       const normalizedFrontend = normalizeAgentPersistedText(role, fullText);
-      if (isFrontendDeliverableInsufficient(normalizedFrontend)) {
+      if (isFrontendDeliverableInsufficient(normalizedFrontend, templateId)) {
         assertNotAborted(abortSignal);
         console.warn(`${role}: deliverable incomplete, requesting completion stream`);
         const completionConfig = {
@@ -217,7 +218,7 @@ export async function streamAgentTurn({
           supplementalUserPrompt: buildFrontendInsufficientContinuationPrompt(),
         });
         if (completionText.trim()) {
-          fullText = `${normalizedFrontend}${completionText.trimStart()}`;
+          fullText = mergeContinuationText(normalizedFrontend, completionText);
           fullText = await continueAgentStreamIfTruncated({
             runId,
             role,
@@ -272,6 +273,7 @@ export async function streamAgentTurn({
   const wasTruncated = looksLikeTruncatedAgentOutput(
     normalizeAgentPersistedText(role, trimmedText),
     role,
+    { templateId },
   );
 
   if (wasTruncated) {
@@ -318,7 +320,7 @@ async function continueAgentStreamIfTruncated({
     continuationIndex < MAX_TRUNCATION_CONTINUATIONS;
     continuationIndex += 1
   ) {
-    if (!looksLikeTruncatedAgentOutput(merged, role)) {
+    if (!looksLikeTruncatedAgentOutput(merged, role, { templateId })) {
       return merged;
     }
 
@@ -347,7 +349,7 @@ async function continueAgentStreamIfTruncated({
     });
 
     if (continuation.trim()) {
-      merged = `${merged}${continuation.trimStart()}`;
+      merged = mergeContinuationText(merged, continuation);
     }
   }
 
@@ -386,7 +388,7 @@ async function retryAfterTruncationExhausted(
   } = params;
 
   const normalized = normalizeAgentPersistedText(role, fullText.trim());
-  if (!looksLikeTruncatedAgentOutput(normalized, role)) {
+  if (!looksLikeTruncatedAgentOutput(normalized, role, { templateId })) {
     return normalized;
   }
 
@@ -413,14 +415,14 @@ async function retryAfterTruncationExhausted(
     abortSignal,
     send,
     continuationOf: normalized,
-    supplementalUserPrompt: buildTruncationContinuationPrompt(normalized),
+    supplementalUserPrompt: buildTruncationContinuationPrompt(normalized, role),
   });
 
   if (!completionText.trim()) {
     return normalized;
   }
 
-  return `${normalized}${completionText.trimStart()}`;
+  return mergeContinuationText(normalized, completionText);
 }
 
 async function retryRoleDeliverableIfNeeded(
@@ -483,7 +485,7 @@ async function retryRoleDeliverableIfNeeded(
     return fullText;
   }
 
-  const merged = `${normalized}${completionText.trimStart()}`;
+  const merged = mergeContinuationText(normalized, completionText);
   return continueAgentStreamIfTruncated({
     runId,
     role,

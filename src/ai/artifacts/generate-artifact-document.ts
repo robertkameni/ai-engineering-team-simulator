@@ -8,7 +8,10 @@ import {
   assertSimulationWithinBudget,
   isSimulationBudgetExceeded,
 } from "@/ai/orchestration/simulation-budget";
-import type { DebateExitOutcome } from "@/ai/orchestration/reviewer-decision";
+import {
+  isUnapprovedDebateExitOutcome,
+  type DebateExitOutcome,
+} from "@/ai/orchestration/reviewer-decision";
 import { getDeepSeekModel } from "@/ai/providers";
 import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import {
@@ -29,9 +32,9 @@ export const ARTIFACT_SYNTHESIS_ORDER = [
   "review",
 ] as const satisfies readonly ArtifactType[];
 
-// STATE CONSISTENCY BUG FIX — strengthened notice for all artifact types
+// STATE CONSISTENCY — notice for every unapproved exit, including degraded_truncated
 const UNAPPROVED_DEBATE_NOTICE =
-  "DEBATE_STATUS: unapproved — The simulation ended without an explicit [APPROVE] (cap_reached or reviewer unresolved). This document MUST be conservative: do NOT describe open reviewer gaps as resolved, do NOT promote recommendations to implemented features, and label every recommendation, proposed mitigation, and risk item as provisional or recommended — never as finalized or shipped.";
+  "DEBATE_STATUS: unapproved — The simulation ended without a clean approved close (cap_reached, degraded_truncated, reviewer unresolved, or budget failure). This document MUST be conservative: do NOT describe open reviewer gaps as resolved, do NOT promote recommendations to implemented features, and label every recommendation, proposed mitigation, and risk item as provisional or recommended — never as finalized or shipped.";
 
 const SOFTWARE_ARTIFACT_FOCUS: Record<ArtifactType, string> = {
   requirements:
@@ -59,8 +62,10 @@ const PHYSICAL_ARTIFACT_FOCUS: Record<ArtifactType, string> = {
     "Where the team agreed, key disagreements, top risks, and prioritized recommendations.",
 };
 
-function needsUnapprovedDebateNotice(outcome: DebateExitOutcome | null): boolean {
-  return outcome === "cap_reached" || outcome === "unknown_reject_fallback";
+export function needsUnapprovedDebateNotice(
+  outcome: DebateExitOutcome | null,
+): boolean {
+  return isUnapprovedDebateExitOutcome(outcome);
 }
 
 function artifactUsesStackReference(type: ArtifactType): boolean {

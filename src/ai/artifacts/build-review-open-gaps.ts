@@ -1,4 +1,3 @@
-import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 import { inferIssueOwnerFromConcern } from "@/ai/orchestration/issue-ownership";
 import type { TranscriptEntry } from "@/ai/context/transcript";
@@ -15,21 +14,26 @@ const DISAGREE_MARKER = /\*\*Disagree\*\*/i;
 const NOT_IN_TEAM_PLAN = /\bnot in any teammate'?s plan\b/i;
 const ONLY_IN_REVIEW =
   /\b(?:only in (?:my|your) (?:prior )?review|mitigation exists only in)/i;
+const APPROVE_TAG = /\[APPROVE\]/i;
+const REJECT_TAG = /\[REJECT:\s*(?:pm|architect|backend|frontend|devops)\]/i;
 
 export function extractReviewOpenGaps(
   transcript: readonly TranscriptEntry[],
   roster: TeamRoster,
 ): ReviewOpenGap[] {
+  const reviewerEntries = transcript.filter((entry) => entry.role === "reviewer");
+  if (reviewerEntries.length === 0) {
+    return [];
+  }
+
+  const lastReview = reviewerEntries[reviewerEntries.length - 1]!;
+  const sourceEntries = resolveOpenGapSourceEntries(reviewerEntries, lastReview);
   const gapMap = new Map<string, ReviewOpenGap>();
 
-  for (const entry of transcript) {
-    if (entry.role !== "reviewer") {
-      continue;
-    }
-
+  for (const entry of sourceEntries) {
     const blocks = splitReviewerBlocks(entry.content);
     for (const block of blocks) {
-      if (!isOpenGapBlock(block)) {
+      if (!isOpenGapBlock(block, entry === lastReview && APPROVE_TAG.test(lastReview.content))) {
         continue;
       }
 
@@ -49,6 +53,19 @@ export function extractReviewOpenGaps(
   }
 
   return [...gapMap.values()].slice(0, MAX_OPEN_GAPS);
+}
+
+function resolveOpenGapSourceEntries(
+  reviewerEntries: readonly TranscriptEntry[],
+  lastReview: TranscriptEntry,
+): readonly TranscriptEntry[] {
+  if (APPROVE_TAG.test(lastReview.content)) {
+    return [lastReview];
+  }
+  if (REJECT_TAG.test(lastReview.content)) {
+    return [lastReview];
+  }
+  return reviewerEntries;
 }
 
 export function buildOpenGapsDirective(
@@ -94,7 +111,11 @@ function splitNumberedBlocks(text: string): string[] {
     .filter((block) => block.length >= 24);
 }
 
-function isOpenGapBlock(block: string): boolean {
+function isOpenGapBlock(block: string, approveClosed: boolean): boolean {
+  if (approveClosed) {
+    return UNRESOLVED_MARKER.test(block);
+  }
+
   return (
     UNRESOLVED_MARKER.test(block) ||
     DISAGREE_MARKER.test(block) ||

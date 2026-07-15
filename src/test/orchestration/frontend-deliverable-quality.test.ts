@@ -28,7 +28,11 @@ TaskChecklist, DocumentUploader, and WelcomeForm with explicit props and client/
 
 ## Frontend Risks
 
-CLS mitigated with skeleton placeholders. Keyboard navigation uses visible focus rings and aria labels on every interactive control.`;
+CLS mitigated with skeleton placeholders. Keyboard navigation uses visible focus rings and aria labels on every interactive control.
+
+## Frontend Readiness
+
+All components above are specified and ready to implement.`;
 
     assert.equal(isFrontendDeliverableInsufficient(text), false);
   });

@@ -165,7 +165,9 @@ export function getAgentTurnPrompt(
           turnPrompt = buildPhysicalDevOpsTurnPrompt();
           break;
         case "reviewer":
-          turnPrompt = buildPhysicalReviewerTurnPrompt(roster);
+          turnPrompt = buildPhysicalReviewerTurnPrompt(roster, {
+            isReReview: debateContext.isReReview,
+          });
           break;
         default:
           throw new Error(`No turn prompt for role: ${role}`);

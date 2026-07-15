@@ -4,6 +4,7 @@ import {
 } from "@/ai/agents/config";
 import { getTeamMember, type TeamRoster } from "@/ai/agents/roster";
 import type { TranscriptEntry } from "@/ai/context/transcript";
+import { hasFrontendRisksSection } from "@/ai/orchestration/looks-like-truncated-agent-output";
 
 const PREFLIGHT_PIPELINE_ROLES = [
   "pm",
@@ -59,11 +60,18 @@ export function buildReviewerPreflightChecklist(
     return `- ${signal.label}: ${found ? "mentioned" : "not detected"}`;
   });
 
+  const frontendEntry = transcript.findLast((entry) => entry.role === "frontend");
+  const frontendRisksLine = frontendEntry
+    ? hasFrontendRisksSection(frontendEntry.content)
+      ? "- Frontend Risks section: present"
+      : "- Frontend Risks section: **missing or incomplete** — prefer [REJECT: frontend] until complete"
+    : "- Frontend Risks section: **missing** — frontend has not spoken";
+
   const pipelineComplete = missingRoles.length === 0;
 
   const reviewGuidance = options?.isReReview
-    ? "RE-REVIEW: The corrected agent just spoke. If they addressed your prior objections with concrete changes, issue [APPROVE]. Reject only when a named concern is still missing from their latest message."
-    : "FIRST-PASS REVIEW: Apply your ZERO-APPROVE DEFAULT — reject the single most severe unresolved gap unless every mitigation already appears in a teammate's prior message (not your own review).";
+    ? "RE-REVIEW: The corrected agent just spoke. If they addressed your prior objections with concrete changes, issue [APPROVE] on the last line alone. Reject only when a named concern is still missing from their latest message. Do not claim all gaps are resolved while any named objection remains open."
+    : "FIRST-PASS REVIEW: Apply your ZERO-APPROVE DEFAULT — reject the single most severe unresolved gap unless every mitigation already appears in a teammate's prior message (not your own review). End with [APPROVE] or [REJECT: role] alone on the absolute last line.";
 
   return [
     "## Debate pre-flight checklist (server-computed)",
@@ -77,6 +85,9 @@ export function buildReviewerPreflightChecklist(
     "",
     "### Role status",
     ...roleLines,
+    "",
+    "### Frontend closure gate",
+    frontendRisksLine,
     "",
     "### Operational signals (keyword scan)",
     ...operationalLines,

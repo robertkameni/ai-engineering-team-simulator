@@ -82,7 +82,7 @@ export function isRoleDeliverableInsufficient(
     return isDevOpsDeliverableInsufficient(text);
   }
   if (role === "frontend") {
-    return isFrontendDeliverableInsufficient(text);
+    return isFrontendDeliverableInsufficient(text, templateId);
   }
   if (role === "architect") {
     return isArchitectDeliverableInsufficient(text, templateId);
@@ -175,15 +175,26 @@ export function isArchitectDeliverableInsufficient(
   return isSoftwareArchitectDeliverableInsufficient(text);
 }
 
-const FRONTEND_RISKS_HEADING = /^##\s+.*(?:Frontend Risks|Risques frontend|Risques FE)/im;
+import { hasFrontendRisksSection } from "@/ai/orchestration/looks-like-truncated-agent-output";
 
-export function isFrontendDeliverableInsufficient(text: string): boolean {
+export function isFrontendDeliverableInsufficient(
+  text: string,
+  templateId: TeamTemplateId = "software",
+): boolean {
+  if (templateId === "physical") {
+    const trimmed = text.trim();
+    if (!trimmed || trimmed.length < 120) {
+      return true;
+    }
+    return !hasCompleteSentenceEnding(trimmed);
+  }
+
   const trimmed = text.trim();
   if (!trimmed || trimmed.length < 200) {
     return true;
   }
 
-  if (!FRONTEND_RISKS_HEADING.test(trimmed)) {
+  if (!hasFrontendRisksSection(trimmed)) {
     return true;
   }
 
@@ -200,9 +211,9 @@ export function isFrontendDeliverableInsufficient(text: string): boolean {
 }
 
 export function buildFrontendInsufficientContinuationPrompt(): string {
-  return `CRITICAL — Your frontend plan was cut off or is missing ## Frontend Risks.
+  return `CRITICAL — Your frontend plan was cut off or is missing ## Frontend Risks / ## Frontend Readiness.
 
-Continue from where you stopped. Finish any incomplete component entry, then add ## Frontend Risks with CLS, race conditions, hydration mismatch, and accessibility mitigations. End with a complete sentence. Do not repeat sections already complete.`;
+Continue from where you stopped. Do not repeat completed sections. Finish any incomplete component entry, then add ## Frontend Risks with at least three concrete domain-specific risks and mitigations (CLS, race conditions, hydration mismatch, accessibility). End with ## Frontend Readiness confirming the plan is implementable, then a complete sentence.`;
 }
 
 export function buildArchitectInsufficientReviewerFeedback(

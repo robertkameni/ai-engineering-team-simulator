@@ -49,7 +49,7 @@ const ACTIVE_AGENTS: Record<SimulationAgentRole, AgentModelConfig> = {
   frontend: {
     role: "frontend",
     model: "deepseek-v4-flash",
-    maxOutputTokens: 2600,
+    maxOutputTokens: 3000,
     temperature: 0.4,
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   },
