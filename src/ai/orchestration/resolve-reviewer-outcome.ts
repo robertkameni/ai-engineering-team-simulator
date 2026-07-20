@@ -22,6 +22,11 @@ import {
 } from "@/ai/orchestration/role-participation";
 import { getUnresolvedDevOpsIssues } from "@/ai/orchestration/ops-follow-up";
 import {
+  hasReachedHardCorrectionLimit,
+  recordRejectCycle,
+  shouldPreferCorrectionLoopApprove,
+} from "@/ai/orchestration/correction-loop";
+import {
   getLatestTruncatedCriticalRoles,
   hasCurrentCriticalTruncation,
   syncHasTruncatedCriticalTurn,
@@ -133,7 +138,7 @@ export function maybeScheduleTruncationRecovery(
     (role) => !state.truncationRecoveryAttemptedRoles.includes(role),
   );
 
-  if (recoverableRole && remainingBudget >= 2) {
+  if (recoverableRole && remainingBudget >= 1) {
     console.info(
       "TRUNCATION RECOVERY: retrying truncated critical turn before finalize approve",
       {
@@ -165,22 +170,48 @@ export function maybeScheduleTruncationRecovery(
   return null;
 }
 
-function preferNearCapApproveOrCap(
+/**
+ * Prefer approve when a correction loop is detected or near turn-cap with
+ * minor open issues. Returns null when neither path applies.
+ */
+function preferLoopOrNearCapApprove(
   state: DebateState,
   ctx: TurnContext,
   maxTurns: number,
-): TurnDirective {
-  const openIssueCount = buildIssueSnapshot(state.reviewIssues).totalOpen;
+  openIssueCount: number,
+): TurnDirective | null {
+  const unresolvedOpsIssueCount = unresolvedOpsCount(state);
+
+  if (
+    shouldPreferCorrectionLoopApprove({
+      transcript: state.transcript,
+      correctionLoopDetected: state.correctionLoopDetected,
+      unresolvedOpsIssueCount,
+    })
+  ) {
+    console.info(
+      "CORRECTION LOOP APPROVE: unproductive reject cycles — preferring approve",
+      {
+        runId: ctx.runId,
+        turnCount: state.turnCount,
+        consecutiveUnproductiveCycles: state.consecutiveUnproductiveCycles,
+        openIssueCount,
+      },
+    );
+    markIssuesAddressed(state.reviewIssues);
+    return { kind: "break", outcome: "approved" };
+  }
+
   if (
     shouldPreferNearCapApprove({
       transcript: state.transcript,
       turnCount: state.turnCount,
       maxTurns,
       openIssueCount,
-      unresolvedOpsIssueCount: unresolvedOpsCount(state),
+      unresolvedOpsIssueCount,
     })
   ) {
-    console.info("NEAR-CAP APPROVE: participation complete with minor open issues", {
+    console.info("NEAR-CAP APPROVE: preferring approve over further reject cycles", {
       runId: ctx.runId,
       turnCount: state.turnCount,
       maxTurns,
@@ -190,7 +221,45 @@ function preferNearCapApproveOrCap(
     return { kind: "break", outcome: "approved" };
   }
 
+  return null;
+}
+
+function preferNearCapApproveOrCap(
+  state: DebateState,
+  ctx: TurnContext,
+  maxTurns: number,
+): TurnDirective {
+  const openIssueCount = buildIssueSnapshot(state.reviewIssues).totalOpen;
+  const approve = preferLoopOrNearCapApprove(state, ctx, maxTurns, openIssueCount);
+  if (approve) {
+    return approve;
+  }
+
   return { kind: "break", outcome: "cap_reached" };
+}
+
+function syncCorrectionLoopFromReject(
+  state: DebateState,
+  rejectRole: SimulationAgentRole,
+  displayText: string,
+  newIssueCount: number,
+): void {
+  const updated = recordRejectCycle(
+    {
+      consecutiveUnproductiveCycles: state.consecutiveUnproductiveCycles,
+      correctionLoopDetected: state.correctionLoopDetected,
+      lastRejectRole: state.lastRejectTarget,
+      lastRejectKeywordKey: null,
+    },
+    {
+      rejectRole,
+      feedbackText: displayText,
+      reviewIssues: state.reviewIssues,
+      newIssueCount,
+    },
+  );
+  state.consecutiveUnproductiveCycles = updated.consecutiveUnproductiveCycles;
+  state.correctionLoopDetected = updated.correctionLoopDetected;
 }
 
 function resolveRejectDecision(
@@ -223,31 +292,19 @@ function resolveRejectDecision(
     ctx.roster,
   );
   state.reviewIssues.push(...newIssues);
+  syncCorrectionLoopFromReject(state, rejectRole, displayText, newIssues.length);
 
   const maxTurns = getMaxSimulationTurns(ctx.templateId);
   const openIssueCount = buildIssueSnapshot(state.reviewIssues).totalOpen;
 
-  if (
-    shouldPreferNearCapApprove({
-      transcript: state.transcript,
-      turnCount: state.turnCount,
-      maxTurns,
-      openIssueCount,
-      unresolvedOpsIssueCount: unresolvedOpsCount(state),
-    })
-  ) {
-    console.info(
-      "NEAR-CAP APPROVE: preferring approve over further reject cycles",
-      {
-        runId: ctx.runId,
-        turnCount: state.turnCount,
-        maxTurns,
-        openIssueCount,
-        rejectRole,
-      },
-    );
-    markIssuesAddressed(state.reviewIssues);
-    return { kind: "break", outcome: "approved" };
+  const nearCapOrLoopApprove = preferLoopOrNearCapApprove(
+    state,
+    ctx,
+    maxTurns,
+    openIssueCount,
+  );
+  if (nearCapOrLoopApprove) {
+    return nearCapOrLoopApprove;
   }
 
   if (hasExceededReviewerRejectionCap(state.reviewerRejectionCount)) {
@@ -261,7 +318,10 @@ function resolveRejectDecision(
     return preferNearCapApproveOrCap(state, ctx, maxTurns);
   }
 
-  if (!canCorrectRole(state.roleCorrectionCounts, rejectRole)) {
+  if (
+    !canCorrectRole(state.roleCorrectionCounts, rejectRole) ||
+    hasReachedHardCorrectionLimit(state.roleCorrectionCounts, rejectRole)
+  ) {
     console.warn("Per-role correction cap reached, closing debate", {
       runId: ctx.runId,
       rejectRole,
@@ -287,17 +347,14 @@ function resolveRejectDecision(
         openIssues: openIssueCount,
       },
     );
-    if (
-      shouldPreferNearCapApprove({
-        transcript: state.transcript,
-        turnCount: state.turnCount,
-        maxTurns,
-        openIssueCount,
-        unresolvedOpsIssueCount: unresolvedOpsCount(state),
-      })
-    ) {
-      markIssuesAddressed(state.reviewIssues);
-      return { kind: "break", outcome: "approved" };
+    const budgetApprove = preferLoopOrNearCapApprove(
+      state,
+      ctx,
+      maxTurns,
+      openIssueCount,
+    );
+    if (budgetApprove) {
+      return budgetApprove;
     }
     return { kind: "break", outcome: "insufficient_budget" };
   }
@@ -328,17 +385,14 @@ function resolveUnknownDecision(
   const remainingBudget = maxTurns - state.turnCount;
   const openIssueCount = buildIssueSnapshot(state.reviewIssues).totalOpen;
 
-  if (
-    shouldPreferNearCapApprove({
-      transcript: state.transcript,
-      turnCount: state.turnCount,
-      maxTurns,
-      openIssueCount,
-      unresolvedOpsIssueCount: unresolvedOpsCount(state),
-    })
-  ) {
-    markIssuesAddressed(state.reviewIssues);
-    return { kind: "break", outcome: "approved" };
+  const loopOrNearCap = preferLoopOrNearCapApprove(
+    state,
+    ctx,
+    maxTurns,
+    openIssueCount,
+  );
+  if (loopOrNearCap) {
+    return loopOrNearCap;
   }
 
   if (remainingBudget >= 2 && state.turnCount < maxTurns) {

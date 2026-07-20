@@ -96,6 +96,8 @@ function buildBaseState(
     focusedOpsFollowUp: null,
     opsFollowUpCheckpoint: null,
     opsFollowUpCheckpoints: [],
+    consecutiveUnproductiveCycles: 0,
+    correctionLoopDetected: false,
     ...overrides,
   };
 }
@@ -387,7 +389,7 @@ describe("ops follow-up observability checkpoint", () => {
     assert.equal(state.opsFollowUpCheckpoints[0], checkpoint);
   });
 
-  it("keeps mid-debate backend corrections out of ops follow-up scope", () => {
+  it("triggers ops follow-up on mid-debate backend correction when DevOps issues remain", () => {
     const ctx = buildTurnContext("software");
     const reviewIssues = createReviewIssues(
       [],
@@ -413,12 +415,9 @@ describe("ops follow-up observability checkpoint", () => {
 
     assert.equal(resolveLastCorrectionRole(state.transcript), "backend");
     assert.equal(checkpoint?.opsFollowUpEvaluated, true);
-    assert.equal(checkpoint?.opsFollowUpTriggered, false);
-    assert.equal(checkpoint?.opsFollowUpEligible, false);
-    assert.equal(
-      checkpoint?.opsFollowUpSkipReason,
-      "not_architect_correction_after_review",
-    );
+    assert.equal(checkpoint?.opsFollowUpTriggered, true);
+    assert.equal(checkpoint?.opsFollowUpEligible, true);
+    assert.equal(checkpoint?.opsFollowUpSkipReason, null);
     assert.equal(checkpoint?.opsFollowUpLastCorrectionRole, "backend");
     assert.ok((checkpoint?.opsFollowUpUnresolvedDevopsIssueCount ?? 0) >= 2);
 

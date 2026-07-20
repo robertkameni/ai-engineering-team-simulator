@@ -59,6 +59,9 @@ export interface DebateState {
   focusedOpsFollowUp: FocusedOpsFollowUpContext | null;
   opsFollowUpCheckpoint: OpsFollowUpCheckpoint | null;
   opsFollowUpCheckpoints: OpsFollowUpCheckpoint[];
+  /** Consecutive unproductive reject cycles → prefer approve. */
+  consecutiveUnproductiveCycles: number;
+  correctionLoopDetected: boolean;
 }
 
 export interface TurnContext {

@@ -13,7 +13,6 @@ import {
 import { looksLikeTruncatedAgentOutput } from "../ai/orchestration/looks-like-truncated-agent-output.js";
 import { createSimulationRoster } from "@/ai/agents/roster";
 import {
-  TRANSCRIPT_WINDOW_RECENT_COUNT,
   windowTranscriptForTurn,
 } from "@/ai/context/window-transcript";
 import {
@@ -443,7 +442,7 @@ describe("windowTranscriptForTurn", () => {
     assert.ok(windowed.entries[0]?.content.includes("Message 8"));
   });
 
-  it("windows long transcripts to recent messages with a summary", () => {
+  it("always summarizes long transcripts (latest turn only, no 6-window verbatim)", () => {
     const roster = createSimulationRoster("software");
     const transcript = Array.from({ length: 8 }, (_, index) => ({
       role: "pm" as const,
@@ -454,8 +453,12 @@ describe("windowTranscriptForTurn", () => {
     const windowed = windowTranscriptForTurn(transcript, roster, {});
 
     assert.ok(windowed.omittedSummary?.includes("Earlier debate summary"));
-    assert.equal(windowed.entries.length, TRANSCRIPT_WINDOW_RECENT_COUNT);
-    assert.equal(windowed.entries[0]?.content, "Message 3 with enough detail to matter.");
+    assert.equal(windowed.entries.length, 1);
+    assert.ok(
+      windowed.entries[0]?.content.includes(
+        "Message 8 with enough detail to matter.",
+      ),
+    );
   });
 });
 

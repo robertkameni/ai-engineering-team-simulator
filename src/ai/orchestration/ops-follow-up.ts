@@ -222,20 +222,18 @@ export function evaluateOpsFollowUpTrigger(
   }
 
   if (!isArchitectCorrectionAfterReview(state.transcript)) {
-    const maxTurns = getMaxSimulationTurns(ctx.templateId);
-    const remainingBudget = maxTurns - state.turnCount;
     const lastEntry = state.transcript[state.transcript.length - 1];
     const isFailedArchitectCorrection =
       lastEntry?.role === "architect" && lastEntry.isCorrectionFailed === true;
 
-    // Near-cap escape only: invite DevOps when unresolved ops remain after
-    // non-architect corrections (finance pattern). Mid-debate backend/frontend
-    // corrections stay out of scope. Failed architect corrections always skip.
-    if (
-      isFailedArchitectCorrection ||
-      blockers.length === 0 ||
-      remainingBudget > 3
-    ) {
+    // Failed architect corrections never unlock ops follow-up.
+    if (isFailedArchitectCorrection) {
+      return baseEvaluation("not_architect_correction_after_review");
+    }
+
+    // When no blockers remain and DevOps has not followed up for this reject cluster,
+    // fall through and trigger — do not require architect correction.
+    if (blockers.length === 0) {
       return baseEvaluation("not_architect_correction_after_review");
     }
   }

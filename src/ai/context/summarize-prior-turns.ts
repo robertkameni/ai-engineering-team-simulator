@@ -5,6 +5,13 @@ import type { TranscriptEntry } from "@/ai/context/transcript";
 /** Soft cap for condensed prior-turn context (chars). */
 export const SUMMARIZED_PRIOR_TURNS_MAX_CHARS = 12_000;
 
+/**
+ * Hard cap for the latest verbatim turn. Round-2 kept the latest turn uncapped,
+ * so a 30k–42k architect correction alone blew past the 12k budget (v3
+ * subscription peakPrompt ≈ 420k when many such turns + 6-window path stacked).
+ */
+export const LATEST_TURN_HARD_CAP_CHARS = 4_000;
+
 /** Per-entry excerpt when compressing older turns. */
 const PRIOR_TURN_EXCERPT_CHARS = 400;
 
@@ -102,25 +109,37 @@ function buildOmittedSummaryFromParts(
   );
 }
 
+function capLatestTurn(entry: TranscriptEntry, maxChars: number): TranscriptEntry {
+  if (entry.content.length <= maxChars) {
+    return entry;
+  }
+  return {
+    ...entry,
+    content: buildEntryExcerpt(entry.content, maxChars),
+  };
+}
+
 /**
- * Keep the latest turn verbatim; compress older turns into a summary and
- * enforce a hard character budget. Prevents correction/continuation paths
- * from re-sending 30k+ char architect dumps.
+ * Keep a capped latest turn; compress older turns into a summary and enforce
+ * a hard character budget. Prevents correction/continuation paths from
+ * re-sending 30k+ char architect dumps.
  */
 export function summarizePriorTurns(
   transcript: readonly TranscriptEntry[],
   roster: TeamRoster,
   options?: {
     readonly maxChars?: number;
+    readonly latestTurnMaxChars?: number;
   },
 ): SummarizedPriorTurns {
   const maxChars = options?.maxChars ?? SUMMARIZED_PRIOR_TURNS_MAX_CHARS;
+  const latestCap = options?.latestTurnMaxChars ?? LATEST_TURN_HARD_CAP_CHARS;
 
   if (transcript.length === 0) {
     return { omittedSummary: null, entries: [], totalChars: 0 };
   }
 
-  const latest = transcript[transcript.length - 1]!;
+  const latest = capLatestTurn(transcript[transcript.length - 1]!, latestCap);
   const older = transcript.slice(0, -1);
 
   if (older.length === 0) {

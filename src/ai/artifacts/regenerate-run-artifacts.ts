@@ -35,6 +35,7 @@ import {
 } from "@/lib/db/runs";
 import {
   computeTotalDurationMs,
+  computeUserWaitMs,
   mergeRunSummarySynthesisTelemetry,
   mergeRunSummaryTimingTelemetry,
   parseRunSummary,
@@ -77,11 +78,12 @@ async function persistArtifactTiming(
 ): Promise<void> {
   const existing = parseRunSummary(existingSummary);
   const debateDurationMs = existing?.debateDurationMs ?? null;
-  const userWaitMs = params.artifactDurationMs;
-  const totalDurationMs = computeTotalDurationMs({
+  const timingParams = {
     debateDurationMs,
     artifactDurationMs: params.artifactDurationMs,
-  });
+  };
+  const totalDurationMs = computeTotalDurationMs(timingParams);
+  const userWaitMs = computeUserWaitMs(timingParams);
 
   await updateRunSummary(
     runId,

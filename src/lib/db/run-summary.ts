@@ -69,6 +69,7 @@ function pickPreservedDebateFields(
   | "hasTruncatedCriticalTurn"
   | "postApproveTruncation"
   | "postApproveContinuationFailed"
+  | "correctionLoopDetected"
   | "openReviewIssueCount"
   | "debateDurationMs"
   | "artifactDurationMs"
@@ -81,6 +82,7 @@ function pickPreservedDebateFields(
     hasTruncatedCriticalTurn: existing?.hasTruncatedCriticalTurn,
     postApproveTruncation: existing?.postApproveTruncation,
     postApproveContinuationFailed: existing?.postApproveContinuationFailed,
+    correctionLoopDetected: existing?.correctionLoopDetected,
     openReviewIssueCount: existing?.openReviewIssueCount,
     debateDurationMs: existing?.debateDurationMs,
     artifactDurationMs: existing?.artifactDurationMs,
@@ -144,6 +146,7 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
       postApproveContinuationFailed: optionalBoolean(
         record.postApproveContinuationFailed,
       ),
+      correctionLoopDetected: optionalBoolean(record.correctionLoopDetected),
       openReviewIssueCount: optionalNumber(record.openReviewIssueCount),
       debateDurationMs: optionalNullableNumber(record.debateDurationMs),
       artifactDurationMs: optionalNullableNumber(record.artifactDurationMs),
@@ -202,6 +205,17 @@ export function computeTotalDurationMs(params: {
     return null;
   }
   return (debate ?? 0) + (artifacts ?? 0);
+}
+
+/**
+ * User-experienced wait from run start until debate and artifacts are both
+ * ready. Must never equal artifactDurationMs alone when debate time exists.
+ */
+export function computeUserWaitMs(params: {
+  readonly debateDurationMs: number | null | undefined;
+  readonly artifactDurationMs: number | null | undefined;
+}): number | null {
+  return computeTotalDurationMs(params);
 }
 
 /** Merge duration / peak-prompt telemetry into an existing summary JSON. */

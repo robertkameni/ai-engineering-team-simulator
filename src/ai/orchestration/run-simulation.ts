@@ -153,6 +153,8 @@ export async function runSimulation(
       focusedOpsFollowUp: null,
       opsFollowUpCheckpoint: null,
       opsFollowUpCheckpoints: [],
+      consecutiveUnproductiveCycles: 0,
+      correctionLoopDetected: false,
     };
 
     const ctx: TurnContext = {
@@ -189,6 +191,7 @@ export async function runSimulation(
         postApproveTruncation: state.postApproveTruncation || undefined,
         postApproveContinuationFailed:
           state.postApproveContinuationFailed || undefined,
+        correctionLoopDetected: state.correctionLoopDetected || undefined,
         openReviewIssueCount: buildIssueSnapshot(state.reviewIssues).totalOpen || undefined,
         debateDurationMs,
         artifactDurationMs: null,

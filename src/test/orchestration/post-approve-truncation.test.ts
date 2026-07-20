@@ -36,6 +36,8 @@ function buildState(
     focusedOpsFollowUp: null,
     opsFollowUpCheckpoint: null,
     opsFollowUpCheckpoints: [],
+    consecutiveUnproductiveCycles: 0,
+    correctionLoopDetected: false,
     ...overrides,
   };
 }
