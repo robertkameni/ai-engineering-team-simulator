@@ -1,5 +1,6 @@
 import { buildRunMarkdown } from "@/lib/export/build-run-export-document";
 import { buildRunMarkdownFilename } from "@/lib/export/export-filename";
+import { canExportApprovedRun } from "@/features/artifacts/artifact-panel-phase";
 import { getRunForWorkspaceIfOwned } from "@/lib/db/runs";
 import { getTeamRoster } from "@/lib/db/team-roster";
 import { getSessionUser } from "@/lib/auth/session";
@@ -34,6 +35,21 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 
   const roster = await getTeamRoster(id);
+  if (
+    !canExportApprovedRun({
+      debateOutcome: run.debateOutcome,
+      artifacts: run.artifacts,
+    })
+  ) {
+    return Response.json(
+      {
+        error:
+          "Artifacts are not ready for this approved run. Wait for synthesis to finish, then retry export.",
+      },
+      { status: 409 },
+    );
+  }
+
   const markdown = buildRunMarkdown({
     run,
     templateId: roster?.templateId,

@@ -1,10 +1,11 @@
 import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
 import type { DebateExitOutcome, RunStatus, SimulationMessage } from "@/features/agents/types";
 import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
+import {
+  computeArtifactPollIntervalMs,
+  POLL_ARTIFACT_MAX_MS,
+} from "@/features/simulation/artifact-poll-backoff";
 
-const POLL_ARTIFACT_INTERVAL_MS = 800;
-/** Match artifacts route synthesis budget (approx). */
-const POLL_ARTIFACT_MAX_MS = 320_000;
 const POLL_RUN_PROGRESS_INTERVAL_MS = 2_000;
 /** Railway SSE cap is 15 minutes; allow polling slightly longer. */
 const POLL_RUN_PROGRESS_MAX_MS = 16 * 60 * 1000;
@@ -118,9 +119,12 @@ async function fetchArtifactsState(
   };
 }
 
-function waitForArtifactPoll(signal?: AbortSignal): Promise<void> {
+function waitForArtifactPoll(
+  intervalMs: number,
+  signal?: AbortSignal,
+): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = globalThis.setTimeout(resolve, POLL_ARTIFACT_INTERVAL_MS);
+    const timer = globalThis.setTimeout(resolve, intervalMs);
     if (signal) {
       if (signal.aborted) {
         globalThis.clearTimeout(timer);
@@ -158,6 +162,10 @@ function applyArtifactsFetchResult(
   setters.setCrossValidationFailed(result.crossValidationFailed);
 }
 
+/**
+ * Fallback poller when SSE did not deliver `all_artifacts_complete`.
+ * Uses exponential backoff (2.5s → ×1.5 → cap 10s) instead of a fixed 800ms storm.
+ */
 export async function pollArtifactsUntilSettled(
   id: string,
   setters: ArtifactPollSetters,
@@ -166,6 +174,8 @@ export async function pollArtifactsUntilSettled(
   const isActive = () => signal == null || !signal.aborted;
 
   const deadline = Date.now() + POLL_ARTIFACT_MAX_MS;
+  let waitIndex = 0;
+
   while (Date.now() < deadline) {
     if (!isActive()) return null;
 
@@ -176,7 +186,11 @@ export async function pollArtifactsUntilSettled(
     if (!result.ok) {
       if (result.retryable) {
         try {
-          await waitForArtifactPoll(signal);
+          await waitForArtifactPoll(
+            computeArtifactPollIntervalMs(waitIndex),
+            signal,
+          );
+          waitIndex += 1;
         } catch {
           return null;
         }
@@ -197,7 +211,11 @@ export async function pollArtifactsUntilSettled(
     }
 
     try {
-      await waitForArtifactPoll(signal);
+      await waitForArtifactPoll(
+        computeArtifactPollIntervalMs(waitIndex),
+        signal,
+      );
+      waitIndex += 1;
     } catch {
       return null;
     }
@@ -215,6 +233,30 @@ export async function pollArtifactsUntilSettled(
 
   setters.setArtifactsStatus("unavailable");
   return "unavailable";
+}
+
+/** Single fetch used when SSE already signaled artifact completion. */
+export async function fetchArtifactsOnce(
+  id: string,
+  setters: ArtifactPollSetters,
+  signal?: AbortSignal,
+): Promise<ArtifactsPanelStatus | null> {
+  if (signal?.aborted) {
+    return null;
+  }
+
+  const result = await fetchArtifactsState(id, signal);
+  if (signal?.aborted) {
+    return null;
+  }
+
+  if (!result.ok) {
+    setters.setArtifactsStatus("unavailable");
+    return "unavailable";
+  }
+
+  applyArtifactsFetchResult(setters, result);
+  return result.status;
 }
 
 export type RunProgressRecoverySetters = ArtifactPollSetters & {

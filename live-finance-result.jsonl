@@ -1,0 +1,5 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+{"phase":"start","prompt":"Build a personal finance tracker for freelancers with multi-currency support","baseUrl":"http://localhost:3100"}
+{"phase":"run_started","runId":"cmrtna4rb0002cwtv4nxvl8lr"}
+{"phase":"agent_end","role":"pm","elapsedMs":15222}
+{"phase":"agent_end","role":"architect","elapsedMs":206036}

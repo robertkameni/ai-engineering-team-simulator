@@ -1,19 +1,21 @@
-import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
-import { isStoredSimulationAgentRole } from "@/ai/config";
-import type { TeamRoster } from "@/ai/agents/roster";
+import "server-only";
+
 import { generateRunArtifacts } from "@/ai/artifacts/generate-run-artifacts";
-import type { RegenerateRunArtifactsResult } from "@/ai/artifacts/regenerate-run-artifacts.types";
-import type { TranscriptEntry } from "@/ai/context/transcript";
+import type {
+  RegenerateRunArtifactsOptions,
+  RegenerateRunArtifactsResult,
+} from "@/ai/artifacts/regenerate-run-artifacts.types";
 import {
-  assertSimulationWithinBudget,
-  isSimulationBudgetExceeded,
-} from "@/ai/orchestration/simulation-budget";
-import { isDebateComplete } from "@/ai/orchestration/reviewer-decision";
-import type { AgentRole } from "@/features/agents/types";
-import { getPersonaBase } from "@/features/agents/personas";
+  getRegenerateBlockingError,
+  isDebateCompleteFromMessages,
+} from "@/ai/artifacts/regenerate-run-eligibility";
+import {
+  mapMessagesToTranscript,
+  prepareArtifactGenerationContext,
+} from "@/ai/artifacts/run-artifact-context";
+import { isSimulationBudgetExceeded } from "@/ai/orchestration/simulation-budget";
 import {
   ARTIFACT_TYPES,
-  type ArtifactType,
 } from "@/features/artifacts/schemas";
 import type { PartialRunArtifacts } from "@/features/artifacts/types";
 import {
@@ -25,76 +27,32 @@ import {
   toAppArtifactStatus,
   updateArtifactStatus,
 } from "@/lib/db/artifact-status";
-import { getRunWithMessages, touchRunActivity, updateRunStatus, updateRunSummary } from "@/lib/db/runs";
 import {
+  getRunWithMessages,
+  touchRunActivity,
+  updateRunStatus,
+  updateRunSummary,
+} from "@/lib/db/runs";
+import {
+  computeTotalDurationMs,
   mergeRunSummarySynthesisTelemetry,
   mergeRunSummaryTimingTelemetry,
+  parseRunSummary,
   RUN_SUMMARY_SYNTHESIS_VERSION,
 } from "@/lib/db/run-summary";
 import { reconcileStaleRunIfNeeded } from "@/lib/db/run-reconcile";
 import { toAppRunStatus } from "@/lib/db/run-status";
-import {
-  getTeamRoster,
-  parseTeamRoster,
-  TEAM_ROSTER_ARTIFACT_TYPE,
-} from "@/lib/db/team-roster";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
-import {
-  requireRunAccess,
-  type RunOwnershipScope,
-} from "@/lib/auth/run-ownership";
+import { requireRunAccess } from "@/lib/auth/run-ownership";
 
-function buildRosterFromMessages(
-  messages: { agentRole: string; agentName: string | null; }[],
-): TeamRoster {
-  const roster = { templateId: "software" } as TeamRoster;
+type RunWithMessages = NonNullable<Awaited<ReturnType<typeof getRunWithMessages>>>;
 
-  for (const role of SIMULATION_AGENT_ORDER) {
-    const message = messages.find((entry) => entry.agentRole === role);
-    const persona = getPersonaBase(role);
-    roster[role] = {
-      role,
-      name: message?.agentName ?? persona.name,
-      title: persona.title,
-      initials: persona.initials,
-    };
-  }
-
-  return roster;
-}
-
-function mapMessagesToTranscript(
-  messages: { agentRole: string; agentName: string | null; content: string; }[],
-): TranscriptEntry[] {
-  return messages.map((message) => {
-    const role = message.agentRole as AgentRole;
-    return {
-      role,
-      agentName: message.agentName ?? getPersonaBase(role).name,
-      content: message.content,
-    };
-  });
-}
-
-export async function regenerateRunArtifacts(
+async function loadRunForRegeneration(
   runId: string,
-  options: {
-    scope: RunOwnershipScope;
-    usageAccumulator?: RunUsageAccumulator;
-    artifactTypes?: readonly ArtifactType[];
-  },
-): Promise<RegenerateRunArtifactsResult> {
-  const access = await requireRunAccess(runId, options.scope);
-  if (!access.ok) {
-    return {
-      ok: false,
-      error: access.reason === "not_found" ? "not_found" : "forbidden",
-    };
-  }
-
+): Promise<RunWithMessages | null> {
   let run = await getRunWithMessages(runId);
   if (!run) {
-    return { ok: false, error: "not_found" };
+    return null;
   }
 
   await reconcileStaleRunIfNeeded({
@@ -105,72 +63,129 @@ export async function regenerateRunArtifacts(
     messageCount: run.messages.length,
   });
 
-  run = await getRunWithMessages(runId);
+  return getRunWithMessages(runId);
+}
+
+async function persistArtifactTiming(
+  runId: string,
+  existingSummary: string | null,
+  params: {
+    readonly artifactDurationMs: number | null;
+    readonly peakPromptTokens?: number | null;
+    readonly artifactsPending: boolean;
+  },
+): Promise<void> {
+  const existing = parseRunSummary(existingSummary);
+  const debateDurationMs = existing?.debateDurationMs ?? null;
+  const userWaitMs = params.artifactDurationMs;
+  const totalDurationMs = computeTotalDurationMs({
+    debateDurationMs,
+    artifactDurationMs: params.artifactDurationMs,
+  });
+
+  await updateRunSummary(
+    runId,
+    mergeRunSummaryTimingTelemetry(existingSummary, {
+      artifactDurationMs: params.artifactDurationMs,
+      totalDurationMs,
+      userWaitMs,
+      artifactsPending: params.artifactsPending,
+      peakPromptTokens: params.peakPromptTokens,
+    }),
+  );
+}
+
+async function finalizeRegenerateFailure(
+  runId: string,
+  status: ReturnType<typeof toAppRunStatus>,
+  existingSummary: string | null,
+  artifactDurationMs: number | null,
+  peakPromptTokens: number | null,
+): Promise<void> {
+  await persistArtifactTiming(runId, existingSummary, {
+    artifactDurationMs,
+    peakPromptTokens,
+    artifactsPending: false,
+  });
+  await updateArtifactStatus(runId, "failed");
+  if (status === "running") {
+    await updateRunStatus(runId, "complete");
+  }
+}
+
+async function finalizeRegenerateSuccess(
+  runId: string,
+  run: RunWithMessages,
+  synthesisResult: Awaited<ReturnType<typeof generateRunArtifacts>>,
+  usageAccumulator: RunUsageAccumulator | undefined,
+  status: ReturnType<typeof toAppRunStatus>,
+): Promise<PartialRunArtifacts> {
+  const bundle = runArtifactsOutputToBundle(synthesisResult.artifacts);
+  const withSynthesis = mergeRunSummarySynthesisTelemetry(run.summary, {
+    synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
+    consistencyRetries: synthesisResult.consistencyRetries,
+    stackValidationFailed: synthesisResult.stackValidationFailed,
+    crossValidationFailed: synthesisResult.crossValidationFailed,
+  });
+  const peakPromptTokens =
+    usageAccumulator?.getTotals().peakPromptTokens ?? null;
+
+  await persistArtifactTiming(runId, withSynthesis, {
+    artifactDurationMs: synthesisResult.artifactDurationMs ?? null,
+    peakPromptTokens,
+    artifactsPending: false,
+  });
+  await updateArtifactStatus(runId, "ready");
+
+  if (status !== "complete") {
+    await updateRunStatus(runId, "complete");
+  }
+
+  return bundle;
+}
+
+export async function regenerateRunArtifacts(
+  runId: string,
+  options: RegenerateRunArtifactsOptions,
+): Promise<RegenerateRunArtifactsResult> {
+  const access = await requireRunAccess(runId, options.scope);
+  if (!access.ok) {
+    return {
+      ok: false,
+      error: access.reason === "not_found" ? "not_found" : "forbidden",
+      artifactDurationMs: null,
+    };
+  }
+
+  const run = await loadRunForRegeneration(runId);
   if (!run) {
-    return { ok: false, error: "not_found" };
+    return { ok: false, error: "not_found", artifactDurationMs: null };
   }
 
   if (run.messages.length === 0) {
-    return { ok: false, error: "no_messages" };
+    return { ok: false, error: "no_messages", artifactDurationMs: null };
   }
 
   const status = toAppRunStatus(run.status);
   const artifactStatus = toAppArtifactStatus(run.artifactStatus);
-  const debateComplete = isDebateComplete(
-    run.messages.map((message) => ({
-      agentRole: message.agentRole,
-      content: message.content,
-    })),
+  const blockingError = getRegenerateBlockingError(
+    status,
+    artifactStatus,
+    isDebateCompleteFromMessages(run.messages),
   );
-
-  if (status === "idle") {
-    return { ok: false, error: "run_in_progress" };
+  if (blockingError) {
+    return { ok: false, error: blockingError, artifactDurationMs: null };
   }
 
-  if (status === "running") {
-    if (!debateComplete) {
-      return { ok: false, error: "run_in_progress" };
-    }
-    if (artifactStatus === "generating" || artifactStatus === "ready") {
-      return { ok: false, error: "run_in_progress" };
-    }
-  } else if (artifactStatus === "generating") {
-    return { ok: false, error: "run_in_progress" };
-  }
-
-  const simulationMessages = run.messages.filter((message) =>
-    isStoredSimulationAgentRole(message.agentRole),
-  );
-
-  if (simulationMessages.length === 0) {
-    return {
-      ok: false,
-      error: "generation_failed",
-    };
-  }
-
-  const rosterArtifact = run.artifacts.find(
-    (artifact) => artifact.type === TEAM_ROSTER_ARTIFACT_TYPE,
-  );
-  const roster =
-    parseTeamRoster(rosterArtifact?.data) ??
-    (await getTeamRoster(runId)) ??
-    buildRosterFromMessages(simulationMessages);
-
-  if (options.usageAccumulator) {
-    try {
-      assertSimulationWithinBudget(options.usageAccumulator);
-    } catch (error) {
-      if (isSimulationBudgetExceeded(error)) {
-        console.warn("Regenerate artifacts: budget exceeded before generation", {
-          runId,
-          estimatedCostUsd: error.estimatedCostUsd,
-          maxCostUsd: error.maxCostUsd,
-        });
-        return { ok: false, error: "budget_exceeded" };
-      }
-      throw error;
-    }
+  const prep = await prepareArtifactGenerationContext({
+    runId,
+    messages: run.messages,
+    artifacts: run.artifacts,
+    usageAccumulator: options.usageAccumulator,
+    logBudgetExceeded: true,
+  });
+  if (!prep.ok) {
+    return { ok: false, error: prep.error, artifactDurationMs: null };
   }
 
   const claimed = await claimArtifactGeneration(runId);
@@ -179,69 +194,91 @@ export async function regenerateRunArtifacts(
       ok: false,
       error: "generation_active",
       message: "A generation process is already active for this workspace.",
+      artifactDurationMs: null,
     };
   }
 
+  const artifactPhaseStartedAt = Date.now();
+  const peakPromptTokens =
+    options.usageAccumulator?.getTotals().peakPromptTokens ?? null;
+
   try {
     await touchRunActivity(runId);
+    await updateRunSummary(
+      runId,
+      mergeRunSummaryTimingTelemetry(run.summary, {
+        artifactsPending: true,
+      }),
+    );
 
     const synthesisResult = await generateRunArtifacts({
       productIdea: run.userPrompt,
-      transcript: mapMessagesToTranscript(simulationMessages),
-      roster,
+      transcript: mapMessagesToTranscript(prep.simulationMessages),
+      roster: prep.roster,
       runSummary: run.summary,
       usageAccumulator: options.usageAccumulator,
       artifactTypes: options.artifactTypes ?? ARTIFACT_TYPES,
       onArtifactComplete: async (type, document) => {
         await saveSingleArtifact(runId, type, document);
+        options.onArtifactComplete?.(type);
       },
     });
-    const bundle = runArtifactsOutputToBundle(synthesisResult.artifacts);
-    const withSynthesis = mergeRunSummarySynthesisTelemetry(run.summary, {
-      synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
-      consistencyRetries: synthesisResult.consistencyRetries,
-      stackValidationFailed: synthesisResult.stackValidationFailed,
-      crossValidationFailed: synthesisResult.crossValidationFailed,
-    });
-    const peakPromptTokens =
-      options.usageAccumulator?.getTotals().peakPromptTokens ?? null;
-    await updateRunSummary(
-      runId,
-      mergeRunSummaryTimingTelemetry(withSynthesis, {
-        artifactDurationMs: synthesisResult.artifactDurationMs ?? null,
-        peakPromptTokens,
-      }),
-    );
-    await updateArtifactStatus(runId, "ready");
-    if (status !== "complete") {
-      await updateRunStatus(runId, "complete");
-    }
 
-    return { ok: true, artifacts: bundle };
+    const bundle = await finalizeRegenerateSuccess(
+      runId,
+      run,
+      synthesisResult,
+      options.usageAccumulator,
+      status,
+    );
+
+    return {
+      ok: true,
+      artifacts: bundle,
+      artifactDurationMs: synthesisResult.artifactDurationMs ?? null,
+    };
   } catch (error) {
+    const artifactDurationMs = Date.now() - artifactPhaseStartedAt;
+
     if (isSimulationBudgetExceeded(error)) {
       console.warn("Regenerate artifacts: budget exceeded during generation", {
         runId,
         estimatedCostUsd: error.estimatedCostUsd,
         maxCostUsd: error.maxCostUsd,
+        artifactDurationMs,
       });
-      await updateArtifactStatus(runId, "failed");
-      if (status === "running") {
-        await updateRunStatus(runId, "complete");
-      }
-      return { ok: false, error: "budget_exceeded" };
+      await finalizeRegenerateFailure(
+        runId,
+        status,
+        run.summary,
+        artifactDurationMs,
+        peakPromptTokens,
+      );
+      return {
+        ok: false,
+        error: "budget_exceeded",
+        artifactDurationMs,
+      };
     }
 
-    console.error("Regenerate artifacts failed:", error);
-    await updateArtifactStatus(runId, "failed");
-    if (status === "running") {
-      await updateRunStatus(runId, "complete");
-    }
+    console.error("Regenerate artifacts failed:", {
+      runId,
+      artifactDurationMs,
+      error,
+    });
+    await finalizeRegenerateFailure(
+      runId,
+      status,
+      run.summary,
+      artifactDurationMs,
+      peakPromptTokens,
+    );
     return {
       ok: false,
       error: "generation_failed",
       message:
         error instanceof Error ? error.message : "Artifact generation failed",
+      artifactDurationMs,
     };
   }
 }

@@ -35,6 +35,15 @@ export function buildImplementationQuoteHint(roster: TeamRoster): string {
 /** Well under the 31k/42k correction dumps observed in failed runs. */
 const FEEDBACK_EXCERPT_MAX_CHARS = 1_200;
 
-export function truncateFeedbackExcerpt(feedback: string): string {
-  return compressCorrectionFeedback(feedback, FEEDBACK_EXCERPT_MAX_CHARS);
+/** Tighter cap for near-cap correction turns to leave room for substantive fixes. */
+const NEAR_CAP_FEEDBACK_EXCERPT_MAX_CHARS = 500;
+
+export function truncateFeedbackExcerpt(
+  feedback: string,
+  options?: { readonly nearCap?: boolean },
+): string {
+  const maxChars = options?.nearCap
+    ? NEAR_CAP_FEEDBACK_EXCERPT_MAX_CHARS
+    : FEEDBACK_EXCERPT_MAX_CHARS;
+  return compressCorrectionFeedback(feedback, maxChars);
 }

@@ -21,6 +21,11 @@
     "dotenv",
     "shadcn"
   ],
+  "health": {
+    "maxCyclomatic": 20,
+    "maxCognitive": 15,
+    "maxCrap": 420
+  },
   "rules": {
     "unused-files": "error",
     "unused-exports": "warn",

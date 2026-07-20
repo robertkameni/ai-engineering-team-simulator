@@ -5,7 +5,7 @@ import type { TranscriptEntry } from "@/ai/context/transcript";
 import { prepareArtifactTranscript } from "@/ai/artifacts/build-transcript";
 
 /** Max chars for the shared debate summary fed to all artifact generators. */
-export const COMPRESSED_DEBATE_SUMMARY_MAX_CHARS = 14_000;
+const COMPRESSED_DEBATE_SUMMARY_MAX_CHARS = 14_000;
 
 const PER_ROLE_EXCERPT_CHARS = 1_800;
 

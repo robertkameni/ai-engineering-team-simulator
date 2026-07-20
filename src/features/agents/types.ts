@@ -63,9 +63,12 @@ export interface MockRun {
   debateOutcome?: DebateExitOutcome | null;
   /** Approved with truncated critical turns — warning, not a downgrade. */
   postApproveTruncation?: boolean;
+  postApproveContinuationFailed?: boolean;
   debateDurationMs?: number | null;
   artifactDurationMs?: number | null;
+  userWaitMs?: number | null;
   totalDurationMs?: number | null;
+  artifactsPending?: boolean;
   peakPromptTokens?: number | null;
   stackValidationFailed?: boolean;
   crossValidationFailed?: boolean;

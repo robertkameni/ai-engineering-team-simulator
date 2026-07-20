@@ -49,8 +49,9 @@ function buildCorrectionTurnPrompt(
   role: SimulationAgentRole,
   reviewerName: string,
   feedbackExcerpt: string,
+  nearCap = false,
 ): string {
-  const excerpt = truncateFeedbackExcerpt(feedbackExcerpt);
+  const excerpt = truncateFeedbackExcerpt(feedbackExcerpt, { nearCap });
   return `
 
 CRITICAL — ${reviewerName} rejected your previous ${role} proposal. Quote their specific objection below, then address each flagged flaw with concrete revisions to your plan.
@@ -208,6 +209,7 @@ export function getAgentTurnPrompt(
       correction.targetRole,
       correction.reviewerName,
       correction.feedback,
+      correction.nearCap === true,
     );
   }
 

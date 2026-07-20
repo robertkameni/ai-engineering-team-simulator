@@ -18,6 +18,7 @@ function baseHooks(
     assertRateLimit: async () => ({ ok: true }),
     regenerateRunArtifactsWithUsage: async () => ({
       ok: true,
+      artifactDurationMs: null,
       artifacts: {
         requirements: [],
         architecture: [],
@@ -45,6 +46,7 @@ describe("regenerateRunArtifacts tenant enclosure", () => {
           regenerateCalled = true;
           return {
             ok: true,
+            artifactDurationMs: null,
             artifacts: {
               requirements: [],
               architecture: [],
@@ -97,6 +99,7 @@ describe("regenerateRunArtifacts tenant enclosure", () => {
           capturedScope = scope;
           return {
             ok: true,
+            artifactDurationMs: null,
             artifacts: {
               requirements: [],
               architecture: [],

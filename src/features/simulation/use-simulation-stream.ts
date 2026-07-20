@@ -117,6 +117,7 @@ export function useSimulationStream() {
 
       const currentRunIdRef = { current: null as string | null };
       const streamSettledRef = { current: false };
+      const artifactsSettledViaStreamRef = { current: false };
 
       try {
         const response = await fetch("/api/simulate", {
@@ -164,6 +165,7 @@ export function useSimulationStream() {
           currentRunIdRef,
           activeMessageIdRef,
           streamSettledRef,
+          artifactsSettledViaStreamRef,
           setRunId,
           setStatus,
           setError,

@@ -15,6 +15,7 @@ export interface DebateTurnContext {
     reviewerName: string;
     feedback: string;
     targetRole: SimulationAgentRole;
+    nearCap?: boolean;
   };
   focusedOpsFollowUp?: {
     reviewerName: string;
@@ -37,6 +38,7 @@ export function resolveDebateTurnContext(
   roster: TeamRoster,
   lastRejectTarget: SimulationAgentRole | null,
   lastRejectFeedback: string | null,
+  options?: { readonly nearCapCorrection?: boolean },
 ): DebateTurnContext {
   const reviewerName = getTeamMember(roster, "reviewer").name;
 
@@ -51,6 +53,7 @@ export function resolveDebateTurnContext(
         reviewerName,
         feedback: lastRejectFeedback,
         targetRole: role,
+        nearCap: options?.nearCapCorrection === true,
       },
     };
   }

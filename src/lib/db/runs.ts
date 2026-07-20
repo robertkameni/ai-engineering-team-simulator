@@ -137,21 +137,31 @@ export async function appendMessage(
 ) {
   const now = new Date();
 
-  return prisma.$transaction([
-    prisma.message.create({
-      data: {
-        runId,
-        agentRole,
-        agentName,
-        content,
-        order,
-      },
-    }),
-    prisma.run.update({
+  // Sequential writes avoid Neon WebSocket pool stalls on `$transaction`
+  // ("Unable to start a transaction in the given time") during long debates.
+  const message = await prisma.message.create({
+    data: {
+      runId,
+      agentRole,
+      agentName,
+      content,
+      order,
+    },
+  });
+
+  try {
+    await prisma.run.update({
       where: { id: runId },
       data: { updatedAt: now },
-    }),
-  ]);
+    });
+  } catch (error) {
+    console.warn("appendMessage: failed to touch run updatedAt", {
+      runId,
+      error,
+    });
+  }
+
+  return message;
 }
 
 export async function getRunWithMessages(runId: string) {
@@ -354,6 +364,62 @@ async function refreshRunAfterReconcile(
   return getRunWithMessages(runId);
 }
 
+function buildOpsFollowUpFromSummary(
+  summaryPayload: ReturnType<typeof parseRunSummary>,
+) {
+  if (!summaryPayload?.opsFollowUpEvaluated) {
+    return opsFollowUpFieldsFromCheckpoint(null);
+  }
+
+  return opsFollowUpFieldsFromCheckpoint({
+    opsFollowUpEvaluated: summaryPayload.opsFollowUpEvaluated,
+    opsFollowUpTriggered: summaryPayload.opsFollowUpTriggered ?? false,
+    opsFollowUpSkipReason: summaryPayload.opsFollowUpSkipReason ?? null,
+    opsFollowUpEligible: summaryPayload.opsFollowUpEligible ?? false,
+    opsFollowUpUnresolvedDevopsIssueCount:
+      summaryPayload.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+    opsFollowUpLastCorrectionRole:
+      summaryPayload.opsFollowUpLastCorrectionRole ?? null,
+    opsFollowUpEvaluationTurn:
+      summaryPayload.opsFollowUpEvaluationTurn ?? null,
+  });
+}
+
+function buildUsageWithSummaryTelemetry(
+  usage: ReturnType<typeof mapUsageFromRun>,
+  summaryPayload: ReturnType<typeof parseRunSummary>,
+): ReturnType<typeof mapUsageFromRun> {
+  const isUsageMissing =
+    usage.usageMissing === true ||
+    (usage.totalTokens === 0 && summaryPayload?.debateOutcome != null);
+
+  return {
+    ...usage,
+    peakPromptTokens: summaryPayload?.peakPromptTokens ?? usage.peakPromptTokens,
+    usageMissing: isUsageMissing ? true : usage.usageMissing,
+  };
+}
+
+function buildSummaryTelemetryFields(
+  summaryPayload: ReturnType<typeof parseRunSummary>,
+) {
+  return {
+    postApproveTruncation: summaryPayload?.postApproveTruncation === true,
+    postApproveContinuationFailed:
+      summaryPayload?.postApproveContinuationFailed === true,
+    debateDurationMs: summaryPayload?.debateDurationMs ?? null,
+    artifactDurationMs: summaryPayload?.artifactDurationMs ?? null,
+    userWaitMs: summaryPayload?.userWaitMs ?? null,
+    totalDurationMs: summaryPayload?.totalDurationMs ?? null,
+    artifactsPending: summaryPayload?.artifactsPending === true,
+    peakPromptTokens: summaryPayload?.peakPromptTokens ?? null,
+    stackValidationFailed: summaryPayload?.stackValidationFailed === true,
+    crossValidationFailed: summaryPayload?.crossValidationFailed === true,
+    opsFollowUpArchitectCheckpoint:
+      summaryPayload?.opsFollowUpArchitectCheckpoint ?? null,
+  };
+}
+
 async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
   const rosterFromArtifact = run.artifacts.find(
     (artifact) => artifact.type === "team-roster",
@@ -362,64 +428,24 @@ async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
     parseTeamRoster(rosterFromArtifact?.data) ??
     (await getTeamRoster(run.id));
 
-  const title = formatRunTitle(run.userPrompt);
-
-  const artifacts = mapDbArtifactsToRunArtifacts(run.artifacts);
   const runStatus = toAppRunStatus(run.status);
   const artifactStatus = toAppArtifactStatus(run.artifactStatus);
-  const artifactsStatus = deriveArtifactsPanelStatus(runStatus, artifactStatus);
-
   const summaryPayload = parseRunSummary(run.summary);
-  const opsFollowUp = opsFollowUpFieldsFromCheckpoint(
-    summaryPayload?.opsFollowUpEvaluated
-      ? {
-          opsFollowUpEvaluated: summaryPayload.opsFollowUpEvaluated,
-          opsFollowUpTriggered: summaryPayload.opsFollowUpTriggered ?? false,
-          opsFollowUpSkipReason: summaryPayload.opsFollowUpSkipReason ?? null,
-          opsFollowUpEligible: summaryPayload.opsFollowUpEligible ?? false,
-          opsFollowUpUnresolvedDevopsIssueCount:
-            summaryPayload.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
-          opsFollowUpLastCorrectionRole:
-            summaryPayload.opsFollowUpLastCorrectionRole ?? null,
-          opsFollowUpEvaluationTurn:
-            summaryPayload.opsFollowUpEvaluationTurn ?? null,
-        }
-      : null,
-  );
-
-  const usage = mapUsageFromRun(run);
-  const usageWithTelemetry: typeof usage = {
-    ...usage,
-    peakPromptTokens: summaryPayload?.peakPromptTokens ?? usage.peakPromptTokens,
-    usageMissing:
-      usage.usageMissing === true ||
-      (usage.totalTokens === 0 && summaryPayload?.debateOutcome != null)
-        ? true
-        : usage.usageMissing,
-  };
 
   return {
     id: run.id,
-    title,
+    title: formatRunTitle(run.userPrompt),
     userPrompt: run.userPrompt,
     status: runStatus,
     updatedAt: run.updatedAt.toISOString(),
     userId: run.userId,
-    usage: usageWithTelemetry,
+    usage: buildUsageWithSummaryTelemetry(mapUsageFromRun(run), summaryPayload),
     messages: mapDbMessagesToSimulation(run.messages, roster),
-    artifacts,
-    artifactsStatus,
+    artifacts: mapDbArtifactsToRunArtifacts(run.artifacts),
+    artifactsStatus: deriveArtifactsPanelStatus(runStatus, artifactStatus),
     debateOutcome: parseDebateOutcomeFromRunSummary(run.summary),
-    postApproveTruncation: summaryPayload?.postApproveTruncation === true,
-    debateDurationMs: summaryPayload?.debateDurationMs ?? null,
-    artifactDurationMs: summaryPayload?.artifactDurationMs ?? null,
-    totalDurationMs: summaryPayload?.totalDurationMs ?? null,
-    peakPromptTokens: summaryPayload?.peakPromptTokens ?? null,
-    stackValidationFailed: summaryPayload?.stackValidationFailed === true,
-    crossValidationFailed: summaryPayload?.crossValidationFailed === true,
-    ...opsFollowUp,
-    opsFollowUpArchitectCheckpoint:
-      summaryPayload?.opsFollowUpArchitectCheckpoint ?? null,
+    ...buildSummaryTelemetryFields(summaryPayload),
+    ...buildOpsFollowUpFromSummary(summaryPayload),
   };
 }
 

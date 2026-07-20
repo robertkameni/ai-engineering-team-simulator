@@ -222,7 +222,22 @@ export function evaluateOpsFollowUpTrigger(
   }
 
   if (!isArchitectCorrectionAfterReview(state.transcript)) {
-    return baseEvaluation("not_architect_correction_after_review");
+    const maxTurns = getMaxSimulationTurns(ctx.templateId);
+    const remainingBudget = maxTurns - state.turnCount;
+    const lastEntry = state.transcript[state.transcript.length - 1];
+    const isFailedArchitectCorrection =
+      lastEntry?.role === "architect" && lastEntry.isCorrectionFailed === true;
+
+    // Near-cap escape only: invite DevOps when unresolved ops remain after
+    // non-architect corrections (finance pattern). Mid-debate backend/frontend
+    // corrections stay out of scope. Failed architect corrections always skip.
+    if (
+      isFailedArchitectCorrection ||
+      blockers.length === 0 ||
+      remainingBudget > 3
+    ) {
+      return baseEvaluation("not_architect_correction_after_review");
+    }
   }
 
   if (state.lastRejectTarget === "devops") {
@@ -242,7 +257,10 @@ export function evaluateOpsFollowUpTrigger(
   }
 
   const maxTurns = getMaxSimulationTurns(ctx.templateId);
-  if (!canScheduleOpsFollowUp(state.turnCount, maxTurns)) {
+  const remainingBudget = maxTurns - state.turnCount;
+  // Near-cap escape: allow a focused DevOps turn when the normal revision
+  // finish budget (4 turns) would block, as long as devops + re-review fit.
+  if (!canScheduleOpsFollowUp(state.turnCount, maxTurns) && remainingBudget < 2) {
     return baseEvaluation("insufficient_turn_budget");
   }
 

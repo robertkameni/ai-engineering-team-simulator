@@ -43,8 +43,17 @@ export type SimulationStreamEvent =
       type: "artifacts_start";
     }
   | {
+      type: "artifact_complete";
+      artifactType: string;
+    }
+  | {
+      type: "all_artifacts_complete";
+    }
+  | {
       type: "done";
       runId: string;
+      /** True when synthesis timed out; client should fall back to polling. */
+      artifactTimeout?: boolean;
     }
   | {
       type: "error";

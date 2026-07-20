@@ -44,6 +44,8 @@ import { syncHasTruncatedCriticalTurn } from "@/ai/orchestration/truncation-appr
 import {
   selectSilentRoleNearCap,
   shouldInviteDevOps,
+  shouldPreferNearCapApprove,
+  NEAR_CAP_APPROVE_REMAINING_TURNS,
 } from "@/ai/orchestration/role-participation";
 import { shouldTriggerSoftwareEarlyReview as shouldTriggerSoftwareEarlyReviewGate } from "@/ai/orchestration/software-early-review";
 import { resolveReviewerOutcome } from "@/ai/orchestration/resolve-reviewer-outcome";
@@ -69,6 +71,7 @@ import {
   scheduleOpsFollowUpTurn,
   recordOpsFollowUpCheckpoint,
   selectOpsFollowUpSummary,
+  getUnresolvedDevOpsIssues,
 } from "@/ai/orchestration/ops-follow-up";
 import { opsFollowUpFieldsFromCheckpoint } from "@/lib/db/ops-follow-up-summary";
 import {
@@ -96,7 +99,6 @@ export async function runSimulation(
   const usageAccumulator =
     options.usageAccumulator ?? new RunUsageAccumulator();
   const abortSignal = options.abortSignal;
-  const runStartedAt = Date.now();
   const run = await createRun(productIdea, {
     userId: options.userId,
     guestSessionId: options.guestSessionId,
@@ -142,6 +144,8 @@ export async function runSimulation(
       isArchitectRevision: false,
       hasTruncatedCriticalTurn: false,
       postApproveTruncation: false,
+      postApproveContinuationFailed: false,
+      truncationRecoveryAttemptedRoles: [],
       reviewIssues: [],
       isGateReroute: false,
       hasHadEarlyReview: false,
@@ -183,10 +187,14 @@ export async function runSimulation(
         turnCount: state.turnCount,
         hasTruncatedCriticalTurn: state.hasTruncatedCriticalTurn || undefined,
         postApproveTruncation: state.postApproveTruncation || undefined,
+        postApproveContinuationFailed:
+          state.postApproveContinuationFailed || undefined,
         openReviewIssueCount: buildIssueSnapshot(state.reviewIssues).totalOpen || undefined,
         debateDurationMs,
         artifactDurationMs: null,
-        totalDurationMs: Date.now() - runStartedAt,
+        userWaitMs: null,
+        totalDurationMs: debateDurationMs,
+        artifactsPending: true,
         peakPromptTokens: usageTotals.peakPromptTokens ?? null,
         ...opsFollowUpFieldsFromCheckpoint(opsFollowUpSummary.last),
         opsFollowUpArchitectCheckpoint: architectCheckpoint,
@@ -216,6 +224,10 @@ export async function runSimulation(
   }
 }
 
+type LoopStepResult =
+  | { action: "continue" }
+  | { action: "break"; outcome: DebateExitOutcome };
+
 async function runDebateLoop(
   state: DebateState,
   ctx: TurnContext,
@@ -225,117 +237,210 @@ async function runDebateLoop(
   while (state.turnCount < maxTurns) {
     assertNotAborted(ctx.abortSignal);
 
-    const participationDirective = ensureRoleParticipationBeforeClose(
+    const participationStep = applyParticipationDirective(state, ctx, maxTurns);
+    if (participationStep.action === "break") {
+      return participationStep.outcome;
+    }
+
+    const directive = await runDebateTurn(state, ctx);
+    const turnStep = applyTurnDirectiveBreakOrReroute(
+      directive,
       state,
       ctx,
       maxTurns,
     );
-    if (participationDirective) {
-      if (participationDirective.kind === "break") {
-        return participationDirective.outcome;
-      }
-      if (participationDirective.kind === "reroute") {
-        state.nextRole = participationDirective.targetRole;
-        continue;
-      }
+    if (turnStep === "rerouted") {
+      continue;
+    }
+    if (turnStep.action === "break") {
+      return turnStep.outcome;
     }
 
-    const directive = await runDebateTurn(state, ctx);
-
-    if (directive.kind === "break") {
-      if (state.turnCount >= maxTurns) {
-        console.warn("Simulation reached maxTurns", { runId: ctx.runId, maxTurns });
-      }
-      return directive.outcome;
-    }
-
-    if (directive.kind === "reroute") {
-      state.nextRole = directive.targetRole;
-
-      if (!state.isGateReroute) {
-        state.returnToReviewer = true;
-      }
-      state.isGateReroute = false;
+    if (applySpecialRouting(state, ctx) === "rerouted") {
       continue;
     }
 
-    if (shouldTriggerArchitectRevision(state, ctx)) {
-      state.isArchitectRevision = true;
-      state.nextRole = "architect";
-      state.returnToReviewer = true;
-      state.roleCorrectionCounts = incrementRoleCorrectionCount(
-        state.roleCorrectionCounts,
-        "architect",
-      );
+    if (applyProgressFollowUps(state, ctx, directive) === "rerouted") {
       continue;
     }
 
-    if (shouldTriggerSoftwareEarlyReview(state, ctx)) {
-      state.nextRole = "reviewer";
-      state.hasHadEarlyReview = true;
-      continue;
-    }
-
-    if (directive.kind === "progress") {
-      const evaluation = recordOpsFollowUpCheckpoint(state, ctx);
-      const checkpoint = state.opsFollowUpCheckpoint;
-
-      if (evaluation?.shouldTrigger) {
-        console.info("OPS FOLLOW-UP CHECKPOINT triggered", {
-          runId: ctx.runId,
-          templateId: ctx.templateId,
-          turnCount: state.turnCount,
-          lastRejectTarget: state.lastRejectTarget,
-          unresolvedDevOpsIssueCount: evaluation.unresolvedDevOpsIssueCount,
-          blockers: evaluation.blockers,
-          lastCorrectionRole: checkpoint?.opsFollowUpLastCorrectionRole,
-        });
-        scheduleOpsFollowUpTurn(state, ctx, evaluation);
-        continue;
-      }
-
-      if (checkpoint?.opsFollowUpEvaluated) {
-        console.info("OPS FOLLOW-UP CHECKPOINT skipped", {
-          runId: ctx.runId,
-          templateId: ctx.templateId,
-          turnCount: state.turnCount,
-          skipReason: checkpoint.opsFollowUpSkipReason,
-          unresolvedDevOpsIssueCount: checkpoint.opsFollowUpUnresolvedDevopsIssueCount,
-          lastCorrectionRole: checkpoint.opsFollowUpLastCorrectionRole,
-          eligible: checkpoint.opsFollowUpEligible,
-        });
-      }
-
-      const devopsInvite = maybeScheduleDevOpsInvite(state, ctx);
-      if (devopsInvite) {
-        state.nextRole = devopsInvite;
-        continue;
-      }
-    }
-
-    if (!applyLinearProgression(state)) {
-      const silentRole = selectSilentRoleNearCap({
-        transcript: state.transcript,
-        turnCount: state.turnCount,
-        maxTurns,
-        preferDevOps: true,
-      });
-      if (silentRole && state.turnCount < maxTurns) {
-        console.info("ROLE PARTICIPATION: scheduling silent role before cap", {
-          runId: ctx.runId,
-          silentRole,
-          turnCount: state.turnCount,
-          maxTurns,
-        });
-        state.nextRole = silentRole;
-        continue;
-      }
-      return "cap_reached";
+    const progressionStep = applyLinearProgressionOrCap(state, ctx, maxTurns);
+    if (progressionStep.action === "break") {
+      return progressionStep.outcome;
     }
   }
 
   console.warn("Simulation reached maxTurns", { runId: ctx.runId, maxTurns });
   return "cap_reached";
+}
+
+function applyParticipationDirective(
+  state: DebateState,
+  ctx: TurnContext,
+  maxTurns: number,
+): LoopStepResult {
+  const participationDirective = ensureRoleParticipationBeforeClose(
+    state,
+    ctx,
+    maxTurns,
+  );
+  if (!participationDirective) {
+    return { action: "continue" };
+  }
+  if (participationDirective.kind === "break") {
+    return { action: "break", outcome: participationDirective.outcome };
+  }
+
+  if (participationDirective.kind === "reroute") {
+    state.nextRole = participationDirective.targetRole;
+    return { action: "continue" };
+  }
+
+  return { action: "continue" };
+}
+
+function applyTurnDirectiveBreakOrReroute(
+  directive: TurnDirective,
+  state: DebateState,
+  ctx: TurnContext,
+  maxTurns: number,
+): LoopStepResult | "rerouted" {
+  if (directive.kind === "break") {
+    if (state.turnCount >= maxTurns) {
+      console.warn("Simulation reached maxTurns", { runId: ctx.runId, maxTurns });
+    }
+    return { action: "break", outcome: directive.outcome };
+  }
+
+  if (directive.kind !== "reroute") {
+    return { action: "continue" };
+  }
+
+  state.nextRole = directive.targetRole;
+  if (!state.isGateReroute) {
+    state.returnToReviewer = true;
+  }
+  state.isGateReroute = false;
+  return "rerouted";
+}
+
+function applySpecialRouting(
+  state: DebateState,
+  ctx: TurnContext,
+): "continue" | "rerouted" {
+  if (shouldTriggerArchitectRevision(state, ctx)) {
+    state.isArchitectRevision = true;
+    state.nextRole = "architect";
+    state.returnToReviewer = true;
+    state.roleCorrectionCounts = incrementRoleCorrectionCount(
+      state.roleCorrectionCounts,
+      "architect",
+    );
+    return "rerouted";
+  }
+
+  if (!shouldTriggerSoftwareEarlyReview(state, ctx)) {
+    return "continue";
+  }
+
+  state.nextRole = "reviewer";
+  state.hasHadEarlyReview = true;
+  return "rerouted";
+}
+
+function applyProgressFollowUps(
+  state: DebateState,
+  ctx: TurnContext,
+  directive: TurnDirective,
+): "continue" | "rerouted" {
+  if (directive.kind !== "progress") {
+    return "continue";
+  }
+
+  const evaluation = recordOpsFollowUpCheckpoint(state, ctx);
+  const checkpoint = state.opsFollowUpCheckpoint;
+
+  if (evaluation?.shouldTrigger) {
+    console.info("OPS FOLLOW-UP CHECKPOINT triggered", {
+      runId: ctx.runId,
+      templateId: ctx.templateId,
+      turnCount: state.turnCount,
+      lastRejectTarget: state.lastRejectTarget,
+      unresolvedDevOpsIssueCount: evaluation.unresolvedDevOpsIssueCount,
+      blockers: evaluation.blockers,
+      lastCorrectionRole: checkpoint?.opsFollowUpLastCorrectionRole,
+    });
+    scheduleOpsFollowUpTurn(state, ctx, evaluation);
+    return "rerouted";
+  }
+
+  if (checkpoint?.opsFollowUpEvaluated) {
+    console.info("OPS FOLLOW-UP CHECKPOINT skipped", {
+      runId: ctx.runId,
+      templateId: ctx.templateId,
+      turnCount: state.turnCount,
+      skipReason: checkpoint.opsFollowUpSkipReason,
+      unresolvedDevOpsIssueCount: checkpoint.opsFollowUpUnresolvedDevopsIssueCount,
+      lastCorrectionRole: checkpoint.opsFollowUpLastCorrectionRole,
+      eligible: checkpoint.opsFollowUpEligible,
+    });
+  }
+
+  const devopsInvite = maybeScheduleDevOpsInvite(state, ctx);
+  if (!devopsInvite) {
+    return "continue";
+  }
+
+  state.nextRole = devopsInvite;
+  return "rerouted";
+}
+
+function applyLinearProgressionOrCap(
+  state: DebateState,
+  ctx: TurnContext,
+  maxTurns: number,
+): LoopStepResult {
+  if (applyLinearProgression(state)) {
+    return { action: "continue" };
+  }
+
+  const silentRole = selectSilentRoleNearCap({
+    transcript: state.transcript,
+    turnCount: state.turnCount,
+    maxTurns,
+    preferDevOps: true,
+  });
+  if (silentRole && state.turnCount < maxTurns) {
+    console.info("ROLE PARTICIPATION: scheduling silent role before cap", {
+      runId: ctx.runId,
+      silentRole,
+      turnCount: state.turnCount,
+      maxTurns,
+    });
+    state.nextRole = silentRole;
+    return { action: "continue" };
+  }
+
+  const openIssueCount = buildIssueSnapshot(state.reviewIssues).totalOpen;
+  if (
+    shouldPreferNearCapApprove({
+      transcript: state.transcript,
+      turnCount: state.turnCount,
+      maxTurns,
+      openIssueCount,
+      unresolvedOpsIssueCount: getUnresolvedDevOpsIssues(state.reviewIssues).length,
+    })
+  ) {
+    console.info("NEAR-CAP APPROVE: closing with approve instead of cap_reached", {
+      runId: ctx.runId,
+      turnCount: state.turnCount,
+      maxTurns,
+      openIssueCount,
+    });
+    return { action: "break", outcome: "approved" };
+  }
+
+  return { action: "break", outcome: "cap_reached" };
 }
 
 function ensureRoleParticipationBeforeClose(
@@ -533,6 +638,11 @@ async function runDebateTurn(
     ctx.roster,
     state.lastRejectTarget,
     state.lastRejectFeedback,
+    {
+      nearCapCorrection:
+        getMaxSimulationTurns(ctx.templateId) - state.turnCount <=
+        NEAR_CAP_APPROVE_REMAINING_TURNS,
+    },
   );
 
   enrichDebateContext(role, state, ctx, debateContext);
@@ -558,52 +668,24 @@ async function runDebateTurn(
 
   const contentToPersist = normalizeTurnContent(role, fullText);
 
-  const gateDirective = await handleArchitectQualityGate(role, contentToPersist, ctx, state);
+  const gateDirective = await handleArchitectQualityGate(
+    role,
+    contentToPersist,
+    ctx,
+    state,
+  );
   if (gateDirective) {
     return gateDirective;
   }
 
-  const isCorrectionTurn = debateContext.correction != null;
-  let correctionValidation: CorrectionValidationResult | null = null;
-
-  if (state.focusedOpsFollowUp && role === "devops") {
-    markDevOpsOperationalIssuesAttempted(
-      state.reviewIssues,
-      state.turnCount,
-    );
-  }
-
-  if (isCorrectionTurn) {
-    const targetRole = debateContext.correction!.targetRole;
-
-    markIssuesAttempted(state.reviewIssues, targetRole, state.turnCount);
-
-    const previousEntry = findLastTranscriptEntry(state.transcript, targetRole);
-    const feedback = state.lastRejectFeedback ?? "";
-
-    if (previousEntry) {
-      correctionValidation = validateCorrectionTurn(
-        previousEntry.content,
-        contentToPersist,
-        feedback,
-        targetRole,
-      );
-
-      if (!correctionValidation.isValid) {
-        console.warn(
-          `CORRECTION LOOP FAILURE: ${role} correction rejected by validation gate`,
-          {
-            runId: ctx.runId,
-            role,
-            failureReason: correctionValidation.failureReason,
-            textSimilarity: correctionValidation.textSimilarity.toFixed(2),
-          },
-        );
-
-        markIssuesFailedValidation(state.reviewIssues, targetRole);
-      }
-    }
-  }
+  const correctionValidation = validateCorrectionIfNeeded(
+    state,
+    ctx,
+    role,
+    debateContext,
+    contentToPersist,
+  );
+  markDevOpsIssuesIfNeeded(state, role);
 
   await persistTurn(
     role,
@@ -615,6 +697,80 @@ async function runDebateTurn(
     correctionValidation,
   );
 
+  clearPostTurnFlags(state, role);
+
+  const failedCorrectionDirective = resolveFailedCorrectionDirective(
+    state,
+    ctx,
+    role,
+    debateContext,
+    correctionValidation,
+  );
+  if (failedCorrectionDirective) {
+    return failedCorrectionDirective;
+  }
+
+  return resolveReviewerOutcome(role, fullText, state, ctx);
+}
+
+function markDevOpsIssuesIfNeeded(
+  state: DebateState,
+  role: SimulationAgentRole,
+): void {
+  if (!state.focusedOpsFollowUp || role !== "devops") {
+    return;
+  }
+
+  markDevOpsOperationalIssuesAttempted(state.reviewIssues, state.turnCount);
+}
+
+function validateCorrectionIfNeeded(
+  state: DebateState,
+  ctx: TurnContext,
+  role: SimulationAgentRole,
+  debateContext: ReturnType<typeof resolveDebateTurnContext>,
+  contentToPersist: string,
+): CorrectionValidationResult | null {
+  if (!debateContext.correction) {
+    return null;
+  }
+
+  const targetRole = debateContext.correction.targetRole;
+  markIssuesAttempted(state.reviewIssues, targetRole, state.turnCount);
+
+  const previousEntry = findLastTranscriptEntry(state.transcript, targetRole);
+  if (!previousEntry) {
+    return null;
+  }
+
+  const feedback = state.lastRejectFeedback ?? "";
+  const correctionValidation = validateCorrectionTurn(
+    previousEntry.content,
+    contentToPersist,
+    feedback,
+    targetRole,
+  );
+
+  if (!correctionValidation.isValid) {
+    console.warn(
+      `CORRECTION LOOP FAILURE: ${role} correction rejected by validation gate`,
+      {
+        runId: ctx.runId,
+        role,
+        failureReason: correctionValidation.failureReason,
+        textSimilarity: correctionValidation.textSimilarity.toFixed(2),
+      },
+    );
+    markIssuesFailedValidation(state.reviewIssues, targetRole);
+  }
+
+  return correctionValidation;
+}
+
+function clearPostTurnFlags(
+  state: DebateState,
+  role: SimulationAgentRole,
+): void {
   if (state.isArchitectRevision) {
     state.isArchitectRevision = false;
   }
@@ -622,34 +778,41 @@ async function runDebateTurn(
   if (role === "devops" && state.focusedOpsFollowUp) {
     state.focusedOpsFollowUp = null;
   }
+}
 
-  // Invalid corrections must not reach re-review.
-  if (isCorrectionTurn && correctionValidation && !correctionValidation.isValid) {
-    console.warn(
-      `CORRECTION LOOP FAILURE: Blocking re-review for failed ${role} correction`,
-      {
-        runId: ctx.runId,
-        role,
-        failureReason: correctionValidation.failureReason,
-      },
-    );
-
-    if (hasExceededReviewerRejectionCap(state.reviewerRejectionCount)) {
-      return { kind: "break", outcome: "cap_reached" };
-    }
-
-    state.reviewerRejectionCount += 1;
-    if (state.lastRejectTarget) {
-      state.roleCorrectionCounts = incrementRoleCorrectionCount(
-        state.roleCorrectionCounts,
-        state.lastRejectTarget,
-      );
-    }
-
-    return { kind: "reroute", targetRole: state.lastRejectTarget ?? role };
+function resolveFailedCorrectionDirective(
+  state: DebateState,
+  ctx: TurnContext,
+  role: SimulationAgentRole,
+  debateContext: ReturnType<typeof resolveDebateTurnContext>,
+  correctionValidation: CorrectionValidationResult | null,
+): TurnDirective | null {
+  if (!debateContext.correction || !correctionValidation || correctionValidation.isValid) {
+    return null;
   }
 
-  return resolveReviewerOutcome(role, fullText, state, ctx);
+  console.warn(
+    `CORRECTION LOOP FAILURE: Blocking re-review for failed ${role} correction`,
+    {
+      runId: ctx.runId,
+      role,
+      failureReason: correctionValidation.failureReason,
+    },
+  );
+
+  if (hasExceededReviewerRejectionCap(state.reviewerRejectionCount)) {
+    return { kind: "break", outcome: "cap_reached" };
+  }
+
+  state.reviewerRejectionCount += 1;
+  if (state.lastRejectTarget) {
+    state.roleCorrectionCounts = incrementRoleCorrectionCount(
+      state.roleCorrectionCounts,
+      state.lastRejectTarget,
+    );
+  }
+
+  return { kind: "reroute", targetRole: state.lastRejectTarget ?? role };
 }
 
 async function executeDebateTurn(

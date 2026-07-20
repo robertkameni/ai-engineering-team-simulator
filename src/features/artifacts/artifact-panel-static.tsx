@@ -1,22 +1,16 @@
 import { ArtifactSections } from "@/features/artifacts/artifact-sections";
 import { BlueprintTabContent } from "@/features/artifacts/blueprint-tab-content";
 import { ArtifactPanelPlaceholder } from "@/features/artifacts/artifact-panel-placeholder";
-import { RegenerateArtifactsButton } from "@/features/artifacts/regenerate-artifacts-button";
-import { ArtifactDebateWarningBanner } from "@/features/artifacts/artifact-debate-warning-banner";
-import { ArtifactSynthesisWarningBanner } from "@/features/artifacts/artifact-synthesis-warning-banner";
+import { ArtifactPanelHeader } from "@/features/artifacts/artifact-panel-header";
+import { ArtifactPanelWarnings } from "@/features/artifacts/artifact-panel-warnings";
+import { buildArtifactPanelViewState } from "@/features/artifacts/artifact-panel-view-state";
 import {
-    artifactPanelSubtitle,
     countRunArtifacts,
     debateProgressFromMessages,
-    isUnapprovedDebateOutcome,
     shouldShowArtifactTabs,
 } from "@/features/artifacts/artifact-panel-phase";
-import {
-  hasSynthesisValidationWarnings,
-  parseSynthesisValidationFlags,
-} from "@/features/artifacts/synthesis-validation";
 import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skeleton";
-import { ARTIFACT_TAB_LIST_CLASS, ARTIFACT_TAB_TRIGGER_STATIC, getArtifactTabConfig } from "@/features/artifacts/artifact-tab-styles";
+import { ARTIFACT_TAB_LIST_CLASS, ARTIFACT_TAB_TRIGGER_STATIC } from "@/features/artifacts/artifact-tab-styles";
 import type {
     ArtifactsPanelStatus,
     PartialRunArtifacts,
@@ -54,25 +48,16 @@ export function ArtifactPanelStatic({
   const showTabs = shouldShowArtifactTabs(status, artifacts);
   const showRegenerate = canRegenerateArtifacts && regenerateRunId != null;
   const debateProgress = debateProgressFromMessages(debateMessages, null);
-  const artifactCount = countRunArtifacts(artifacts);
-  const synthesisValidation = parseSynthesisValidationFlags(
-    stackValidationFailed,
-    crossValidationFailed,
-  );
-  const subtitle = artifactPanelSubtitle(
+  const viewState = buildArtifactPanelViewState({
     status,
     debateProgress,
-    artifactCount,
+    artifactCount: countRunArtifacts(artifacts),
     debateOutcome,
-    synthesisValidation,
-  );
-  const showDebateWarning =
-    (isUnapprovedDebateOutcome(debateOutcome) || postApproveTruncation) &&
-    (status === "ready" || status === "generating");
-  const showSynthesisWarning =
-    hasSynthesisValidationWarnings(synthesisValidation) &&
-    (status === "ready" || status === "generating");
-  const artifactTabs = getArtifactTabConfig(teamRoster?.templateId ?? "software");
+    stackValidationFailed,
+    crossValidationFailed,
+    postApproveTruncation,
+    templateId: teamRoster?.templateId,
+  });
 
   return (
     <aside
@@ -81,33 +66,24 @@ export function ArtifactPanelStatic({
         "h-full max-h-none w-[min(100%,420px)] border-l border-glass-border min-[960px]:flex",
       )}
     >
-      <header className="flex shrink-0 items-start justify-between gap-2 border-b border-glass-border px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-title font-semibold tracking-tight">Artifacts</h2>
-          <p className="mt-0.5 text-caption text-muted-foreground">{subtitle}</p>
-        </div>
-        {showRegenerate ? (
-          <RegenerateArtifactsButton
-            runId={regenerateRunId}
-            disabled={status === "generating" || status === "pending"}
-          />
-        ) : null}
-      </header>
+      <ArtifactPanelHeader
+        subtitle={viewState.subtitle}
+        showRegenerate={showRegenerate}
+        regenerateRunId={regenerateRunId ?? ""}
+        status={status}
+      />
 
-      {showDebateWarning ? (
-        <ArtifactDebateWarningBanner
-          debateOutcome={debateOutcome}
-          postApproveTruncation={postApproveTruncation}
-        />
-      ) : null}
-
-      {showSynthesisWarning ? (
-        <ArtifactSynthesisWarningBanner synthesisValidation={synthesisValidation} />
-      ) : null}
+      <ArtifactPanelWarnings
+        showDebateWarning={viewState.showDebateWarning}
+        showSynthesisWarning={viewState.showSynthesisWarning}
+        debateOutcome={debateOutcome}
+        postApproveTruncation={postApproveTruncation}
+        synthesisValidation={viewState.synthesisValidation}
+      />
 
       {showTabs ? (
         <div className="artifact-static-tabs flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          {artifactTabs.map((tab, index) => (
+          {viewState.artifactTabs.map((tab, index) => (
             <input
               key={tab.value}
               type="radio"
@@ -128,7 +104,7 @@ export function ArtifactPanelStatic({
             role="tablist"
             aria-label="Artifact categories"
           >
-            {artifactTabs.map((tab) => (
+            {viewState.artifactTabs.map((tab) => (
               <label
                 key={tab.value}
                 htmlFor={`artifact-tab-${tab.value}`}
@@ -141,7 +117,7 @@ export function ArtifactPanelStatic({
           </div>
 
           <div className="artifact-static-panels flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            {artifactTabs.map((tab) => (
+            {viewState.artifactTabs.map((tab) => (
               <div
                 key={tab.value}
                 role="tabpanel"

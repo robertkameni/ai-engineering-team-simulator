@@ -42,6 +42,16 @@ export interface DebateState {
   hasTruncatedCriticalTurn: boolean;
   /** Set when reviewer [APPROVE] lands despite truncated critical turns. */
   postApproveTruncation: boolean;
+  /**
+   * True when a post-approve truncation recovery turn was attempted and the
+   * critical turn remained truncated (or budget blocked a second recovery).
+   */
+  postApproveContinuationFailed: boolean;
+  /**
+   * Critical roles already given a post-approve truncation recovery turn.
+   * Prevents infinite recovery loops when a retry stays truncated.
+   */
+  truncationRecoveryAttemptedRoles: SimulationAgentRole[];
   reviewIssues: ReviewIssue[];
   isGateReroute: boolean;
   hasHadEarlyReview: boolean;

@@ -11,7 +11,11 @@ import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
 import { formatMessageTime } from "@/lib/format-time";
 
-import { pollArtifactsUntilSettled, type ArtifactPollSetters } from "./simulation-stream-polling";
+import {
+  fetchArtifactsOnce,
+  pollArtifactsUntilSettled,
+  type ArtifactPollSetters,
+} from "./simulation-stream-polling";
 
 export type SimulationStreamEventContext = ArtifactPollSetters & {
   signal: AbortSignal;
@@ -28,7 +32,24 @@ export type SimulationStreamEventContext = ArtifactPollSetters & {
   setTeamRoster: (roster: TeamRosterPreview | null) => void;
   router: ReturnType<typeof useRouter>;
   streamSettledRef: { current: boolean };
+  /** Set when SSE delivered `all_artifacts_complete` — skip poll storm. */
+  artifactsSettledViaStreamRef: { current: boolean };
 };
+
+function finalizeDoneStatus(
+  context: SimulationStreamEventContext,
+  finalPanel: string | null,
+): void {
+  if (finalPanel === "unavailable") {
+    context.setStatus("complete");
+    context.setError((prev) => prev ?? "Artifact synthesis failed");
+  } else if (finalPanel === "ready") {
+    context.setError(null);
+    context.setStatus((current) => (current === "failed" ? current : "complete"));
+  } else if (finalPanel != null) {
+    context.setStatus((current) => (current === "failed" ? current : "complete"));
+  }
+}
 
 export function createSimulationStreamEventHandler(
   context: SimulationStreamEventContext,
@@ -46,6 +67,7 @@ export function createSimulationStreamEventHandler(
       context.currentRunIdRef.current = event.runId;
       context.setRunId(event.runId);
       context.setArtifactsStatus("pending");
+      context.artifactsSettledViaStreamRef.current = false;
       return;
     }
 
@@ -149,6 +171,21 @@ export function createSimulationStreamEventHandler(
       return;
     }
 
+    if (event.type === "artifact_complete") {
+      return;
+    }
+
+    if (event.type === "all_artifacts_complete") {
+      context.artifactsSettledViaStreamRef.current = true;
+      const runId = context.currentRunIdRef.current;
+      if (!runId || !context.isActive()) {
+        return;
+      }
+
+      await fetchArtifactsOnce(runId, artifactSetters, context.signal);
+      return;
+    }
+
     if (event.type === "heartbeat") {
       return;
     }
@@ -191,24 +228,25 @@ export function createSimulationStreamEventHandler(
       context.setRunId(event.runId);
       context.currentRunIdRef.current = event.runId;
 
-      const finalPanel = await pollArtifactsUntilSettled(
-        event.runId,
-        artifactSetters,
-        context.signal,
-      );
+      const shouldPoll =
+        event.artifactTimeout === true ||
+        !context.artifactsSettledViaStreamRef.current;
+
+      const finalPanel = shouldPoll
+        ? await pollArtifactsUntilSettled(
+            event.runId,
+            artifactSetters,
+            context.signal,
+          )
+        : await fetchArtifactsOnce(
+            event.runId,
+            artifactSetters,
+            context.signal,
+          );
 
       if (!context.isActive()) return;
 
-      if (finalPanel === "unavailable") {
-        context.setStatus("complete");
-        context.setError((prev) => prev ?? "Artifact synthesis failed");
-      } else if (finalPanel === "ready") {
-        context.setError(null);
-        context.setStatus((current) => (current === "failed" ? current : "complete"));
-      } else if (finalPanel != null) {
-        context.setStatus((current) => (current === "failed" ? current : "complete"));
-      }
-
+      finalizeDoneStatus(context, finalPanel);
       context.router.replace(`/runs/${event.runId}`);
     }
   };

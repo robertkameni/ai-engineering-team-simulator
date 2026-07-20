@@ -6,7 +6,10 @@ import {
 } from "@/ai/orchestration/run-simulation";
 import { getRunOwnershipContextWithGuestSession } from "@/lib/auth/run-ownership";
 import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
-import { dispatchCoreArtifactSynthesisWorker } from "@/lib/ai/schedule-artifact-synthesis";
+import {
+  awaitCoreArtifactSynthesis,
+  dispatchCoreArtifactSynthesisWorker,
+} from "@/lib/ai/schedule-artifact-synthesis";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
 import { buildRunSummaryPayload } from "@/lib/db/run-summary";
@@ -80,23 +83,57 @@ export async function POST(request: Request) {
       };
 
       try {
-        const simulation = await runSimulation(prompt, send, {
-          userId,
-          guestSessionId,
-          usageAccumulator,
-        });
+        const simulation = await runSimulation(
+          prompt,
+          (event) => {
+            if (event.type === "run_started") {
+              runId = event.runId;
+            }
+            send(event);
+          },
+          {
+            userId,
+            guestSessionId,
+            usageAccumulator,
+          },
+        );
         runId = simulation.runId;
         synthesisStarted = true;
 
         await setRunUsageTotals(runId, usageAccumulator.getTotals());
 
-        dispatchCoreArtifactSynthesisWorker(request, runId, ownershipScope);
+        if (signal.aborted) {
+          // Client left after debate — keep synthesis alive via worker.
+          dispatchCoreArtifactSynthesisWorker(request, runId, ownershipScope);
+          return;
+        }
+
+        const synthesis = await awaitCoreArtifactSynthesis({
+          runId,
+          scope: ownershipScope,
+          usageAccumulator,
+          onArtifactComplete: (artifactType) => {
+            send({ type: "artifact_complete", artifactType });
+          },
+        });
 
         if (signal.aborted) {
           return;
         }
 
-        send({ type: "done", runId });
+        if (synthesis.completed && !synthesis.timedOut) {
+          send({ type: "all_artifacts_complete" });
+          send({ type: "done", runId });
+          return;
+        }
+
+        // Timed out awaiting synthesis — synthesis may still finish in-process;
+        // signal the client to fall back to polling.
+        send({
+          type: "done",
+          runId,
+          artifactTimeout: true,
+        });
       } catch (error) {
         if (runId) {
           await setRunUsageTotals(runId, usageAccumulator.getTotals());
