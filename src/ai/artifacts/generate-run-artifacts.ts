@@ -2,7 +2,7 @@ import {
   buildOpenGapsDirective,
   extractReviewOpenGaps,
 } from "@/ai/artifacts/build-review-open-gaps";
-import { buildTranscriptForArtifacts } from "@/ai/artifacts/build-transcript";
+import { buildCompressedDebateSummary } from "@/ai/artifacts/compress-debate-summary";
 import { buildConsensusDirectives } from "@/ai/artifacts/build-consensus-directives";
 import {
   ARTIFACT_SYNTHESIS_ORDER,
@@ -36,6 +36,16 @@ import type {
 } from "@/features/artifacts/schemas";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 
+/**
+ * Forced sequencing (documented):
+ * 1. requirements — alone (no prior artifacts)
+ * 2. architecture + implementation — parallel (both consume requirements)
+ * 3. blueprint + review — parallel (consume prior wave outputs)
+ *
+ * Independent generateText calls within a wave use Promise.all.
+ * Cross/stack consistency retries remain sequential after the waves.
+ */
+
 function resolveSynthesisOrder(
   artifactTypes: readonly ArtifactType[],
 ): ArtifactType[] {
@@ -63,13 +73,16 @@ export async function generateRunArtifacts({
   runSummary?: string | null;
   artifactTypes?: readonly ArtifactType[];
 }): Promise<GenerateRunArtifactsResult> {
+  const artifactPhaseStartedAt = Date.now();
   const templateId = roster.templateId;
   const debateOutcome = parseDebateOutcomeFromRunSummary(runSummary ?? null);
   const mergedTranscript = mergeCorrectionTurns(transcript);
   const openGaps = extractReviewOpenGaps(mergedTranscript, roster);
   const openGapsDirective = buildOpenGapsDirective(openGaps);
   const consensusDirectives = buildConsensusDirectives(mergedTranscript);
-  const transcriptPrompt = buildTranscriptForArtifacts(
+  // One compressed summary reused across all generators (Group 6.1).
+  // cap_reached / unapproved outcomes still synthesize (Group 6.3).
+  const transcriptPrompt = buildCompressedDebateSummary(
     productIdea,
     transcript,
     roster,
@@ -82,8 +95,8 @@ export async function generateRunArtifacts({
   const synthesisOrder = resolveSynthesisOrder(artifactTypes);
   const output: Partial<RunArtifactsOutput> = {};
   const truthfulnessViolations: ArtifactTruthfulnessViolationEntry[] = [];
+  const perArtifactDurationMs: Partial<Record<ArtifactType, number>> = {};
 
-  // ARTIFACT TRUTHFULNESS GUARD — build context for post-generation checks
   const isUnapproved =
     debateOutcome !== null && isUnapprovedDebateExitOutcome(debateOutcome);
   const truthfulnessContext: ArtifactTruthfulnessContext = {
@@ -92,11 +105,12 @@ export async function generateRunArtifacts({
     isTruncationDegraded: debateOutcome === "degraded_truncated",
   };
 
-  for (const type of synthesisOrder) {
+  async function synthesizeOne(type: ArtifactType): Promise<void> {
     if (usageAccumulator) {
       assertSimulationWithinBudget(usageAccumulator);
     }
 
+    const startedAt = Date.now();
     const priorArtifactsPrompt = buildPriorArtifactsPrompt(type, output);
     const prompt = buildArtifactPrompt(
       transcriptPrompt,
@@ -114,8 +128,6 @@ export async function generateRunArtifacts({
       debateOutcome,
     );
 
-    // ARTIFACT TRUTHFULNESS GUARD — post-generation validation
-    // STATE CONSISTENCY POST-CHECK
     const truthfulnessResult = validateArtifactTruthfulness(
       document,
       truthfulnessContext,
@@ -142,7 +154,28 @@ export async function generateRunArtifacts({
     }
 
     output[type] = document;
+    perArtifactDurationMs[type] = Date.now() - startedAt;
     await onArtifactComplete?.(type, document);
+  }
+
+  const wave1 = synthesisOrder.filter((type) => type === "requirements");
+  const wave2 = synthesisOrder.filter(
+    (type) => type === "architecture" || type === "implementation",
+  );
+  const wave3 = synthesisOrder.filter(
+    (type) => type === "blueprint" || type === "review",
+  );
+
+  for (const type of wave1) {
+    await synthesizeOne(type);
+  }
+
+  if (wave2.length > 0) {
+    await Promise.all(wave2.map((type) => synthesizeOne(type)));
+  }
+
+  if (wave3.length > 0) {
+    await Promise.all(wave3.map((type) => synthesizeOne(type)));
   }
 
   const retryContext = {
@@ -164,11 +197,19 @@ export async function generateRunArtifacts({
     openGaps,
   });
 
+  const artifactDurationMs = Date.now() - artifactPhaseStartedAt;
+  console.info("ARTIFACT PHASE complete", {
+    artifactDurationMs,
+    perArtifactDurationMs,
+    debateOutcome,
+  });
+
   return {
     artifacts: output,
     consistencyRetries: stackRetryResult.retryCount + crossRetryResult.retryCount,
     stackValidationFailed: stackRetryResult.stackValidationFailed,
     crossValidationFailed: crossRetryResult.crossValidationFailed,
     truthfulnessViolations,
+    artifactDurationMs,
   };
 }

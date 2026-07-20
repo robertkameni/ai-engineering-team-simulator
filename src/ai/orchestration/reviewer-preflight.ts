@@ -61,11 +61,13 @@ export function buildReviewerPreflightChecklist(
   });
 
   const frontendEntry = transcript.findLast((entry) => entry.role === "frontend");
+  // Hard-block Frontend Risks only when Frontend has actually spoken.
+  // Otherwise prefer inviting Frontend — never reject a silent role into a correction loop.
   const frontendRisksLine = frontendEntry
     ? hasFrontendRisksSection(frontendEntry.content)
       ? "- Frontend Risks section: present"
       : "- Frontend Risks section: **missing or incomplete** — prefer [REJECT: frontend] until complete"
-    : "- Frontend Risks section: **missing** — frontend has not spoken";
+    : "- Frontend Risks section: not applicable yet — frontend has not spoken (do NOT [REJECT: frontend]; invite Frontend first)";
 
   const pipelineComplete = missingRoles.length === 0;
 

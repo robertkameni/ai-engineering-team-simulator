@@ -1,5 +1,6 @@
 import type { TeamRoster } from "@/ai/agents/roster";
 import { formatTeammateNames } from "@/ai/agents/roster";
+import { compressCorrectionFeedback } from "@/ai/context/summarize-prior-turns";
 
 export type DiscussionDepthStyle = "standard" | "compact";
 
@@ -31,12 +32,9 @@ export function buildImplementationQuoteHint(roster: TeamRoster): string {
   return `You MUST include at least one claim from ${roster.backend.name} (${roster.backend.title}), ${roster.frontend.name} (${roster.frontend.title}), or ${roster.devops.name} (${roster.devops.title}) if they have spoken.`;
 }
 
-const FEEDBACK_EXCERPT_MAX_CHARS = 1400;
+/** Well under the 31k/42k correction dumps observed in failed runs. */
+const FEEDBACK_EXCERPT_MAX_CHARS = 1_200;
 
 export function truncateFeedbackExcerpt(feedback: string): string {
-  const trimmed = feedback.trim();
-  if (trimmed.length <= FEEDBACK_EXCERPT_MAX_CHARS) {
-    return trimmed;
-  }
-  return `${trimmed.slice(0, FEEDBACK_EXCERPT_MAX_CHARS).trimEnd()}…`;
+  return compressCorrectionFeedback(feedback, FEEDBACK_EXCERPT_MAX_CHARS);
 }

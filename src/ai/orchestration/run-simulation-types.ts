@@ -40,6 +40,8 @@ export interface DebateState {
   isArchitectRevision: boolean;
   /** True when a critical role's *latest* turn is still truncated. */
   hasTruncatedCriticalTurn: boolean;
+  /** Set when reviewer [APPROVE] lands despite truncated critical turns. */
+  postApproveTruncation: boolean;
   reviewIssues: ReviewIssue[];
   isGateReroute: boolean;
   hasHadEarlyReview: boolean;

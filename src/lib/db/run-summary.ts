@@ -17,6 +17,21 @@ const VALID_DEBATE_OUTCOMES = new Set<string>([
   "aborted",
 ]);
 
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function optionalNullableNumber(value: unknown): number | null | undefined {
+  if (value === null) {
+    return null;
+  }
+  return optionalNumber(value);
+}
+
+function optionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
 export function buildRunSummaryPayload(payload: RunSummaryPayload): string {
   return JSON.stringify(payload);
 }
@@ -42,47 +57,22 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
     const turnCount =
       typeof record.turnCount === "number" ? record.turnCount : null;
 
-    const synthesisVersion =
-      typeof record.synthesisVersion === "number"
-        ? record.synthesisVersion
-        : undefined;
-
-    const consistencyRetries =
-      typeof record.consistencyRetries === "number"
-        ? record.consistencyRetries
-        : undefined;
-
-    const stackValidationFailed =
-      typeof record.stackValidationFailed === "boolean"
-        ? record.stackValidationFailed
-        : undefined;
-
-    const crossValidationFailed =
-      typeof record.crossValidationFailed === "boolean"
-        ? record.crossValidationFailed
-        : undefined;
-
-    const hasTruncatedCriticalTurn =
-      typeof record.hasTruncatedCriticalTurn === "boolean"
-        ? record.hasTruncatedCriticalTurn
-        : undefined;
-
-    const openReviewIssueCount =
-      typeof record.openReviewIssueCount === "number"
-        ? record.openReviewIssueCount
-        : undefined;
-
     const opsFollowUpFields = parseOpsFollowUpFields(record);
 
     return {
       debateOutcome,
       turnCount,
-      synthesisVersion,
-      consistencyRetries,
-      stackValidationFailed,
-      crossValidationFailed,
-      hasTruncatedCriticalTurn,
-      openReviewIssueCount,
+      synthesisVersion: optionalNumber(record.synthesisVersion),
+      consistencyRetries: optionalNumber(record.consistencyRetries),
+      stackValidationFailed: optionalBoolean(record.stackValidationFailed),
+      crossValidationFailed: optionalBoolean(record.crossValidationFailed),
+      hasTruncatedCriticalTurn: optionalBoolean(record.hasTruncatedCriticalTurn),
+      postApproveTruncation: optionalBoolean(record.postApproveTruncation),
+      openReviewIssueCount: optionalNumber(record.openReviewIssueCount),
+      debateDurationMs: optionalNullableNumber(record.debateDurationMs),
+      artifactDurationMs: optionalNullableNumber(record.artifactDurationMs),
+      totalDurationMs: optionalNullableNumber(record.totalDurationMs),
+      peakPromptTokens: optionalNullableNumber(record.peakPromptTokens),
       ...opsFollowUpFields,
     };
   } catch {
@@ -121,7 +111,64 @@ export function mergeRunSummarySynthesisTelemetry(
     stackValidationFailed,
     crossValidationFailed,
     hasTruncatedCriticalTurn: existing?.hasTruncatedCriticalTurn,
+    postApproveTruncation: existing?.postApproveTruncation,
     openReviewIssueCount: existing?.openReviewIssueCount,
+    debateDurationMs: existing?.debateDurationMs,
+    artifactDurationMs: existing?.artifactDurationMs,
+    totalDurationMs: existing?.totalDurationMs,
+    peakPromptTokens: existing?.peakPromptTokens,
+    opsFollowUpEvaluated: existing?.opsFollowUpEvaluated,
+    opsFollowUpTriggered: existing?.opsFollowUpTriggered,
+    opsFollowUpSkipReason: existing?.opsFollowUpSkipReason,
+    opsFollowUpEligible: existing?.opsFollowUpEligible,
+    opsFollowUpUnresolvedDevopsIssueCount:
+      existing?.opsFollowUpUnresolvedDevopsIssueCount,
+    opsFollowUpLastCorrectionRole: existing?.opsFollowUpLastCorrectionRole,
+    opsFollowUpEvaluationTurn: existing?.opsFollowUpEvaluationTurn,
+    opsFollowUpArchitectCheckpoint: existing?.opsFollowUpArchitectCheckpoint,
+  });
+}
+
+/** Merge duration / peak-prompt telemetry into an existing summary JSON. */
+export function mergeRunSummaryTimingTelemetry(
+  existingSummary: string | null,
+  timing: {
+    readonly debateDurationMs?: number | null;
+    readonly artifactDurationMs?: number | null;
+    readonly totalDurationMs?: number | null;
+    readonly peakPromptTokens?: number | null;
+    readonly postApproveTruncation?: boolean;
+  },
+): string {
+  const existing = parseRunSummary(existingSummary);
+
+  return buildRunSummaryPayload({
+    debateOutcome: existing?.debateOutcome ?? null,
+    turnCount: existing?.turnCount ?? null,
+    synthesisVersion: existing?.synthesisVersion,
+    consistencyRetries: existing?.consistencyRetries,
+    stackValidationFailed: existing?.stackValidationFailed,
+    crossValidationFailed: existing?.crossValidationFailed,
+    hasTruncatedCriticalTurn: existing?.hasTruncatedCriticalTurn,
+    postApproveTruncation:
+      timing.postApproveTruncation ?? existing?.postApproveTruncation,
+    openReviewIssueCount: existing?.openReviewIssueCount,
+    debateDurationMs:
+      timing.debateDurationMs !== undefined
+        ? timing.debateDurationMs
+        : (existing?.debateDurationMs ?? null),
+    artifactDurationMs:
+      timing.artifactDurationMs !== undefined
+        ? timing.artifactDurationMs
+        : (existing?.artifactDurationMs ?? null),
+    totalDurationMs:
+      timing.totalDurationMs !== undefined
+        ? timing.totalDurationMs
+        : (existing?.totalDurationMs ?? null),
+    peakPromptTokens:
+      timing.peakPromptTokens !== undefined
+        ? timing.peakPromptTokens
+        : (existing?.peakPromptTokens ?? null),
     opsFollowUpEvaluated: existing?.opsFollowUpEvaluated,
     opsFollowUpTriggered: existing?.opsFollowUpTriggered,
     opsFollowUpSkipReason: existing?.opsFollowUpSkipReason,

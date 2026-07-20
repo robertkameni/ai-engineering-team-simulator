@@ -29,22 +29,24 @@ import {
   hasExceededReviewerRejectionCap,
   canScheduleArchitectRevision,
   getMaxSimulationTurns,
-  parseReviewerDecision,
-  resolveUnknownReviewerDecision,
   stripReviewerDecisionTag,
 } from "@/ai/orchestration/reviewer-decision";
 import {
-  createReviewIssues,
+  normalizeMangledReviewerDecisionText,
+  parseReviewerDecisionWithMangleRecovery,
+} from "@/ai/orchestration/normalize-mangled-decision-tag";
+import {
   markIssuesAttempted,
   markIssuesFailedValidation,
-  markIssuesAddressed,
   buildIssueSnapshot,
-  type ReviewIssue,
 } from "@/ai/orchestration/review-issue-tracker";
+import { syncHasTruncatedCriticalTurn } from "@/ai/orchestration/truncation-approval-gate";
 import {
-  hasCurrentCriticalTruncation,
-  syncHasTruncatedCriticalTurn,
-} from "@/ai/orchestration/truncation-approval-gate";
+  selectSilentRoleNearCap,
+  shouldInviteDevOps,
+} from "@/ai/orchestration/role-participation";
+import { shouldTriggerSoftwareEarlyReview as shouldTriggerSoftwareEarlyReviewGate } from "@/ai/orchestration/software-early-review";
+import { resolveReviewerOutcome } from "@/ai/orchestration/resolve-reviewer-outcome";
 import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import { updateArtifactStatus } from "@/lib/db/artifact-status";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
@@ -94,6 +96,7 @@ export async function runSimulation(
   const usageAccumulator =
     options.usageAccumulator ?? new RunUsageAccumulator();
   const abortSignal = options.abortSignal;
+  const runStartedAt = Date.now();
   const run = await createRun(productIdea, {
     userId: options.userId,
     guestSessionId: options.guestSessionId,
@@ -138,6 +141,7 @@ export async function runSimulation(
       transcript: [],
       isArchitectRevision: false,
       hasTruncatedCriticalTurn: false,
+      postApproveTruncation: false,
       reviewIssues: [],
       isGateReroute: false,
       hasHadEarlyReview: false,
@@ -157,12 +161,15 @@ export async function runSimulation(
       notify,
     };
 
+    const debateStartedAt = Date.now();
     const debateExitOutcome = await runDebateLoop(state, ctx);
+    const debateDurationMs = Date.now() - debateStartedAt;
 
     assertNotAborted(abortSignal);
 
     debateComplete = true;
 
+    const usageTotals = usageAccumulator.getTotals();
     const opsFollowUpSummary = selectOpsFollowUpSummary(state.opsFollowUpCheckpoints);
     const architectCheckpoint =
       opsFollowUpSummary.relevantArchitect !== opsFollowUpSummary.last
@@ -175,7 +182,12 @@ export async function runSimulation(
         debateOutcome: debateExitOutcome,
         turnCount: state.turnCount,
         hasTruncatedCriticalTurn: state.hasTruncatedCriticalTurn || undefined,
+        postApproveTruncation: state.postApproveTruncation || undefined,
         openReviewIssueCount: buildIssueSnapshot(state.reviewIssues).totalOpen || undefined,
+        debateDurationMs,
+        artifactDurationMs: null,
+        totalDurationMs: Date.now() - runStartedAt,
+        peakPromptTokens: usageTotals.peakPromptTokens ?? null,
         ...opsFollowUpFieldsFromCheckpoint(opsFollowUpSummary.last),
         opsFollowUpArchitectCheckpoint: architectCheckpoint,
       }),
@@ -212,6 +224,21 @@ async function runDebateLoop(
 
   while (state.turnCount < maxTurns) {
     assertNotAborted(ctx.abortSignal);
+
+    const participationDirective = ensureRoleParticipationBeforeClose(
+      state,
+      ctx,
+      maxTurns,
+    );
+    if (participationDirective) {
+      if (participationDirective.kind === "break") {
+        return participationDirective.outcome;
+      }
+      if (participationDirective.kind === "reroute") {
+        state.nextRole = participationDirective.targetRole;
+        continue;
+      }
+    }
 
     const directive = await runDebateTurn(state, ctx);
 
@@ -278,15 +305,105 @@ async function runDebateLoop(
           eligible: checkpoint.opsFollowUpEligible,
         });
       }
+
+      const devopsInvite = maybeScheduleDevOpsInvite(state, ctx);
+      if (devopsInvite) {
+        state.nextRole = devopsInvite;
+        continue;
+      }
     }
 
     if (!applyLinearProgression(state)) {
+      const silentRole = selectSilentRoleNearCap({
+        transcript: state.transcript,
+        turnCount: state.turnCount,
+        maxTurns,
+        preferDevOps: true,
+      });
+      if (silentRole && state.turnCount < maxTurns) {
+        console.info("ROLE PARTICIPATION: scheduling silent role before cap", {
+          runId: ctx.runId,
+          silentRole,
+          turnCount: state.turnCount,
+          maxTurns,
+        });
+        state.nextRole = silentRole;
+        continue;
+      }
       return "cap_reached";
     }
   }
 
   console.warn("Simulation reached maxTurns", { runId: ctx.runId, maxTurns });
   return "cap_reached";
+}
+
+function ensureRoleParticipationBeforeClose(
+  state: DebateState,
+  ctx: TurnContext,
+  maxTurns: number,
+): TurnDirective | null {
+  if (state.turnCount < maxTurns - 1) {
+    return null;
+  }
+
+  const silentRole = selectSilentRoleNearCap({
+    transcript: state.transcript,
+    turnCount: state.turnCount,
+    maxTurns,
+    preferDevOps: true,
+  });
+
+  if (!silentRole) {
+    return null;
+  }
+
+  if (state.nextRole === silentRole) {
+    return null;
+  }
+
+  console.info("ROLE PARTICIPATION: near-cap invite for silent role", {
+    runId: ctx.runId,
+    silentRole,
+    turnCount: state.turnCount,
+    maxTurns,
+  });
+
+  return { kind: "reroute", targetRole: silentRole };
+}
+
+function maybeScheduleDevOpsInvite(
+  state: DebateState,
+  ctx: TurnContext,
+): SimulationAgentRole | null {
+  if (ctx.templateId === "physical") {
+    return null;
+  }
+
+  const openOpsIssues = buildIssueSnapshot(state.reviewIssues).totalOpen > 0;
+  const frontendSpoke = state.transcript.some((entry) => entry.role === "frontend");
+
+  if (
+    !shouldInviteDevOps({
+      transcript: state.transcript,
+      hasUnresolvedOpsIssues: openOpsIssues,
+      frontendHasSpoken: frontendSpoke,
+    })
+  ) {
+    return null;
+  }
+
+  // Only interrupt when the linear pipeline would otherwise skip past devops.
+  if (state.nextRole === "reviewer" || state.returnToReviewer) {
+    console.info("ROLE PARTICIPATION: inviting silent DevOps", {
+      runId: ctx.runId,
+      turnCount: state.turnCount,
+      openOpsIssues,
+    });
+    return "devops";
+  }
+
+  return null;
 }
 
 function shouldTriggerArchitectRevision(
@@ -333,34 +450,8 @@ function shouldTriggerSoftwareEarlyReview(
   state: DebateState,
   ctx: TurnContext,
 ): boolean {
-  if (ctx.templateId === "physical") {
-    return false;
-  }
-
-  if (state.hasHadEarlyReview) {
-    return false;
-  }
-
-  if (state.nextRole === "reviewer") {
-    return false;
-  }
-
-  if (state.returnToReviewer) {
-    return false;
-  }
-
-  if (state.isArchitectRevision) {
-    return false;
-  }
-
-  const architectSpoke = state.transcript.some(
-    (entry) => entry.role === "architect",
-  );
-  if (!architectSpoke) {
-    return false;
-  }
-
-  if (state.nextRole !== "backend") {
+  const shouldTrigger = shouldTriggerSoftwareEarlyReviewGate(state, ctx.templateId);
+  if (!shouldTrigger) {
     return false;
   }
 
@@ -606,21 +697,29 @@ async function recoverUnknownReviewerTag(
   fullText: string,
   ctx: TurnContext,
 ): Promise<string> {
-  if (role !== "reviewer" || parseReviewerDecision(fullText, ctx.roster).decision !== "unknown") {
+  if (role !== "reviewer") {
     return fullText;
   }
 
-  const recoveredTag = await recoverReviewerDecisionTag(fullText, {
+  const normalizedText = normalizeMangledReviewerDecisionText(fullText, ctx.roster);
+  const parsed = parseReviewerDecisionWithMangleRecovery(normalizedText, ctx.roster);
+
+  if (parsed.decision !== "unknown") {
+    return normalizedText;
+  }
+
+  const recoveredTag = await recoverReviewerDecisionTag(normalizedText, {
     usageAccumulator: ctx.usageAccumulator,
     abortSignal: ctx.abortSignal,
   });
 
   if (recoveredTag) {
-    fullText = `${fullText.trimEnd()}\n\n${recoveredTag}`;
+    assertSimulationWithinBudget(ctx.usageAccumulator);
+    return `${normalizedText.trimEnd()}\n\n${recoveredTag}`;
   }
 
   assertSimulationWithinBudget(ctx.usageAccumulator);
-  return fullText;
+  return normalizedText;
 }
 
 function normalizeTurnContent(
@@ -751,128 +850,6 @@ function findLastTranscriptEntry(
     }
   }
   return undefined;
-}
-
-function resolveReviewerOutcome(
-  role: SimulationAgentRole,
-  fullText: string,
-  state: DebateState,
-  ctx: TurnContext,
-): TurnDirective {
-  if (role !== "reviewer") {
-    return { kind: "progress" };
-  }
-
-  const parsed = parseReviewerDecision(fullText, ctx.roster);
-
-  if (parsed.decision === "approve") {
-    state.lastRejectFeedback = null;
-    state.lastRejectTarget = null;
-    state.hasHadOpsFollowUpForCurrentReject = false;
-    state.focusedOpsFollowUp = null;
-
-    // Only degrade when a critical role's *latest* turn is still truncated.
-    syncHasTruncatedCriticalTurn(state, state.transcript);
-    if (hasCurrentCriticalTruncation(state.transcript)) {
-      console.warn(
-        "TRUNCATION APPROVAL GUARD: reviewer approved but latest critical turns are truncated — downgrading to degraded_truncated",
-        { runId: ctx.runId, turnCount: state.turnCount },
-      );
-      markIssuesAddressed(state.reviewIssues);
-      return { kind: "break", outcome: "degraded_truncated" };
-    }
-
-    markIssuesAddressed(state.reviewIssues);
-    return { kind: "break", outcome: "approved" };
-  }
-
-  if (parsed.decision === "reject" && parsed.rejectRole) {
-    const newIssues = createReviewIssues(
-      state.reviewIssues,
-      parsed.rejectRole,
-      parsed.displayText,
-      state.reviewerRejectionCount,
-      state.turnCount,
-      ctx.roster,
-    );
-    state.reviewIssues.push(...newIssues);
-
-    if (hasExceededReviewerRejectionCap(state.reviewerRejectionCount)) {
-      console.warn("Reviewer rejection cap reached, closing debate", {
-        runId: ctx.runId,
-        reviewerRejectionCount: state.reviewerRejectionCount,
-        maxReviewerRejectionCycles: 4,
-        perRoleCorrections: { ...state.roleCorrectionCounts },
-        openIssues: buildIssueSnapshot(state.reviewIssues).totalOpen,
-      });
-      return { kind: "break", outcome: "cap_reached" };
-    }
-
-    if (!canCorrectRole(state.roleCorrectionCounts, parsed.rejectRole)) {
-      console.warn("Per-role correction cap reached, closing debate", {
-        runId: ctx.runId,
-        rejectRole: parsed.rejectRole,
-        maxPerRole: 2,
-        currentCount: state.roleCorrectionCounts[parsed.rejectRole] ?? 0,
-        openIssues: buildIssueSnapshot(state.reviewIssues).totalOpen,
-      });
-      return { kind: "break", outcome: "cap_reached" };
-    }
-
-    const maxTurns = getMaxSimulationTurns(ctx.templateId);
-    const remainingBudget = maxTurns - state.turnCount;
-
-    if (remainingBudget < 2) {
-      console.warn(
-        "BUDGET-AWARE REVIEWER GUARD: insufficient remaining budget for reject cycle — exiting with open gaps",
-        {
-          runId: ctx.runId,
-          turnCount: state.turnCount,
-          maxTurns,
-          remainingBudget,
-          rejectRole: parsed.rejectRole,
-          templateId: ctx.templateId,
-          openIssues: buildIssueSnapshot(state.reviewIssues).totalOpen,
-        },
-      );
-      return { kind: "break", outcome: "insufficient_budget" };
-    }
-
-    state.reviewerRejectionCount += 1;
-    state.roleCorrectionCounts = incrementRoleCorrectionCount(
-      state.roleCorrectionCounts,
-      parsed.rejectRole,
-    );
-    state.lastRejectFeedback = parsed.displayText.trim() || null;
-    state.lastRejectTarget = parsed.rejectRole;
-    state.hasHadOpsFollowUpForCurrentReject = false;
-    state.focusedOpsFollowUp = null;
-    return { kind: "reroute", targetRole: parsed.rejectRole };
-  }
-
-  console.warn("Invalid reviewer decision, routing correction");
-
-  const fallback = resolveUnknownReviewerDecision();
-  const fallbackRole = fallback.rejectRole ?? "pm";
-
-  const maxTurns = getMaxSimulationTurns(ctx.templateId);
-  const remainingBudget = maxTurns - state.turnCount;
-
-  if (remainingBudget >= 2 && state.turnCount < maxTurns) {
-    if (!canCorrectRole(state.roleCorrectionCounts, fallbackRole)) {
-      return { kind: "break", outcome: "unknown_reject_fallback" };
-    }
-
-    state.roleCorrectionCounts = incrementRoleCorrectionCount(
-      state.roleCorrectionCounts,
-      fallbackRole,
-    );
-    state.lastRejectFeedback = parsed.displayText.trim() || null;
-    state.lastRejectTarget = fallbackRole;
-    return { kind: "reroute", targetRole: fallbackRole };
-  }
-
-  return { kind: "break", outcome: "unknown_reject_fallback" };
 }
 
 function buildNotifyHandler(

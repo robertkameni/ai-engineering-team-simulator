@@ -33,6 +33,7 @@ interface ArtifactPanelStaticProps {
   debateMessages?: { role: AgentRole; isStreaming?: boolean; agentTitle?: string }[];
   teamRoster?: TeamRosterPreview | null;
   debateOutcome?: DebateExitOutcome | null;
+  postApproveTruncation?: boolean;
   stackValidationFailed?: boolean;
   crossValidationFailed?: boolean;
 }
@@ -46,6 +47,7 @@ export function ArtifactPanelStatic({
   debateMessages = [],
   teamRoster = null,
   debateOutcome = null,
+  postApproveTruncation = false,
   stackValidationFailed = false,
   crossValidationFailed = false,
 }: ArtifactPanelStaticProps) {
@@ -65,7 +67,7 @@ export function ArtifactPanelStatic({
     synthesisValidation,
   );
   const showDebateWarning =
-    isUnapprovedDebateOutcome(debateOutcome) &&
+    (isUnapprovedDebateOutcome(debateOutcome) || postApproveTruncation) &&
     (status === "ready" || status === "generating");
   const showSynthesisWarning =
     hasSynthesisValidationWarnings(synthesisValidation) &&
@@ -93,7 +95,10 @@ export function ArtifactPanelStatic({
       </header>
 
       {showDebateWarning ? (
-        <ArtifactDebateWarningBanner debateOutcome={debateOutcome} />
+        <ArtifactDebateWarningBanner
+          debateOutcome={debateOutcome}
+          postApproveTruncation={postApproveTruncation}
+        />
       ) : null}
 
       {showSynthesisWarning ? (

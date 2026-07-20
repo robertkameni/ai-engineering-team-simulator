@@ -8,6 +8,7 @@ import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import { buildAgentMessages, type DebateTurnContext } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
+import { windowTranscriptForContinuation } from "@/ai/context/window-transcript";
 import { hasPhysicalKeywords } from "@/ai/orchestration/classify-project";
 import {
   getAgentStreamDisplayText,
@@ -63,30 +64,30 @@ export async function collectAgentStream({
   disableTools?: boolean;
   supplementalUserPrompt?: string;
 }): Promise<string> {
-  const baseMessages = buildAgentMessages(
-    role,
-    productIdea,
-    transcript,
-    roster,
-    debateContext,
-  );
-  let messages = baseMessages;
+  const isContinuation =
+    continuationOf != null && continuationOf.trim().length > 0;
 
-  if (supplementalUserPrompt?.trim()) {
+  // Continuations: truncated turn + short summary only (no full transcript dump).
+  let messages = isContinuation
+    ? buildContinuationMessages({
+        role,
+        productIdea,
+        transcript,
+        roster,
+        continuationOf: continuationOf!,
+      })
+    : buildAgentMessages(
+        role,
+        productIdea,
+        transcript,
+        roster,
+        debateContext,
+      );
+
+  if (supplementalUserPrompt?.trim() && !isContinuation) {
     messages = [
       ...messages,
       { role: "user" as const, content: supplementalUserPrompt.trim() },
-    ];
-  }
-
-  if (continuationOf != null && continuationOf.trim().length > 0) {
-    messages = [
-      ...messages,
-      { role: "assistant" as const, content: continuationOf },
-      {
-        role: "user" as const,
-        content: buildTruncationContinuationPrompt(continuationOf, role),
-      },
     ];
   }
 
@@ -211,6 +212,44 @@ function resolveToolsForTurn(
     return getComplianceTools();
   }
   return getAgentTools(role);
+}
+
+function buildContinuationMessages(params: {
+  readonly role: SimulationAgentRole;
+  readonly productIdea: string;
+  readonly transcript: TranscriptEntry[];
+  readonly roster: TeamRoster;
+  readonly continuationOf: string;
+}): Array<{ role: "user" | "assistant"; content: string }> {
+  const windowed = windowTranscriptForContinuation(
+    params.transcript,
+    params.roster,
+  );
+  const messages: Array<{ role: "user" | "assistant"; content: string }> = [
+    {
+      role: "user",
+      content: `## Product idea\n\n${params.productIdea}`,
+    },
+  ];
+
+  if (windowed.omittedSummary) {
+    messages.push({ role: "user", content: windowed.omittedSummary });
+  }
+
+  // Prefer the truncated turn itself over re-sending older verbatim entries.
+  messages.push({
+    role: "assistant",
+    content: params.continuationOf,
+  });
+  messages.push({
+    role: "user",
+    content: buildTruncationContinuationPrompt(
+      params.continuationOf,
+      params.role,
+    ),
+  });
+
+  return messages;
 }
 
 async function recordStreamUsage(

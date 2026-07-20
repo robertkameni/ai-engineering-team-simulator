@@ -13,14 +13,11 @@ export function getMaxSimulationTurns(templateId: TeamTemplateId): number {
   return templateId === "physical" ? PHYSICAL_MAX_TURNS : SOFTWARE_MAX_TURNS;
 }
 
-/** @deprecated Use {@link getMaxSimulationTurns} instead. */
-export const MAX_SIMULATION_TURNS = SOFTWARE_MAX_TURNS;
-
 export const MIN_TURNS_FOR_REVISION_FINISH = 4;
 
 export function canScheduleArchitectRevision(
   turnCount: number,
-  maxTurns = MAX_SIMULATION_TURNS,
+  maxTurns: number,
 ): boolean {
   return turnCount + MIN_TURNS_FOR_REVISION_FINISH <= maxTurns;
 }
@@ -282,7 +279,7 @@ export function isDebateComplete(
 
   const maxTurns = templateId
     ? getMaxSimulationTurns(templateId)
-    : MAX_SIMULATION_TURNS;
+    : SOFTWARE_MAX_TURNS;
 
   if (messages.length >= maxTurns) {
     return true;
