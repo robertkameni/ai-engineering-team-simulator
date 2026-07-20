@@ -62,10 +62,27 @@ function logEvent(type: string, detail?: string): void {
   );
 }
 
-async function readDbSummary(id: string) {
+type DbSummaryError =
+  | { readonly error: "DATABASE_URL missing" }
+  | { readonly error: "run not found" }
+  | { readonly error: "unexpected failure"; readonly detail: string };
+
+type DbSummarySuccess = {
+  readonly status: string;
+  readonly artifactStatus: string | null;
+  readonly estimatedCostUsd: number | null;
+  readonly promptTokens: number | null;
+  readonly completionTokens: number | null;
+  readonly artifactTypes: string[];
+  readonly summary: Record<string, unknown> | null;
+};
+
+type DbSummaryResult = DbSummaryError | DbSummarySuccess;
+
+async function readDbSummary(id: string): Promise<DbSummaryResult> {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
-    return { error: "DATABASE_URL missing" as const };
+    return { error: "DATABASE_URL missing" };
   }
 
   const prisma = new PrismaClient({
@@ -86,7 +103,7 @@ async function readDbSummary(id: string) {
         artifacts: { select: { type: true } },
       },
     });
-    if (!run) return { error: "run not found" as const };
+    if (!run) return { error: "run not found" };
 
     let summary: Record<string, unknown> | null = null;
     try {
@@ -100,12 +117,15 @@ async function readDbSummary(id: string) {
     return {
       status: run.status,
       artifactStatus: run.artifactStatus,
-      estimatedCostUsd: run.estimatedCostUsd,
+      estimatedCostUsd:
+        run.estimatedCostUsd != null ? Number(run.estimatedCostUsd) : null,
       promptTokens: run.promptTokens,
       completionTokens: run.completionTokens,
       artifactTypes: run.artifacts.map((a) => a.type),
       summary,
     };
+  } catch (error) {
+    return { error: "unexpected failure", detail: String(error) };
   } finally {
     await prisma.$disconnect();
   }
@@ -222,7 +242,7 @@ async function main(): Promise<void> {
   let debateOutcome: string | null = null;
   let coreCounts: Record<string, number> = {};
   let filledCore = 0;
-  let db: Awaited<ReturnType<typeof readDbSummary>> | null = null;
+  let db: DbSummaryResult | null = null;
 
   if (runId) {
     const artifactsResponse = await fetchOwned(`/api/runs/${runId}/artifacts`);
@@ -259,11 +279,7 @@ async function main(): Promise<void> {
       artifactsStatus = runData.artifactsStatus ?? artifactsStatus;
     }
 
-    try {
-      db = await readDbSummary(runId);
-    } catch (error) {
-      db = { error: String(error) };
-    }
+    db = await readDbSummary(runId);
   }
 
   const summary =
