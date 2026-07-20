@@ -37,6 +37,25 @@ interface RunOpsFollowUpExportFields {
   readonly architectCheckpoint: import("@/lib/db/ops-follow-up-summary").OpsFollowUpCheckpoint | null;
 }
 
+type BoldFormatter = (label: string) => string;
+
+interface MetadataWriter {
+  appendPrompt: (prompt: string) => void;
+  appendSimulatedDate: (dateLabel: string) => void;
+  appendUsage: (value: string) => void;
+  appendDuration: (value: string) => void;
+  appendDebateOutcome: (params: DebateOutcomeMetadata) => void;
+  appendSynthesisValidationWarning: (message: string) => void;
+  appendOpsFollowUp: (fields: RunOpsFollowUpExportFields) => void;
+}
+
+interface DebateOutcomeMetadata {
+  readonly label: string;
+  readonly isUnapproved: boolean;
+  readonly warningMessage: string;
+  readonly hasPostApproveTruncation: boolean;
+}
+
 function resolveRunOpsFollowUpFields(run: MockRun): RunOpsFollowUpExportFields {
   const last = opsFollowUpFieldsFromCheckpoint(
     run.opsFollowUpEvaluated
@@ -81,224 +100,289 @@ function formatInlineMarkdown(text: string): string {
     .replace(/`([^`]+)`/g, "<code>$1</code>");
 }
 
-function appendMetadata(lines: string[], ctx: RunExportContext): void {
-  const { run } = ctx;
-  lines.push("**Prompt:** " + run.userPrompt, "");
-  lines.push(
-    "**Simulated:** " + formatExportDate(run.updatedAt),
-    "",
+function buildUsageLineValue(run: MockRun, bold: BoldFormatter): string | null {
+  if (!hasRecordedRunUsage(run.usage)) {
+    return null;
+  }
+
+  const { usage } = run;
+  const cost =
+    usage.estimatedCostUsd > 0
+      ? " · " + bold("Est. cost:") + " $" + usage.estimatedCostUsd.toFixed(4)
+      : "";
+  const missingNote =
+    usage.usageMissing === true ? " · " + bold("usageMissing:") + " true" : "";
+  const peakPromptTokens = usage.peakPromptTokens ?? run.peakPromptTokens;
+  const peakNote =
+    peakPromptTokens != null
+      ? " · " + bold("Peak prompt:") + " " + peakPromptTokens.toLocaleString()
+      : "";
+
+  return (
+    usage.promptTokens.toLocaleString() +
+    " prompt · " +
+    usage.completionTokens.toLocaleString() +
+    " completion · " +
+    usage.totalTokens.toLocaleString() +
+    " total" +
+    cost +
+    peakNote +
+    missingNote
   );
+}
 
-  if (hasRecordedRunUsage(run.usage)) {
-    const cost =
-      run.usage.estimatedCostUsd > 0
-        ? " · **Est. cost:** $" + run.usage.estimatedCostUsd.toFixed(4)
-        : "";
-    const missingNote =
-      run.usage.usageMissing === true ? " · **usageMissing:** true" : "";
-    const peakNote =
-      run.usage.peakPromptTokens != null || run.peakPromptTokens != null
-        ? " · **Peak prompt:** " +
-          (run.usage.peakPromptTokens ?? run.peakPromptTokens)!.toLocaleString()
-        : "";
-    lines.push(
-      "**Usage:** " +
-        run.usage.promptTokens.toLocaleString() +
-        " prompt · " +
-        run.usage.completionTokens.toLocaleString() +
-        " completion · " +
-        run.usage.totalTokens.toLocaleString() +
-        " total" +
-        cost +
-        peakNote +
-        missingNote,
-      "",
-    );
+function buildDurationLineValue(run: MockRun): string | null {
+  const hasDuration =
+    run.debateDurationMs != null ||
+    run.artifactDurationMs != null ||
+    run.totalDurationMs != null;
+  if (!hasDuration) {
+    return null;
   }
 
-  if (run.debateDurationMs != null || run.artifactDurationMs != null || run.totalDurationMs != null) {
-    const parts: string[] = [];
-    if (run.debateDurationMs != null) {
-      parts.push("debate " + run.debateDurationMs + "ms");
-    }
-    if (run.artifactDurationMs != null) {
-      parts.push("artifacts " + run.artifactDurationMs + "ms");
-    }
-    if (run.totalDurationMs != null) {
-      parts.push("total " + run.totalDurationMs + "ms");
-    }
-    lines.push("**Duration:** " + parts.join(" · "), "");
+  const parts: string[] = [];
+  if (run.debateDurationMs != null) {
+    parts.push("debate " + run.debateDurationMs + "ms");
+  }
+  if (run.artifactDurationMs != null) {
+    parts.push("artifacts " + run.artifactDurationMs + "ms");
+  }
+  if (run.totalDurationMs != null) {
+    parts.push("total " + run.totalDurationMs + "ms");
+  }
+  return parts.join(" · ");
+}
+
+function buildDebateOutcomeMetadata(run: MockRun): DebateOutcomeMetadata | null {
+  if (!run.debateOutcome) {
+    return null;
   }
 
-  if (run.debateOutcome) {
-    const label = debateOutcomeLabel(run.debateOutcome);
-    if (isUnapprovedDebateOutcome(run.debateOutcome)) {
-      lines.push(
-        "**Debate outcome:** " +
-          label +
-          " — " +
-          debateOutcomeWarningMessage(run.debateOutcome),
-        "",
-      );
-    } else {
-      lines.push("**Debate outcome:** " + label, "");
-    }
-    if (run.postApproveTruncation === true) {
-      lines.push(
-        "**Warning:** postApproveTruncation — reviewer approved but some critical turns were truncated.",
-        "",
-      );
-    }
-  }
+  return {
+    label: debateOutcomeLabel(run.debateOutcome),
+    isUnapproved: isUnapprovedDebateOutcome(run.debateOutcome),
+    warningMessage: debateOutcomeWarningMessage(run.debateOutcome),
+    hasPostApproveTruncation: run.postApproveTruncation === true,
+  };
+}
 
+function buildSynthesisValidationMessage(run: MockRun): string | null {
   const synthesisValidation = parseSynthesisValidationFlags(
     run.stackValidationFailed,
     run.crossValidationFailed,
   );
-  if (hasSynthesisValidationWarnings(synthesisValidation)) {
-    lines.push(
-      "**Artifact validation:** " +
-        synthesisValidationWarningMessage(synthesisValidation),
-      "",
-    );
+  if (!hasSynthesisValidationWarnings(synthesisValidation)) {
+    return null;
+  }
+  return synthesisValidationWarningMessage(synthesisValidation);
+}
+
+function appendRunMetadata(writer: MetadataWriter, run: MockRun): void {
+  writer.appendPrompt(run.userPrompt);
+  writer.appendSimulatedDate(formatExportDate(run.updatedAt));
+
+  const usageValue = buildUsageLineValue(run, (label) => "**" + label + "**");
+  if (usageValue) {
+    writer.appendUsage(usageValue);
   }
 
-  const opsFields = resolveRunOpsFollowUpFields(run);
-  appendOpsFollowUpMetadataLines(lines, opsFields.last, opsFields.architectCheckpoint);
+  const durationValue = buildDurationLineValue(run);
+  if (durationValue) {
+    writer.appendDuration(durationValue);
+  }
+
+  const debateOutcome = buildDebateOutcomeMetadata(run);
+  if (debateOutcome) {
+    writer.appendDebateOutcome(debateOutcome);
+  }
+
+  const synthesisMessage = buildSynthesisValidationMessage(run);
+  if (synthesisMessage) {
+    writer.appendSynthesisValidationWarning(synthesisMessage);
+  }
+
+  writer.appendOpsFollowUp(resolveRunOpsFollowUpFields(run));
+}
+
+function createMarkdownMetadataWriter(lines: string[]): MetadataWriter {
+  return {
+    appendPrompt: (prompt) => {
+      lines.push("**Prompt:** " + prompt, "");
+    },
+    appendSimulatedDate: (dateLabel) => {
+      lines.push("**Simulated:** " + dateLabel, "");
+    },
+    appendUsage: (value) => {
+      lines.push("**Usage:** " + value, "");
+    },
+    appendDuration: (value) => {
+      lines.push("**Duration:** " + value, "");
+    },
+    appendDebateOutcome: ({ label, isUnapproved, warningMessage, hasPostApproveTruncation }) => {
+      if (isUnapproved) {
+        lines.push("**Debate outcome:** " + label + " — " + warningMessage, "");
+      } else {
+        lines.push("**Debate outcome:** " + label, "");
+      }
+      if (hasPostApproveTruncation) {
+        lines.push(
+          "**Warning:** postApproveTruncation — reviewer approved but some critical turns were truncated.",
+          "",
+        );
+      }
+    },
+    appendSynthesisValidationWarning: (message) => {
+      lines.push("**Artifact validation:** " + message, "");
+    },
+    appendOpsFollowUp: (fields) => {
+      appendOpsFollowUpMetadataLines(lines, fields.last, fields.architectCheckpoint);
+    },
+  };
+}
+
+function createHtmlMetadataWriter(parts: string[]): MetadataWriter {
+  return {
+    appendPrompt: (prompt) => {
+      parts.push(
+        '<p class="meta-block"><strong>Prompt:</strong> ' +
+          formatInlineMarkdown(prompt) +
+          "</p>",
+      );
+    },
+    appendSimulatedDate: (dateLabel) => {
+      parts.push(
+        '<p class="meta-block"><strong>Simulated:</strong> ' +
+          escapeHtml(dateLabel) +
+          "</p>",
+      );
+    },
+    appendUsage: (value) => {
+      parts.push(
+        '<p class="meta-block"><strong>Usage:</strong> ' +
+          value.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>") +
+          "</p>",
+      );
+    },
+    appendDuration: (value) => {
+      parts.push(
+        '<p class="meta-block"><strong>Duration:</strong> ' +
+          escapeHtml(value) +
+          "</p>",
+      );
+    },
+    appendDebateOutcome: ({ label, isUnapproved, warningMessage, hasPostApproveTruncation }) => {
+      const escapedLabel = escapeHtml(label);
+      if (isUnapproved) {
+        parts.push(
+          '<div class="export-warning"><strong>Debate outcome:</strong> ' +
+            escapedLabel +
+            " — " +
+            escapeHtml(warningMessage) +
+            "</div>",
+        );
+      } else {
+        parts.push(
+          '<p class="meta-block"><strong>Debate outcome:</strong> ' +
+            escapedLabel +
+            "</p>",
+        );
+      }
+      if (hasPostApproveTruncation) {
+        parts.push(
+          '<div class="export-warning"><strong>Warning:</strong> postApproveTruncation — reviewer approved but some critical turns were truncated.</div>',
+        );
+      }
+    },
+    appendSynthesisValidationWarning: (message) => {
+      parts.push(
+        '<div class="export-warning"><strong>Artifact validation:</strong> ' +
+          escapeHtml(message) +
+          "</div>",
+      );
+    },
+    appendOpsFollowUp: (fields) => {
+      appendOpsFollowUpMetadataHtml(parts, fields.last, fields.architectCheckpoint);
+    },
+  };
+}
+
+function appendMetadata(lines: string[], ctx: RunExportContext): void {
+  appendRunMetadata(createMarkdownMetadataWriter(lines), ctx.run);
 }
 
 function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
-  const { run } = ctx;
-  parts.push(
-    '<p class="meta-block"><strong>Prompt:</strong> ' +
-      formatInlineMarkdown(run.userPrompt) +
-      "</p>",
-    '<p class="meta-block"><strong>Simulated:</strong> ' +
-      escapeHtml(formatExportDate(run.updatedAt)) +
-      "</p>",
-  );
+  appendRunMetadata(createHtmlMetadataWriter(parts), ctx.run);
+}
 
-  if (hasRecordedRunUsage(run.usage)) {
-    const cost =
-      run.usage.estimatedCostUsd > 0
-        ? " · <strong>Est. cost:</strong> $" +
-          run.usage.estimatedCostUsd.toFixed(4)
-        : "";
-    const missingNote =
-      run.usage.usageMissing === true
-        ? " · <strong>usageMissing:</strong> true"
-        : "";
-    const peakNote =
-      run.usage.peakPromptTokens != null || run.peakPromptTokens != null
-        ? " · <strong>Peak prompt:</strong> " +
-          (run.usage.peakPromptTokens ?? run.peakPromptTokens)!.toLocaleString()
-        : "";
-    parts.push(
-      '<p class="meta-block"><strong>Usage:</strong> ' +
-        run.usage.promptTokens.toLocaleString() +
-        " prompt · " +
-        run.usage.completionTokens.toLocaleString() +
-        " completion · " +
-        run.usage.totalTokens.toLocaleString() +
-        " total" +
-        cost +
-        peakNote +
-        missingNote +
-        "</p>",
-    );
+function markdownLinesForHeading(block: Extract<MessageBlock, { type: "heading" }>): string[] {
+  const prefix = block.level === 2 ? "## " : "### ";
+  return [prefix + block.text, ""];
+}
+
+function markdownLinesForQuote(block: Extract<MessageBlock, { type: "quote" }>): string[] {
+  return [
+    "> **" + block.agentName + ":** " + block.text,
+    block.verdict ? "> *" + block.verdict + "*" : "",
+    "",
+  ];
+}
+
+function markdownLinesForBlock(block: MessageBlock): string[] {
+  if (block.type === "spacer") {
+    return [""];
   }
-
-  if (run.debateDurationMs != null || run.artifactDurationMs != null || run.totalDurationMs != null) {
-    const partsDuration: string[] = [];
-    if (run.debateDurationMs != null) {
-      partsDuration.push("debate " + run.debateDurationMs + "ms");
-    }
-    if (run.artifactDurationMs != null) {
-      partsDuration.push("artifacts " + run.artifactDurationMs + "ms");
-    }
-    if (run.totalDurationMs != null) {
-      partsDuration.push("total " + run.totalDurationMs + "ms");
-    }
-    parts.push(
-      '<p class="meta-block"><strong>Duration:</strong> ' +
-        escapeHtml(partsDuration.join(" · ")) +
-        "</p>",
-    );
+  if (block.type === "heading") {
+    return markdownLinesForHeading(block);
   }
-
-  if (run.debateOutcome) {
-    const label = escapeHtml(debateOutcomeLabel(run.debateOutcome));
-    if (isUnapprovedDebateOutcome(run.debateOutcome)) {
-      parts.push(
-        '<div class="export-warning"><strong>Debate outcome:</strong> ' +
-          label +
-          " — " +
-          escapeHtml(debateOutcomeWarningMessage(run.debateOutcome)) +
-          "</div>",
-      );
-    } else {
-      parts.push(
-        '<p class="meta-block"><strong>Debate outcome:</strong> ' +
-          label +
-          "</p>",
-      );
-    }
-    if (run.postApproveTruncation === true) {
-      parts.push(
-        '<div class="export-warning"><strong>Warning:</strong> postApproveTruncation — reviewer approved but some critical turns were truncated.</div>',
-      );
-    }
+  if (block.type === "quote") {
+    return markdownLinesForQuote(block);
   }
-
-  const synthesisValidation = parseSynthesisValidationFlags(
-    run.stackValidationFailed,
-    run.crossValidationFailed,
-  );
-  if (hasSynthesisValidationWarnings(synthesisValidation)) {
-    parts.push(
-      '<div class="export-warning"><strong>Artifact validation:</strong> ' +
-        escapeHtml(synthesisValidationWarningMessage(synthesisValidation)) +
-        "</div>",
-    );
+  if (block.type === "bullet") {
+    return ["- " + block.text];
   }
-
-  const opsFields = resolveRunOpsFollowUpFields(run);
-  appendOpsFollowUpMetadataHtml(parts, opsFields.last, opsFields.architectCheckpoint);
+  if (block.type === "emphasis") {
+    return ["**" + block.text + "**", ""];
+  }
+  return [block.text, ""];
 }
 
 function blocksToMarkdown(blocks: MessageBlock[]): string[] {
   const lines: string[] = [];
-
   for (const block of blocks) {
-    if (block.type === "spacer") {
-      lines.push("");
-      continue;
-    }
-    if (block.type === "heading") {
-      const prefix = block.level === 2 ? "## " : "### ";
-      lines.push(prefix + block.text, "");
-      continue;
-    }
-    if (block.type === "quote") {
-      lines.push(
-        "> **" + block.agentName + ":** " + block.text,
-        block.verdict ? "> *" + block.verdict + "*" : "",
-        "",
-      );
-      continue;
-    }
-    if (block.type === "bullet") {
-      lines.push("- " + block.text);
-      continue;
-    }
-    if (block.type === "emphasis") {
-      lines.push("**" + block.text + "**", "");
-      continue;
-    }
-    lines.push(block.text, "");
+    lines.push(...markdownLinesForBlock(block));
   }
-
   return lines;
+}
+
+function htmlForHeading(block: Extract<MessageBlock, { type: "heading" }>): string {
+  const tag = block.level === 2 ? "h2" : "h3";
+  return "<" + tag + ">" + escapeHtml(block.text) + "</" + tag + ">";
+}
+
+function htmlForQuote(block: Extract<MessageBlock, { type: "quote" }>): string {
+  const verdictHtml = block.verdict
+    ? "<p><em>" + escapeHtml(block.verdict) + "</em></p>"
+    : "";
+  return (
+    '<blockquote class="export-quote"><cite>' +
+    escapeHtml(block.agentName) +
+    "</cite>" +
+    formatInlineMarkdown(block.text) +
+    verdictHtml +
+    "</blockquote>"
+  );
+}
+
+function htmlForEmphasis(block: Extract<MessageBlock, { type: "emphasis" }>): string {
+  return "<p><strong>" + escapeHtml(block.text) + "</strong></p>";
+}
+
+function htmlForParagraph(block: Extract<MessageBlock, { type: "paragraph" }>): string {
+  return "<p>" + formatInlineMarkdown(block.text) + "</p>";
+}
+
+function htmlForBullet(block: Extract<MessageBlock, { type: "bullet" }>): string {
+  return "<li>" + formatInlineMarkdown(block.text) + "</li>";
 }
 
 function blocksToHtml(blocks: MessageBlock[]): string {
@@ -306,10 +390,16 @@ function blocksToHtml(blocks: MessageBlock[]): string {
   let listOpen = false;
 
   const closeList = () => {
-    if (listOpen) {
-      parts.push("</ul>");
-      listOpen = false;
+    if (!listOpen) {
+      return;
     }
+    parts.push("</ul>");
+    listOpen = false;
+  };
+
+  const appendNonListBlock = (html: string) => {
+    closeList();
+    parts.push(html);
   };
 
   for (const block of blocks) {
@@ -317,28 +407,12 @@ function blocksToHtml(blocks: MessageBlock[]): string {
       closeList();
       continue;
     }
-
     if (block.type === "heading") {
-      closeList();
-      const tag = block.level === 2 ? "h2" : "h3";
-      parts.push(
-        "<" + tag + ">" + escapeHtml(block.text) + "</" + tag + ">",
-      );
+      appendNonListBlock(htmlForHeading(block));
       continue;
     }
     if (block.type === "quote") {
-      closeList();
-      const verdictHtml = block.verdict
-        ? "<p><em>" + escapeHtml(block.verdict) + "</em></p>"
-        : "";
-      parts.push(
-        '<blockquote class="export-quote"><cite>' +
-          escapeHtml(block.agentName) +
-          "</cite>" +
-          formatInlineMarkdown(block.text) +
-          verdictHtml +
-          "</blockquote>",
-      );
+      appendNonListBlock(htmlForQuote(block));
       continue;
     }
     if (block.type === "bullet") {
@@ -346,15 +420,14 @@ function blocksToHtml(blocks: MessageBlock[]): string {
         parts.push("<ul>");
         listOpen = true;
       }
-      parts.push("<li>" + formatInlineMarkdown(block.text) + "</li>");
+      parts.push(htmlForBullet(block));
       continue;
     }
-    closeList();
     if (block.type === "emphasis") {
-      parts.push("<p><strong>" + escapeHtml(block.text) + "</strong></p>");
+      appendNonListBlock(htmlForEmphasis(block));
       continue;
     }
-    parts.push("<p>" + formatInlineMarkdown(block.text) + "</p>");
+    appendNonListBlock(htmlForParagraph(block));
   }
 
   closeList();

@@ -2,7 +2,7 @@ import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 
-export function frontendHasSpoken(
+function frontendHasSpoken(
   transcript: readonly TranscriptEntry[],
 ): boolean {
   return transcript.some((entry) => entry.role === "frontend");

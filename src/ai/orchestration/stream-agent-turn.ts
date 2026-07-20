@@ -26,7 +26,9 @@ import { DEEPSEEK_CHAT_OPTIONS } from "@/ai/deepseek-options";
 import { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
-import type { AgentStreamRetryParams } from "@/ai/orchestration/stream-agent-turn.types";
+import type {
+  AgentStreamRetryParams,
+} from "@/ai/orchestration/stream-agent-turn.types";
 
 import { assertNotAborted } from "./simulation-abort";
 import { collectAgentStream } from "./collect-agent-stream";
@@ -65,6 +67,18 @@ export async function streamAgentTurn({
 }): Promise<StreamAgentTurnResult> {
   const config = getAgentConfig(role);
   const member = getTeamMember(roster, role);
+  const streamParams = {
+    runId,
+    role,
+    productIdea,
+    transcript,
+    roster,
+    templateId,
+    debateContext,
+    usageAccumulator,
+    abortSignal,
+    send,
+  };
 
   send({
     type: "agent_start",
@@ -76,179 +90,38 @@ export async function streamAgentTurn({
   let fullText: string;
   try {
     fullText = await collectAgentStream({
-      runId,
-      role,
-      productIdea,
-      transcript,
-      roster,
-      templateId,
+      ...streamParams,
       config,
-      debateContext,
-      usageAccumulator,
-      abortSignal,
-      send,
       disableTools,
     });
 
-    if (!fullText.trim()) {
-      assertNotAborted(abortSignal);
-      console.warn(
-        `${role}: empty stream, retrying with chat model (no reasoning)`,
-      );
-      const retryConfig = {
-        ...config,
-        model: "deepseek-v4-flash" as const,
-        maxOutputTokens: Math.max(config.maxOutputTokens * 1.5, 2400),
-        deepseek: DEEPSEEK_CHAT_OPTIONS,
-      };
-      fullText = await collectAgentStream({
-        runId,
-        role,
-        productIdea,
-        transcript,
-        roster,
-        templateId,
-        config: retryConfig,
-        debateContext,
-        usageAccumulator,
-        abortSignal,
-        send,
-      });
-      fullText = await continueAgentStreamIfTruncated({
-        runId,
-        role,
-        productIdea,
-        transcript,
-        roster,
-        templateId,
-        config: retryConfig,
-        debateContext,
-        usageAccumulator,
-        abortSignal,
-        send,
-        fullText,
-      });
-    }
-
-    fullText = await continueAgentStreamIfTruncated({
-      runId,
-      role,
-      productIdea,
-      transcript,
-      roster,
-      templateId,
+    fullText = await retryEmptyStreamIfNeeded({
+      ...streamParams,
       config,
-      debateContext,
-      usageAccumulator,
-      abortSignal,
-      send,
       fullText,
     });
 
-    if (role === "architect" && templateId !== "physical") {
-      const normalized = normalizeAgentPersistedText(role, fullText);
-      if (isArchitectDeliverableInsufficient(normalized, templateId)) {
-        assertNotAborted(abortSignal);
-        console.warn(
-          `${role}: insufficient sections after tool turn, retrying without tools`,
-        );
-        const toollessConfig = {
-          ...config,
-          model: "deepseek-v4-flash" as const,
-          maxOutputTokens: Math.max(config.maxOutputTokens, 3200),
-          deepseek: DEEPSEEK_CHAT_OPTIONS,
-        };
-        const toollessText = await collectAgentStream({
-          runId,
-          role,
-          productIdea,
-          transcript,
-          roster,
-          templateId,
-          config: toollessConfig,
-          debateContext,
-          usageAccumulator,
-          abortSignal,
-          send,
-          disableTools: true,
-          supplementalUserPrompt: buildArchitectToollessRetryUserPrompt(),
-        });
-        if (toollessText.trim()) {
-          fullText = toollessText;
-          fullText = await continueAgentStreamIfTruncated({
-            runId,
-            role,
-            productIdea,
-            transcript,
-            roster,
-            templateId,
-            config: toollessConfig,
-            debateContext,
-            usageAccumulator,
-            abortSignal,
-            send,
-            fullText,
-          });
-        }
-      }
-    }
+    fullText = await continueAgentStreamIfTruncated({
+      ...streamParams,
+      config,
+      fullText,
+    });
 
-    if (role === "frontend" && templateId !== "physical") {
-      const normalizedFrontend = normalizeAgentPersistedText(role, fullText);
-      if (isFrontendDeliverableInsufficient(normalizedFrontend, templateId)) {
-        assertNotAborted(abortSignal);
-        console.warn(`${role}: deliverable incomplete, requesting completion stream`);
-        const completionConfig = {
-          ...config,
-          maxOutputTokens: Math.max(config.maxOutputTokens, 2600),
-        };
-        const completionText = await collectAgentStream({
-          runId,
-          role,
-          productIdea,
-          transcript,
-          roster,
-          templateId,
-          config: completionConfig,
-          debateContext,
-          usageAccumulator,
-          abortSignal,
-          send,
-          continuationOf: normalizedFrontend,
-          supplementalUserPrompt: buildFrontendInsufficientContinuationPrompt(),
-        });
-        if (completionText.trim()) {
-          fullText = mergeContinuationText(normalizedFrontend, completionText);
-          fullText = await continueAgentStreamIfTruncated({
-            runId,
-            role,
-            productIdea,
-            transcript,
-            roster,
-            templateId,
-            config: completionConfig,
-            debateContext,
-            usageAccumulator,
-            abortSignal,
-            send,
-            fullText,
-          });
-        }
-      }
-    }
+    fullText = await retryArchitectQualityIfNeeded({
+      ...streamParams,
+      config,
+      fullText,
+    });
+
+    fullText = await retryFrontendQualityIfNeeded({
+      ...streamParams,
+      config,
+      fullText,
+    });
 
     fullText = await retryRoleDeliverableIfNeeded({
-      runId,
-      role,
-      productIdea,
-      transcript,
-      roster,
-      templateId,
+      ...streamParams,
       config,
-      debateContext,
-      usageAccumulator,
-      abortSignal,
-      send,
       fullText,
     });
 
@@ -268,7 +141,6 @@ export async function streamAgentTurn({
     send({ type: "agent_end", role });
   }
 
-  // TRUNCATION HANDLING FAILURE GUARD
   const trimmedText = fullText.trim();
   const wasTruncated = looksLikeTruncatedAgentOutput(
     normalizeAgentPersistedText(role, trimmedText),
@@ -286,33 +158,139 @@ export async function streamAgentTurn({
   return { text: trimmedText, wasTruncated };
 }
 
-async function continueAgentStreamIfTruncated({
-  runId,
-  role,
-  productIdea,
-  transcript,
-  roster,
-  templateId,
-  config,
-  debateContext,
-  usageAccumulator,
-  abortSignal,
-  send,
-  fullText,
-}: {
-  runId: string;
-  role: SimulationAgentRole;
-  productIdea: string;
-  transcript: TranscriptEntry[];
-  roster: TeamRoster;
-  templateId: TeamTemplateId;
-  config: ReturnType<typeof getAgentConfig>;
-  debateContext?: DebateTurnContext;
-  usageAccumulator: RunUsageAccumulator;
-  abortSignal?: AbortSignal;
-  send: (event: SimulationStreamEvent) => void;
-  fullText: string;
-}): Promise<string> {
+async function retryEmptyStreamIfNeeded(
+  params: AgentStreamRetryParams,
+): Promise<string> {
+  if (params.fullText.trim()) {
+    return params.fullText;
+  }
+
+  assertNotAborted(params.abortSignal);
+  console.warn(
+    `${params.role}: empty stream, retrying with chat model (no reasoning)`,
+  );
+
+  const retryConfig = {
+    ...params.config,
+    model: "deepseek-v4-flash" as const,
+    maxOutputTokens: Math.max(params.config.maxOutputTokens * 1.5, 2400),
+    deepseek: DEEPSEEK_CHAT_OPTIONS,
+  };
+
+  const retried = await collectAgentStream({
+    ...params,
+    config: retryConfig,
+  });
+
+  return continueAgentStreamIfTruncated({
+    ...params,
+    config: retryConfig,
+    fullText: retried,
+  });
+}
+
+async function retryArchitectQualityIfNeeded(
+  params: AgentStreamRetryParams,
+): Promise<string> {
+  if (params.role !== "architect" || params.templateId === "physical") {
+    return params.fullText;
+  }
+
+  const normalized = normalizeAgentPersistedText(params.role, params.fullText);
+  if (!isArchitectDeliverableInsufficient(normalized, params.templateId)) {
+    return params.fullText;
+  }
+
+  assertNotAborted(params.abortSignal);
+  console.warn(
+    `${params.role}: insufficient sections after tool turn, retrying without tools`,
+  );
+
+  const toollessConfig = {
+    ...params.config,
+    model: "deepseek-v4-flash" as const,
+    maxOutputTokens: Math.max(params.config.maxOutputTokens, 3200),
+    deepseek: DEEPSEEK_CHAT_OPTIONS,
+  };
+
+  const toollessText = await collectAgentStream({
+    ...params,
+    config: toollessConfig,
+    disableTools: true,
+    supplementalUserPrompt: buildArchitectToollessRetryUserPrompt(),
+  });
+
+  if (!toollessText.trim()) {
+    return params.fullText;
+  }
+
+  return continueAgentStreamIfTruncated({
+    ...params,
+    config: toollessConfig,
+    fullText: toollessText,
+  });
+}
+
+async function retryFrontendQualityIfNeeded(
+  params: AgentStreamRetryParams,
+): Promise<string> {
+  if (params.role !== "frontend" || params.templateId === "physical") {
+    return params.fullText;
+  }
+
+  const normalizedFrontend = normalizeAgentPersistedText(
+    params.role,
+    params.fullText,
+  );
+  if (!isFrontendDeliverableInsufficient(normalizedFrontend, params.templateId)) {
+    return params.fullText;
+  }
+
+  assertNotAborted(params.abortSignal);
+  console.warn(
+    `${params.role}: deliverable incomplete, requesting completion stream`,
+  );
+
+  const completionConfig = {
+    ...params.config,
+    maxOutputTokens: Math.max(params.config.maxOutputTokens, 2600),
+  };
+
+  const completionText = await collectAgentStream({
+    ...params,
+    config: completionConfig,
+    continuationOf: normalizedFrontend,
+    supplementalUserPrompt: buildFrontendInsufficientContinuationPrompt(),
+  });
+
+  if (!completionText.trim()) {
+    return params.fullText;
+  }
+
+  return continueAgentStreamIfTruncated({
+    ...params,
+    config: completionConfig,
+    fullText: mergeContinuationText(normalizedFrontend, completionText),
+  });
+}
+
+async function continueAgentStreamIfTruncated(
+  params: AgentStreamRetryParams,
+): Promise<string> {
+  const {
+    runId,
+    role,
+    productIdea,
+    transcript,
+    roster,
+    templateId,
+    config,
+    debateContext,
+    usageAccumulator,
+    abortSignal,
+    send,
+    fullText,
+  } = params;
   let merged = fullText.trim();
 
   for (

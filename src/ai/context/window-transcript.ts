@@ -8,14 +8,14 @@ import {
 } from "@/ai/context/summarize-prior-turns";
 
 export const TRANSCRIPT_WINDOW_RECENT_COUNT = 6;
-export const TRANSCRIPT_SUMMARY_EXCERPT_CHARS = 280;
+const TRANSCRIPT_SUMMARY_EXCERPT_CHARS = 280;
 
 export interface WindowedTranscript {
   omittedSummary: string | null;
   entries: TranscriptEntry[];
 }
 
-export function shouldUseFullTranscript(debateContext: DebateTurnContext): boolean {
+function shouldUseFullTranscript(debateContext: DebateTurnContext): boolean {
   return Boolean(
     debateContext.correction ||
     debateContext.focusedOpsFollowUp ||
@@ -32,7 +32,7 @@ function buildEntryExcerpt(content: string): string {
   return `${normalized.slice(0, TRANSCRIPT_SUMMARY_EXCERPT_CHARS).trimEnd()}…`;
 }
 
-export function buildOmittedTranscriptSummary(
+function buildOmittedTranscriptSummary(
   omitted: readonly TranscriptEntry[],
   roster: TeamRoster,
 ): string {

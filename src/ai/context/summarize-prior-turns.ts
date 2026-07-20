@@ -6,10 +6,10 @@ import type { TranscriptEntry } from "@/ai/context/transcript";
 export const SUMMARIZED_PRIOR_TURNS_MAX_CHARS = 12_000;
 
 /** Per-entry excerpt when compressing older turns. */
-export const PRIOR_TURN_EXCERPT_CHARS = 400;
+const PRIOR_TURN_EXCERPT_CHARS = 400;
 
 /** Absolute hard cap for correction feedback. */
-export const CORRECTION_CONTEXT_HARD_CAP_CHARS = 8_000;
+const CORRECTION_CONTEXT_HARD_CAP_CHARS = 8_000;
 
 export interface SummarizedPriorTurns {
   readonly omittedSummary: string | null;
@@ -47,6 +47,61 @@ function buildCompressedSummary(
   ].join("\n");
 }
 
+function collectRecentCompressedEntries(
+  older: readonly TranscriptEntry[],
+  budgetForSummary: number,
+): {
+  readonly includedFromEnd: TranscriptEntry[];
+  readonly dropped: TranscriptEntry[];
+} {
+  const includedFromEnd: TranscriptEntry[] = [];
+  let used = 0;
+
+  for (let index = older.length - 1; index >= 0; index -= 1) {
+    const entry = older[index]!;
+    const excerpt = buildEntryExcerpt(entry.content, PRIOR_TURN_EXCERPT_CHARS);
+    if (used + excerpt.length > budgetForSummary && includedFromEnd.length > 0) {
+      break;
+    }
+    if (used + excerpt.length > budgetForSummary) {
+      break;
+    }
+    includedFromEnd.unshift({ ...entry, content: excerpt });
+    used += excerpt.length;
+  }
+
+  const droppedCount = older.length - includedFromEnd.length;
+  return {
+    includedFromEnd,
+    dropped: older.slice(0, droppedCount),
+  };
+}
+
+function buildOmittedSummaryFromParts(
+  dropped: readonly TranscriptEntry[],
+  includedFromEnd: readonly TranscriptEntry[],
+  older: readonly TranscriptEntry[],
+  roster: TeamRoster,
+): string | null {
+  const summaryParts: string[] = [];
+
+  if (dropped.length > 0) {
+    const droppedSummary = buildCompressedSummary(dropped, roster);
+    if (droppedSummary) {
+      summaryParts.push(droppedSummary);
+    }
+  }
+
+  if (includedFromEnd.length > 0) {
+    summaryParts.push(buildCompressedSummary(includedFromEnd, roster) ?? "");
+  }
+
+  return (
+    summaryParts.filter(Boolean).join("\n\n") ||
+    buildCompressedSummary(older, roster)
+  );
+}
+
 /**
  * Keep the latest turn verbatim; compress older turns into a summary and
  * enforce a hard character budget. Prevents correction/continuation paths
@@ -76,45 +131,17 @@ export function summarizePriorTurns(
     };
   }
 
-  // Prefer as many recent compressed excerpts as fit under the budget.
-  const budgetForSummary = Math.max(
-    0,
-    maxChars - latest.content.length,
+  const budgetForSummary = Math.max(0, maxChars - latest.content.length);
+  const { includedFromEnd, dropped } = collectRecentCompressedEntries(
+    older,
+    budgetForSummary,
   );
-  const includedFromEnd: TranscriptEntry[] = [];
-  let used = 0;
-
-  for (let index = older.length - 1; index >= 0; index -= 1) {
-    const entry = older[index]!;
-    const excerpt = buildEntryExcerpt(entry.content, PRIOR_TURN_EXCERPT_CHARS);
-    if (used + excerpt.length > budgetForSummary && includedFromEnd.length > 0) {
-      break;
-    }
-    if (used + excerpt.length > budgetForSummary) {
-      break;
-    }
-    includedFromEnd.unshift({ ...entry, content: excerpt });
-    used += excerpt.length;
-  }
-
-  const droppedCount = older.length - includedFromEnd.length;
-  const dropped = older.slice(0, droppedCount);
-  const summaryParts: string[] = [];
-
-  if (dropped.length > 0) {
-    const droppedSummary = buildCompressedSummary(dropped, roster);
-    if (droppedSummary) {
-      summaryParts.push(droppedSummary);
-    }
-  }
-
-  if (includedFromEnd.length > 0) {
-    summaryParts.push(buildCompressedSummary(includedFromEnd, roster) ?? "");
-  }
-
-  const omittedSummary =
-    summaryParts.filter(Boolean).join("\n\n") ||
-    buildCompressedSummary(older, roster);
+  const omittedSummary = buildOmittedSummaryFromParts(
+    dropped,
+    includedFromEnd,
+    older,
+    roster,
+  );
 
   return {
     omittedSummary,

@@ -1,4 +1,4 @@
-import { stepCountIs, streamText } from "ai";
+import { stepCountIs, streamText, type ModelMessage } from "ai";
 
 import {
   getAgentConfig,
@@ -10,6 +10,7 @@ import { buildAgentMessages, type DebateTurnContext } from "@/ai/context/build-m
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { windowTranscriptForContinuation } from "@/ai/context/window-transcript";
 import { hasPhysicalKeywords } from "@/ai/orchestration/classify-project";
+import type { CollectAgentStreamParams } from "@/ai/orchestration/agent-stream-context.types";
 import {
   getAgentStreamDisplayText,
   hasCompletedOpeningBlock,
@@ -33,63 +34,35 @@ import { assertNotAborted, isSimulationAborted } from "./simulation-abort";
 
 const STREAM_HEARTBEAT_MS = 15_000;
 
-export async function collectAgentStream({
-  runId,
-  role,
-  productIdea,
-  transcript,
-  roster,
-  templateId,
-  config,
-  debateContext,
-  usageAccumulator,
-  abortSignal,
-  send,
-  continuationOf,
-  disableTools = false,
-  supplementalUserPrompt,
-}: {
-  runId: string;
-  role: SimulationAgentRole;
-  productIdea: string;
-  transcript: TranscriptEntry[];
-  roster: TeamRoster;
-  templateId: TeamTemplateId;
-  config: ReturnType<typeof getAgentConfig>;
-  debateContext?: DebateTurnContext;
-  usageAccumulator: RunUsageAccumulator;
-  abortSignal?: AbortSignal;
-  send: (event: SimulationStreamEvent) => void;
-  continuationOf?: string;
-  disableTools?: boolean;
-  supplementalUserPrompt?: string;
-}): Promise<string> {
-  const isContinuation =
-    continuationOf != null && continuationOf.trim().length > 0;
+export async function collectAgentStream(
+  params: CollectAgentStreamParams,
+): Promise<string> {
+  const {
+    runId,
+    role,
+    productIdea,
+    transcript,
+    roster,
+    templateId,
+    config,
+    debateContext,
+    usageAccumulator,
+    abortSignal,
+    send,
+    continuationOf,
+    disableTools = false,
+    supplementalUserPrompt,
+  } = params;
 
-  // Continuations: truncated turn + short summary only (no full transcript dump).
-  let messages = isContinuation
-    ? buildContinuationMessages({
-        role,
-        productIdea,
-        transcript,
-        roster,
-        continuationOf: continuationOf!,
-      })
-    : buildAgentMessages(
-        role,
-        productIdea,
-        transcript,
-        roster,
-        debateContext,
-      );
-
-  if (supplementalUserPrompt?.trim() && !isContinuation) {
-    messages = [
-      ...messages,
-      { role: "user" as const, content: supplementalUserPrompt.trim() },
-    ];
-  }
+  const messages = buildStreamMessages({
+    role,
+    productIdea,
+    transcript,
+    roster,
+    debateContext,
+    continuationOf,
+    supplementalUserPrompt,
+  });
 
   const tools = disableTools
     ? undefined
@@ -112,78 +85,23 @@ export async function collectAgentStream({
     },
   });
 
-  let fullText = "";
-  let emittedLength = 0;
-  let lastHeartbeatAt = Date.now();
-  let normalizedText = "";
-  let normalizedRawLength = 0;
+  const streamState = createStreamEmitState();
   try {
-    for await (const part of result.fullStream) {
-      assertNotAborted(abortSignal);
+    await consumeAgentStreamParts({
+      result,
+      role,
+      runId,
+      abortSignal,
+      send,
+      streamState,
+    });
 
-      if (part.type === "text-delta") {
-        fullText += part.text;
-
-        if (role === "architect" && !hasCompletedOpeningBlock(fullText)) {
-          if (!/^##\s/m.test(fullText)) {
-            continue;
-          }
-        }
-
-        const rawSuffix = fullText.slice(normalizedRawLength);
-        const isFirstChunk = normalizedText.length === 0;
-        normalizedText += normalizeAgentSuffix(role, rawSuffix, isFirstChunk);
-        normalizedRawLength = fullText.length;
-
-        let display = normalizedText;
-        if (role === "reviewer") {
-          display = reviewerVisibleText(normalizedText);
-        }
-
-        const delta = display.slice(emittedLength);
-        if (delta) {
-          send({ type: "text-delta", role, delta });
-          emittedLength += delta.length;
-        }
-      } else if (part.type === "tool-call") {
-        const toolPart = part as {
-          toolName: string;
-          input?: unknown;
-          args?: unknown;
-        };
-        send({
-          type: "tool_start",
-          role,
-          toolName: toolPart.toolName,
-          args: toolPart.input ?? toolPart.args,
-        });
-      } else if (part.type === "tool-result") {
-        send({
-          type: "tool_end",
-          role,
-          toolName: part.toolName,
-        });
-      }
-
-      const now = Date.now();
-      if (now - lastHeartbeatAt >= STREAM_HEARTBEAT_MS) {
-        await touchRunActivity(runId);
-        lastHeartbeatAt = now;
-      }
-    }
-
-    if (!fullText.trim()) {
-      const resolved = await result.text;
-      if (resolved.trim()) {
-        fullText = resolved;
-        const visible = getAgentStreamDisplayText(role, fullText);
-        const delta = visible.slice(emittedLength);
-        if (delta) {
-          send({ type: "text-delta", role, delta });
-          emittedLength += delta.length;
-        }
-      }
-    }
+    await emitResolvedTextIfEmpty({
+      result,
+      role,
+      send,
+      streamState,
+    });
 
     await recordStreamUsage(result, config.model, usageAccumulator);
   } catch (error) {
@@ -191,12 +109,192 @@ export async function collectAgentStream({
     if (isSimulationAborted(error)) {
       throw error;
     }
-    if (fullText.trim()) {
-      return fullText.trim();
+    if (streamState.fullText.trim()) {
+      return streamState.fullText.trim();
     }
     throw error;
   }
-  return fullText.trim();
+  return streamState.fullText.trim();
+}
+
+interface StreamEmitState {
+  fullText: string;
+  emittedLength: number;
+  normalizedText: string;
+  normalizedRawLength: number;
+}
+
+function createStreamEmitState(): StreamEmitState {
+  return {
+    fullText: "",
+    emittedLength: 0,
+    normalizedText: "",
+    normalizedRawLength: 0,
+  };
+}
+
+async function consumeAgentStreamParts({
+  result,
+  role,
+  runId,
+  abortSignal,
+  send,
+  streamState,
+}: {
+  result: ReturnType<typeof streamText>;
+  role: SimulationAgentRole;
+  runId: string;
+  abortSignal?: AbortSignal;
+  send: (event: SimulationStreamEvent) => void;
+  streamState: StreamEmitState;
+}): Promise<void> {
+  let lastHeartbeatAt = Date.now();
+
+  for await (const part of result.fullStream) {
+    assertNotAborted(abortSignal);
+
+    if (part.type === "text-delta") {
+      processTextDeltaPart(part.text, role, send, streamState);
+    } else if (part.type === "tool-call") {
+      emitToolCallPart(part, role, send);
+    } else if (part.type === "tool-result") {
+      send({
+        type: "tool_end",
+        role,
+        toolName: part.toolName,
+      });
+    }
+
+    lastHeartbeatAt = await maybeTouchRunActivity(runId, lastHeartbeatAt);
+  }
+}
+
+function processTextDeltaPart(
+  deltaText: string,
+  role: SimulationAgentRole,
+  send: (event: SimulationStreamEvent) => void,
+  streamState: StreamEmitState,
+): void {
+  streamState.fullText += deltaText;
+
+  if (role === "architect" && !hasCompletedOpeningBlock(streamState.fullText)) {
+    if (!/^##\s/m.test(streamState.fullText)) {
+      return;
+    }
+  }
+
+  const rawSuffix = streamState.fullText.slice(streamState.normalizedRawLength);
+  const isFirstChunk = streamState.normalizedText.length === 0;
+  streamState.normalizedText += normalizeAgentSuffix(role, rawSuffix, isFirstChunk);
+  streamState.normalizedRawLength = streamState.fullText.length;
+
+  const display =
+    role === "reviewer"
+      ? reviewerVisibleText(streamState.normalizedText)
+      : streamState.normalizedText;
+
+  const delta = display.slice(streamState.emittedLength);
+  if (!delta) {
+    return;
+  }
+
+  send({ type: "text-delta", role, delta });
+  streamState.emittedLength += delta.length;
+}
+
+function emitToolCallPart(
+  part: { toolName: string; input?: unknown; args?: unknown; },
+  role: SimulationAgentRole,
+  send: (event: SimulationStreamEvent) => void,
+): void {
+  send({
+    type: "tool_start",
+    role,
+    toolName: part.toolName,
+    args: part.input ?? part.args,
+  });
+}
+
+async function maybeTouchRunActivity(
+  runId: string,
+  lastHeartbeatAt: number,
+): Promise<number> {
+  const now = Date.now();
+  if (now - lastHeartbeatAt < STREAM_HEARTBEAT_MS) {
+    return lastHeartbeatAt;
+  }
+
+  await touchRunActivity(runId);
+  return now;
+}
+
+async function emitResolvedTextIfEmpty({
+  result,
+  role,
+  send,
+  streamState,
+}: {
+  result: ReturnType<typeof streamText>;
+  role: SimulationAgentRole;
+  send: (event: SimulationStreamEvent) => void;
+  streamState: StreamEmitState;
+}): Promise<void> {
+  if (streamState.fullText.trim()) {
+    return;
+  }
+
+  const resolved = await result.text;
+  if (!resolved.trim()) {
+    return;
+  }
+
+  streamState.fullText = resolved;
+  const visible = getAgentStreamDisplayText(role, streamState.fullText);
+  const delta = visible.slice(streamState.emittedLength);
+  if (!delta) {
+    return;
+  }
+
+  send({ type: "text-delta", role, delta });
+  streamState.emittedLength += delta.length;
+}
+
+function buildStreamMessages(params: {
+  readonly role: SimulationAgentRole;
+  readonly productIdea: string;
+  readonly transcript: TranscriptEntry[];
+  readonly roster: TeamRoster;
+  readonly debateContext?: DebateTurnContext;
+  readonly continuationOf?: string;
+  readonly supplementalUserPrompt?: string;
+}): ModelMessage[] {
+  const isContinuation =
+    params.continuationOf != null && params.continuationOf.trim().length > 0;
+
+  let messages = isContinuation
+    ? buildContinuationMessages({
+        role: params.role,
+        productIdea: params.productIdea,
+        transcript: params.transcript,
+        roster: params.roster,
+        continuationOf: params.continuationOf!,
+      })
+    : buildAgentMessages(
+        params.role,
+        params.productIdea,
+        params.transcript,
+        params.roster,
+        params.debateContext,
+      );
+
+  if (params.supplementalUserPrompt?.trim() && !isContinuation) {
+    messages = [
+      ...messages,
+      { role: "user" as const, content: params.supplementalUserPrompt.trim() },
+    ];
+  }
+
+  return messages;
 }
 
 function resolveToolsForTurn(
@@ -220,7 +318,7 @@ function buildContinuationMessages(params: {
   readonly transcript: TranscriptEntry[];
   readonly roster: TeamRoster;
   readonly continuationOf: string;
-}): Array<{ role: "user" | "assistant"; content: string }> {
+}): ModelMessage[] {
   const windowed = windowTranscriptForContinuation(
     params.transcript,
     params.roster,
@@ -236,7 +334,6 @@ function buildContinuationMessages(params: {
     messages.push({ role: "user", content: windowed.omittedSummary });
   }
 
-  // Prefer the truncated turn itself over re-sending older verbatim entries.
   messages.push({
     role: "assistant",
     content: params.continuationOf,

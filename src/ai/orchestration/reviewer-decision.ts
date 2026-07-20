@@ -117,6 +117,107 @@ function isBoundedConversationalTail(tail: string): boolean {
   return /^[\s.!?,;:—–\-–»"'`()\w]*$/u.test(tail);
 }
 
+type TagCandidate = {
+  tagStart: number;
+  tagEnd: number;
+  tag: ExtractedDecisionTag;
+};
+
+function findBestApproveTag(
+  trimmed: string,
+  regionStart: number,
+): TagCandidate | null {
+  const approveNeedle = "[APPROVE]";
+  let best: TagCandidate | null = null;
+  let searchFrom = trimmed.length;
+
+  while (searchFrom > 0) {
+    const idx = trimmed.lastIndexOf(approveNeedle, searchFrom - 1);
+    if (idx === -1 || idx < regionStart) {
+      break;
+    }
+
+    const tagEnd = idx + approveNeedle.length;
+    const tail = trimmed.slice(tagEnd);
+    if (!isBoundedConversationalTail(tail)) {
+      searchFrom = idx;
+      continue;
+    }
+
+    const candidate: TagCandidate = {
+      tagStart: idx,
+      tagEnd,
+      tag: { kind: "approve", tagStart: idx, tagEnd },
+    };
+    if (!best || idx > best.tagStart) {
+      best = candidate;
+    }
+    searchFrom = idx;
+  }
+
+  return best;
+}
+
+function findBestRejectTag(
+  trimmed: string,
+  regionStart: number,
+  roster?: TeamRoster,
+): TagCandidate | null {
+  let best: TagCandidate | null = null;
+
+  for (const match of trimmed.matchAll(REJECT_TAG_IN_TEXT)) {
+    const idx = match.index;
+    if (idx === undefined || idx < regionStart) {
+      continue;
+    }
+
+    const tagEnd = idx + match[0].length;
+    const tail = trimmed.slice(tagEnd);
+    if (!isBoundedConversationalTail(tail)) {
+      continue;
+    }
+
+    const roleIdentifier = match[1]!.trim();
+    if (!resolveRejectIdentifier(roleIdentifier, roster)) {
+      continue;
+    }
+
+    const candidate: TagCandidate = {
+      tagStart: idx,
+      tagEnd,
+      tag: {
+        kind: "reject",
+        role: roleIdentifier,
+        tagStart: idx,
+        tagEnd,
+      },
+    };
+    if (!best || idx > best.tagStart) {
+      best = candidate;
+    }
+  }
+
+  return best;
+}
+
+function selectLatestTagCandidate(
+  approveCandidate: TagCandidate | null,
+  rejectCandidate: TagCandidate | null,
+): ExtractedDecisionTag | null {
+  if (!approveCandidate && !rejectCandidate) {
+    return null;
+  }
+  if (!approveCandidate) {
+    return rejectCandidate!.tag;
+  }
+  if (!rejectCandidate) {
+    return approveCandidate.tag;
+  }
+  return approveCandidate.tagStart >= rejectCandidate.tagStart
+    ? approveCandidate.tag
+    : rejectCandidate.tag;
+}
+
 /** Analyzes the terminal region for a valid decision tag with optional short tail. */
 export function extractReviewerDecisionTag(
   raw: string,
@@ -128,63 +229,10 @@ export function extractReviewerDecisionTag(
   }
 
   const regionStart = Math.max(0, trimmed.length - TERMINAL_REGION_CHARS);
-  const approveNeedle = "[APPROVE]";
+  const approveCandidate = findBestApproveTag(trimmed, regionStart);
+  const rejectCandidate = findBestRejectTag(trimmed, regionStart, roster);
 
-  let best: { tagStart: number; tagEnd: number; tag: ExtractedDecisionTag; } | null =
-    null;
-
-  let searchFrom = trimmed.length;
-  while (searchFrom > 0) {
-    const idx = trimmed.lastIndexOf(approveNeedle, searchFrom - 1);
-    if (idx === -1 || idx < regionStart) {
-      break;
-    }
-    const tagEnd = idx + approveNeedle.length;
-    const tail = trimmed.slice(tagEnd);
-    if (isBoundedConversationalTail(tail)) {
-      const candidate = {
-        tagStart: idx,
-        tagEnd,
-        tag: { kind: "approve" as const, tagStart: idx, tagEnd },
-      };
-      if (!best || idx > best.tagStart) {
-        best = candidate;
-      }
-    }
-    searchFrom = idx;
-  }
-
-  const rejectMatches = [...trimmed.matchAll(REJECT_TAG_IN_TEXT)];
-  for (const match of rejectMatches) {
-    const idx = match.index;
-    if (idx === undefined || idx < regionStart) {
-      continue;
-    }
-    const tagEnd = idx + match[0].length;
-    const tail = trimmed.slice(tagEnd);
-    if (!isBoundedConversationalTail(tail)) {
-      continue;
-    }
-    const roleIdentifier = match[1]!.trim();
-    if (!resolveRejectIdentifier(roleIdentifier, roster)) {
-      continue;
-    }
-    const candidate = {
-      tagStart: idx,
-      tagEnd,
-      tag: {
-        kind: "reject" as const,
-        role: roleIdentifier,
-        tagStart: idx,
-        tagEnd,
-      },
-    };
-    if (!best || idx > best.tagStart) {
-      best = candidate;
-    }
-  }
-
-  return best?.tag ?? null;
+  return selectLatestTagCandidate(approveCandidate, rejectCandidate);
 }
 
 export function stripReviewerDecisionTag(
