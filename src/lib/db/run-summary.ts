@@ -68,19 +68,25 @@ function pickPreservedDebateFields(
   RunSummaryPayload,
   | "hasTruncatedCriticalTurn"
   | "postApproveTruncation"
+  | "postApproveContinuationFailed"
   | "openReviewIssueCount"
   | "debateDurationMs"
   | "artifactDurationMs"
+  | "userWaitMs"
   | "totalDurationMs"
+  | "artifactsPending"
   | "peakPromptTokens"
 > {
   return {
     hasTruncatedCriticalTurn: existing?.hasTruncatedCriticalTurn,
     postApproveTruncation: existing?.postApproveTruncation,
+    postApproveContinuationFailed: existing?.postApproveContinuationFailed,
     openReviewIssueCount: existing?.openReviewIssueCount,
     debateDurationMs: existing?.debateDurationMs,
     artifactDurationMs: existing?.artifactDurationMs,
+    userWaitMs: existing?.userWaitMs,
     totalDurationMs: existing?.totalDurationMs,
+    artifactsPending: existing?.artifactsPending,
     peakPromptTokens: existing?.peakPromptTokens,
   };
 }
@@ -135,10 +141,15 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
       crossValidationFailed: optionalBoolean(record.crossValidationFailed),
       hasTruncatedCriticalTurn: optionalBoolean(record.hasTruncatedCriticalTurn),
       postApproveTruncation: optionalBoolean(record.postApproveTruncation),
+      postApproveContinuationFailed: optionalBoolean(
+        record.postApproveContinuationFailed,
+      ),
       openReviewIssueCount: optionalNumber(record.openReviewIssueCount),
       debateDurationMs: optionalNullableNumber(record.debateDurationMs),
       artifactDurationMs: optionalNullableNumber(record.artifactDurationMs),
+      userWaitMs: optionalNullableNumber(record.userWaitMs),
       totalDurationMs: optionalNullableNumber(record.totalDurationMs),
+      artifactsPending: optionalBoolean(record.artifactsPending),
       peakPromptTokens: optionalNullableNumber(record.peakPromptTokens),
       ...opsFollowUpFields,
     };
@@ -180,15 +191,31 @@ export function mergeRunSummarySynthesisTelemetry(
   });
 }
 
+/** Recompute totalDurationMs so it includes debate + artifact phases. */
+export function computeTotalDurationMs(params: {
+  readonly debateDurationMs: number | null | undefined;
+  readonly artifactDurationMs: number | null | undefined;
+}): number | null {
+  const debate = params.debateDurationMs;
+  const artifacts = params.artifactDurationMs;
+  if (debate == null && artifacts == null) {
+    return null;
+  }
+  return (debate ?? 0) + (artifacts ?? 0);
+}
+
 /** Merge duration / peak-prompt telemetry into an existing summary JSON. */
 export function mergeRunSummaryTimingTelemetry(
   existingSummary: string | null,
   timing: {
     readonly debateDurationMs?: number | null;
     readonly artifactDurationMs?: number | null;
+    readonly userWaitMs?: number | null;
     readonly totalDurationMs?: number | null;
+    readonly artifactsPending?: boolean;
     readonly peakPromptTokens?: number | null;
     readonly postApproveTruncation?: boolean;
+    readonly postApproveContinuationFailed?: boolean;
   },
 ): string {
   const existing = parseRunSummary(existingSummary);
@@ -203,6 +230,9 @@ export function mergeRunSummaryTimingTelemetry(
     hasTruncatedCriticalTurn: existing?.hasTruncatedCriticalTurn,
     postApproveTruncation:
       timing.postApproveTruncation ?? existing?.postApproveTruncation,
+    postApproveContinuationFailed:
+      timing.postApproveContinuationFailed ??
+      existing?.postApproveContinuationFailed,
     openReviewIssueCount: existing?.openReviewIssueCount,
     debateDurationMs: resolveTimingField(
       timing.debateDurationMs,
@@ -212,10 +242,15 @@ export function mergeRunSummaryTimingTelemetry(
       timing.artifactDurationMs,
       existing?.artifactDurationMs,
     ),
+    userWaitMs: resolveTimingField(timing.userWaitMs, existing?.userWaitMs),
     totalDurationMs: resolveTimingField(
       timing.totalDurationMs,
       existing?.totalDurationMs,
     ),
+    artifactsPending:
+      timing.artifactsPending !== undefined
+        ? timing.artifactsPending
+        : existing?.artifactsPending,
     peakPromptTokens: resolveTimingField(
       timing.peakPromptTokens,
       existing?.peakPromptTokens,

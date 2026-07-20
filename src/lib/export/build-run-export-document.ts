@@ -135,6 +135,7 @@ function buildDurationLineValue(run: MockRun): string | null {
   const hasDuration =
     run.debateDurationMs != null ||
     run.artifactDurationMs != null ||
+    run.userWaitMs != null ||
     run.totalDurationMs != null;
   if (!hasDuration) {
     return null;
@@ -147,8 +148,14 @@ function buildDurationLineValue(run: MockRun): string | null {
   if (run.artifactDurationMs != null) {
     parts.push("artifacts " + run.artifactDurationMs + "ms");
   }
+  if (run.userWaitMs != null) {
+    parts.push("userWait " + run.userWaitMs + "ms");
+  }
   if (run.totalDurationMs != null) {
     parts.push("total " + run.totalDurationMs + "ms");
+  }
+  if (run.artifactsPending === true) {
+    parts.push("artifactsPending");
   }
   return parts.join(" · ");
 }

@@ -59,6 +59,7 @@ describe("executeRegenerateArtifactsPost rate limiting", () => {
         regenerateCalled = true;
         return {
           ok: true,
+          artifactDurationMs: null,
           artifacts: {
             requirements: [],
             architecture: [],

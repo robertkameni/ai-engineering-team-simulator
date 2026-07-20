@@ -1,0 +1,93 @@
+{
+  "prompt": "Personal finance tracker for freelancers",
+  "runId": "cmrtndzhq0006cwtvh973xbcy",
+  "elapsedMs": 644122,
+  "doneSeen": false,
+  "artifactTimeout": false,
+  "allArtifactsComplete": false,
+  "allArtifactsBeforeDone": false,
+  "artifactCompleteCount": 0,
+  "lastAgentEndAt": 274081,
+  "allArtifactsCompleteAt": null,
+  "doneAt": null,
+  "errorMessage": "Simulation failed",
+  "debateOutcome": null,
+  "artifactsStatus": "pending",
+  "coreCounts": {
+    "requirements": 0,
+    "architecture": 0,
+    "implementation": 0,
+    "blueprint": 0,
+    "review": 0
+  },
+  "filledCore": 0,
+  "eventCounts": {
+    "heartbeat": 15,
+    "run_started": 1,
+    "team_ready": 1,
+    "agent_start": 3,
+    "text-delta": 778,
+    "agent_end": 3,
+    "error": 1
+  },
+  "db": {
+    "error": "PrismaClientValidationError: \nInvalid `prisma.run.findUnique()` invocation in\nC:\\Users\\lucas\\Desktop\\projects\\ai-engineering-team-simulator\\scripts\\live-simulate-smoke.ts:76:34\n\n  73 });\n  74 \n  75 try {\n→ 76   const run = await prisma.run.findUnique({\n         where: {\n           id: \"cmrtndzhq0006cwtvh973xbcy\"\n         },\n         select: {\n           id: true,\n           status: true,\n           artifactStatus: true,\n           summary: true,\n           totalCostUsd: true,\n           ~~~~~~~~~~~~\n           totalTokens: true,\n           artifacts: {\n             select: {\n               type: true\n             }\n           },\n       ?   projectId?: true,\n       ?   userId?: true,\n       ?   guestSessionId?: true,\n       ?   userPrompt?: true,\n       ?   promptTokens?: true,\n       ?   completionTokens?: true,\n       ?   estimatedCostUsd?: true,\n       ?   createdAt?: true,\n       ?   updatedAt?: true,\n       ?   project?: true,\n       ?   user?: true,\n       ?   messages?: true,\n       ?   _count?: true\n         }\n       })\n\nUnknown field `totalCostUsd` for select statement on model `Run`. Available options are marked with ?."
+  },
+  "acceptance": {
+    "debateOutcome": null,
+    "debateDurationMs": null,
+    "artifactDurationMs": null,
+    "totalDurationMs": null,
+    "userWaitMs": null,
+    "artifactsPending": null,
+    "postApproveTruncation": null,
+    "turnCount": null,
+    "filledCore": 0,
+    "costUsd": null
+  },
+  "eventLog": [
+    {
+      "t": 74800,
+      "type": "run_started"
+    },
+    {
+      "t": 74801,
+      "type": "team_ready"
+    },
+    {
+      "t": 74902,
+      "type": "agent_start",
+      "detail": "pm"
+    },
+    {
+      "t": 94964,
+      "type": "agent_end",
+      "detail": "pm"
+    },
+    {
+      "t": 105377,
+      "type": "agent_start",
+      "detail": "architect"
+    },
+    {
+      "t": 274073,
+      "type": "agent_end",
+      "detail": "architect"
+    },
+    {
+      "t": 274079,
+      "type": "agent_start",
+      "detail": "architect"
+    },
+    {
+      "t": 274080,
+      "type": "agent_end",
+      "detail": "architect"
+    },
+    {
+      "t": 379546,
+      "type": "error",
+      "detail": "Simulation failed"
+    }
+  ]
+}

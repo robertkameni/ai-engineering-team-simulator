@@ -18,6 +18,7 @@ import {
 import { normalizeAgentPersistedText } from "@/ai/orchestration/agent-stream-text";
 import {
   buildTruncationContinuationPrompt,
+  isWorthlessContinuation,
   looksLikeTruncatedAgentOutput,
   mergeContinuationText,
 } from "@/ai/orchestration/looks-like-truncated-agent-output";
@@ -326,9 +327,14 @@ async function continueAgentStreamIfTruncated(
       continuationOf: merged,
     });
 
-    if (continuation.trim()) {
-      merged = mergeContinuationText(merged, continuation);
+    if (!continuation.trim() || isWorthlessContinuation(continuation)) {
+      console.info(`${role}: skipping worthless continuation (meta/duplicate tags)`, {
+        continuationIndex: continuationIndex + 1,
+      });
+      return merged;
     }
+
+    merged = mergeContinuationText(merged, continuation);
   }
 
   return retryAfterTruncationExhausted({

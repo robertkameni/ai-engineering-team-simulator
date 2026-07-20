@@ -22,7 +22,17 @@ export interface RunSummaryPayload {
   readonly openReviewIssueCount?: number;
   readonly debateDurationMs?: number | null;
   readonly artifactDurationMs?: number | null;
+  /** Wall-clock wait for artifact synthesis (usually equals artifactDurationMs). */
+  readonly userWaitMs?: number | null;
+  /**
+   * Debate + artifact phases. Provisional at debate end (debate only) until
+   * synthesis settles and rewrites this to debate + artifact.
+   */
   readonly totalDurationMs?: number | null;
+  /** True while core artifact synthesis is still in flight. */
+  readonly artifactsPending?: boolean;
+  /** Post-approve truncation recovery attempted but still truncated. */
+  readonly postApproveContinuationFailed?: boolean;
   readonly peakPromptTokens?: number | null;
   readonly opsFollowUpEvaluated?: boolean;
   readonly opsFollowUpTriggered?: boolean;

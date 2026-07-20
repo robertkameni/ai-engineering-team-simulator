@@ -44,6 +44,8 @@ import { syncHasTruncatedCriticalTurn } from "@/ai/orchestration/truncation-appr
 import {
   selectSilentRoleNearCap,
   shouldInviteDevOps,
+  shouldPreferNearCapApprove,
+  NEAR_CAP_APPROVE_REMAINING_TURNS,
 } from "@/ai/orchestration/role-participation";
 import { shouldTriggerSoftwareEarlyReview as shouldTriggerSoftwareEarlyReviewGate } from "@/ai/orchestration/software-early-review";
 import { resolveReviewerOutcome } from "@/ai/orchestration/resolve-reviewer-outcome";
@@ -69,6 +71,7 @@ import {
   scheduleOpsFollowUpTurn,
   recordOpsFollowUpCheckpoint,
   selectOpsFollowUpSummary,
+  getUnresolvedDevOpsIssues,
 } from "@/ai/orchestration/ops-follow-up";
 import { opsFollowUpFieldsFromCheckpoint } from "@/lib/db/ops-follow-up-summary";
 import {
@@ -96,7 +99,6 @@ export async function runSimulation(
   const usageAccumulator =
     options.usageAccumulator ?? new RunUsageAccumulator();
   const abortSignal = options.abortSignal;
-  const runStartedAt = Date.now();
   const run = await createRun(productIdea, {
     userId: options.userId,
     guestSessionId: options.guestSessionId,
@@ -142,6 +144,8 @@ export async function runSimulation(
       isArchitectRevision: false,
       hasTruncatedCriticalTurn: false,
       postApproveTruncation: false,
+      postApproveContinuationFailed: false,
+      truncationRecoveryAttemptedRoles: [],
       reviewIssues: [],
       isGateReroute: false,
       hasHadEarlyReview: false,
@@ -183,10 +187,14 @@ export async function runSimulation(
         turnCount: state.turnCount,
         hasTruncatedCriticalTurn: state.hasTruncatedCriticalTurn || undefined,
         postApproveTruncation: state.postApproveTruncation || undefined,
+        postApproveContinuationFailed:
+          state.postApproveContinuationFailed || undefined,
         openReviewIssueCount: buildIssueSnapshot(state.reviewIssues).totalOpen || undefined,
         debateDurationMs,
         artifactDurationMs: null,
-        totalDurationMs: Date.now() - runStartedAt,
+        userWaitMs: null,
+        totalDurationMs: debateDurationMs,
+        artifactsPending: true,
         peakPromptTokens: usageTotals.peakPromptTokens ?? null,
         ...opsFollowUpFieldsFromCheckpoint(opsFollowUpSummary.last),
         opsFollowUpArchitectCheckpoint: architectCheckpoint,
@@ -413,6 +421,25 @@ function applyLinearProgressionOrCap(
     return { action: "continue" };
   }
 
+  const openIssueCount = buildIssueSnapshot(state.reviewIssues).totalOpen;
+  if (
+    shouldPreferNearCapApprove({
+      transcript: state.transcript,
+      turnCount: state.turnCount,
+      maxTurns,
+      openIssueCount,
+      unresolvedOpsIssueCount: getUnresolvedDevOpsIssues(state.reviewIssues).length,
+    })
+  ) {
+    console.info("NEAR-CAP APPROVE: closing with approve instead of cap_reached", {
+      runId: ctx.runId,
+      turnCount: state.turnCount,
+      maxTurns,
+      openIssueCount,
+    });
+    return { action: "break", outcome: "approved" };
+  }
+
   return { action: "break", outcome: "cap_reached" };
 }
 
@@ -611,6 +638,11 @@ async function runDebateTurn(
     ctx.roster,
     state.lastRejectTarget,
     state.lastRejectFeedback,
+    {
+      nearCapCorrection:
+        getMaxSimulationTurns(ctx.templateId) - state.turnCount <=
+        NEAR_CAP_APPROVE_REMAINING_TURNS,
+    },
   );
 
   enrichDebateContext(role, state, ctx, debateContext);

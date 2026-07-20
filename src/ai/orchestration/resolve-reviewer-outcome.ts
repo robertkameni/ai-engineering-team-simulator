@@ -17,9 +17,12 @@ import { parseReviewerDecisionWithMangleRecovery } from "@/ai/orchestration/norm
 import {
   canApproveWithFullParticipation,
   listMissingPipelineRoles,
+  shouldPreferNearCapApprove,
   shouldScheduleMissingRoleFirstTurn,
 } from "@/ai/orchestration/role-participation";
+import { getUnresolvedDevOpsIssues } from "@/ai/orchestration/ops-follow-up";
 import {
+  getLatestTruncatedCriticalRoles,
   hasCurrentCriticalTruncation,
   syncHasTruncatedCriticalTurn,
 } from "@/ai/orchestration/truncation-approval-gate";
@@ -28,6 +31,10 @@ import type {
   TurnContext,
   TurnDirective,
 } from "@/ai/orchestration/run-simulation-types";
+
+function unresolvedOpsCount(state: DebateState): number {
+  return getUnresolvedDevOpsIssues(state.reviewIssues).length;
+}
 
 export function resolveReviewerOutcome(
   role: SimulationAgentRole,
@@ -83,26 +90,107 @@ function resolveApproveDecision(
 
     const maxTurns = getMaxSimulationTurns(ctx.templateId);
     if (state.turnCount >= maxTurns - 1) {
-      return { kind: "break", outcome: "cap_reached" };
+      return preferNearCapApproveOrCap(state, ctx, maxTurns);
     }
 
     state.returnToReviewer = true;
     return { kind: "reroute", targetRole: inviteRole };
   }
 
-  // Never downgrade APPROVE to degraded_truncated — warn instead.
-  syncHasTruncatedCriticalTurn(state, state.transcript);
-  if (hasCurrentCriticalTruncation(state.transcript)) {
-    console.warn(
-      "TRUNCATION APPROVAL GUARD: reviewer approved with truncated critical turns — keeping approved, setting postApproveTruncation",
-      { runId: ctx.runId, turnCount: state.turnCount },
-    );
-    state.postApproveTruncation = true;
-    state.hasTruncatedCriticalTurn = true;
+  const truncationRecovery = maybeScheduleTruncationRecovery(state, ctx);
+  if (truncationRecovery) {
+    return truncationRecovery;
   }
 
   markIssuesAddressed(state.reviewIssues);
   return { kind: "break", outcome: "approved" };
+}
+
+/**
+ * When reviewer approves but a critical turn is still truncated, retry that
+ * role once before finalize. Clears postApproveTruncation when recovery
+ * succeeds on a later approve; otherwise ships Approved with the warning flag.
+ */
+export function maybeScheduleTruncationRecovery(
+  state: DebateState,
+  ctx: TurnContext,
+): TurnDirective | null {
+  syncHasTruncatedCriticalTurn(state, state.transcript);
+
+  if (!hasCurrentCriticalTruncation(state.transcript)) {
+    state.postApproveTruncation = false;
+    state.hasTruncatedCriticalTurn = false;
+    if (state.truncationRecoveryAttemptedRoles.length > 0) {
+      state.postApproveContinuationFailed = false;
+    }
+    return null;
+  }
+
+  const truncatedRoles = getLatestTruncatedCriticalRoles(state.transcript);
+  const maxTurns = getMaxSimulationTurns(ctx.templateId);
+  const remainingBudget = maxTurns - state.turnCount;
+  const recoverableRole = truncatedRoles.find(
+    (role) => !state.truncationRecoveryAttemptedRoles.includes(role),
+  );
+
+  if (recoverableRole && remainingBudget >= 2) {
+    console.info(
+      "TRUNCATION RECOVERY: retrying truncated critical turn before finalize approve",
+      {
+        runId: ctx.runId,
+        recoverableRole,
+        truncatedRoles,
+        turnCount: state.turnCount,
+        remainingBudget,
+      },
+    );
+    state.truncationRecoveryAttemptedRoles = [
+      ...state.truncationRecoveryAttemptedRoles,
+      recoverableRole,
+    ];
+    state.returnToReviewer = true;
+    state.isGateReroute = true;
+    return { kind: "reroute", targetRole: recoverableRole };
+  }
+
+  console.warn(
+    "TRUNCATION APPROVAL GUARD: reviewer approved with truncated critical turns — keeping approved, setting postApproveTruncation",
+    { runId: ctx.runId, turnCount: state.turnCount, truncatedRoles },
+  );
+  state.postApproveTruncation = true;
+  state.hasTruncatedCriticalTurn = true;
+  if (state.truncationRecoveryAttemptedRoles.length > 0) {
+    state.postApproveContinuationFailed = true;
+  }
+  return null;
+}
+
+function preferNearCapApproveOrCap(
+  state: DebateState,
+  ctx: TurnContext,
+  maxTurns: number,
+): TurnDirective {
+  const openIssueCount = buildIssueSnapshot(state.reviewIssues).totalOpen;
+  if (
+    shouldPreferNearCapApprove({
+      transcript: state.transcript,
+      turnCount: state.turnCount,
+      maxTurns,
+      openIssueCount,
+      unresolvedOpsIssueCount: unresolvedOpsCount(state),
+    })
+  ) {
+    console.info("NEAR-CAP APPROVE: participation complete with minor open issues", {
+      runId: ctx.runId,
+      turnCount: state.turnCount,
+      maxTurns,
+      openIssueCount,
+    });
+    markIssuesAddressed(state.reviewIssues);
+    return { kind: "break", outcome: "approved" };
+  }
+
+  return { kind: "break", outcome: "cap_reached" };
 }
 
 function resolveRejectDecision(
@@ -136,15 +224,41 @@ function resolveRejectDecision(
   );
   state.reviewIssues.push(...newIssues);
 
+  const maxTurns = getMaxSimulationTurns(ctx.templateId);
+  const openIssueCount = buildIssueSnapshot(state.reviewIssues).totalOpen;
+
+  if (
+    shouldPreferNearCapApprove({
+      transcript: state.transcript,
+      turnCount: state.turnCount,
+      maxTurns,
+      openIssueCount,
+      unresolvedOpsIssueCount: unresolvedOpsCount(state),
+    })
+  ) {
+    console.info(
+      "NEAR-CAP APPROVE: preferring approve over further reject cycles",
+      {
+        runId: ctx.runId,
+        turnCount: state.turnCount,
+        maxTurns,
+        openIssueCount,
+        rejectRole,
+      },
+    );
+    markIssuesAddressed(state.reviewIssues);
+    return { kind: "break", outcome: "approved" };
+  }
+
   if (hasExceededReviewerRejectionCap(state.reviewerRejectionCount)) {
     console.warn("Reviewer rejection cap reached, closing debate", {
       runId: ctx.runId,
       reviewerRejectionCount: state.reviewerRejectionCount,
       maxReviewerRejectionCycles: 4,
       perRoleCorrections: { ...state.roleCorrectionCounts },
-      openIssues: buildIssueSnapshot(state.reviewIssues).totalOpen,
+      openIssues: openIssueCount,
     });
-    return { kind: "break", outcome: "cap_reached" };
+    return preferNearCapApproveOrCap(state, ctx, maxTurns);
   }
 
   if (!canCorrectRole(state.roleCorrectionCounts, rejectRole)) {
@@ -153,12 +267,11 @@ function resolveRejectDecision(
       rejectRole,
       maxPerRole: 2,
       currentCount: state.roleCorrectionCounts[rejectRole] ?? 0,
-      openIssues: buildIssueSnapshot(state.reviewIssues).totalOpen,
+      openIssues: openIssueCount,
     });
-    return { kind: "break", outcome: "cap_reached" };
+    return preferNearCapApproveOrCap(state, ctx, maxTurns);
   }
 
-  const maxTurns = getMaxSimulationTurns(ctx.templateId);
   const remainingBudget = maxTurns - state.turnCount;
 
   if (remainingBudget < 2) {
@@ -171,9 +284,21 @@ function resolveRejectDecision(
         remainingBudget,
         rejectRole,
         templateId: ctx.templateId,
-        openIssues: buildIssueSnapshot(state.reviewIssues).totalOpen,
+        openIssues: openIssueCount,
       },
     );
+    if (
+      shouldPreferNearCapApprove({
+        transcript: state.transcript,
+        turnCount: state.turnCount,
+        maxTurns,
+        openIssueCount,
+        unresolvedOpsIssueCount: unresolvedOpsCount(state),
+      })
+    ) {
+      markIssuesAddressed(state.reviewIssues);
+      return { kind: "break", outcome: "approved" };
+    }
     return { kind: "break", outcome: "insufficient_budget" };
   }
 
@@ -201,6 +326,20 @@ function resolveUnknownDecision(
 
   const maxTurns = getMaxSimulationTurns(ctx.templateId);
   const remainingBudget = maxTurns - state.turnCount;
+  const openIssueCount = buildIssueSnapshot(state.reviewIssues).totalOpen;
+
+  if (
+    shouldPreferNearCapApprove({
+      transcript: state.transcript,
+      turnCount: state.turnCount,
+      maxTurns,
+      openIssueCount,
+      unresolvedOpsIssueCount: unresolvedOpsCount(state),
+    })
+  ) {
+    markIssuesAddressed(state.reviewIssues);
+    return { kind: "break", outcome: "approved" };
+  }
 
   if (remainingBudget >= 2 && state.turnCount < maxTurns) {
     if (!canCorrectRole(state.roleCorrectionCounts, fallbackRole)) {

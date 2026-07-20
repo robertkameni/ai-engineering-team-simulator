@@ -71,6 +71,20 @@ export function hasCoreArtifacts(
   return countCoreArtifacts(artifacts) === CORE_ARTIFACT_TYPES.length;
 }
 
+/**
+ * Approved runs must ship all core artifacts. Prevents the food-run failure
+ * mode (Approved + 0/5 in export) when synthesis has not completed.
+ */
+export function canExportApprovedRun(params: {
+  readonly debateOutcome: DebateExitOutcome | null | undefined;
+  readonly artifacts: PartialRunArtifacts | null | undefined;
+}): boolean {
+  if (params.debateOutcome !== "approved") {
+    return true;
+  }
+  return hasCoreArtifacts(params.artifacts);
+}
+
 export function shouldShowArtifactTabs(
   status: ArtifactsPanelStatus,
   artifacts: PartialRunArtifacts | null | undefined,

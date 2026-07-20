@@ -256,12 +256,12 @@ export function mergeContinuationText(
   const base = prior.trimEnd();
   const next = stripOverlappingContinuationPrefix(base, continuation);
   if (!next) {
-    return base;
+    return sanitizeMergedContinuation(base);
   }
   if (!base) {
-    return next;
+    return sanitizeMergedContinuation(next);
   }
-  return `${base}\n\n${next}`;
+  return sanitizeMergedContinuation(`${base}\n\n${next}`);
 }
 
 function finalSectionGuidance(role: SimulationAgentRole): string {
@@ -278,9 +278,60 @@ function finalSectionGuidance(role: SimulationAgentRole): string {
     return "Complete ## Decisions & Risks. End on a complete sentence.";
   }
   if (role === "reviewer") {
-    return "Finish recommendations briefly, then end with [APPROVE] or [REJECT: role] alone on the absolute last line.";
+    return "If the prior message already ends with [APPROVE] or [REJECT: role], output exactly NO_CONTINUATION_NEEDED and nothing else. Otherwise finish recommendations briefly, then end with [APPROVE] or [REJECT: role] alone on the absolute last line — never emit a second decision tag.";
   }
   return "Complete your role's final mandatory section and end on a complete sentence.";
+}
+
+const CONTINUATION_META_LINE =
+  /^(?:no(?:\s+further)?\s+continuation\s+needed|already\s+complete|nothing\s+to\s+(?:add|continue)|done\.?|no_continuation_needed)$/i;
+
+const DECISION_TAG_GLOBAL =
+  /\[(?:APPROVE|REJECT:\s*(?:pm|architect|backend|frontend|devops))\]/gi;
+
+/**
+ * True when a continuation adds no substantive content (meta-only or
+ * duplicate decision tags). Used to stop continuation loops that append
+ * "no continuation needed" + another [APPROVE].
+ */
+export function isWorthlessContinuation(continuation: string): boolean {
+  const trimmed = continuation.trim();
+  if (!trimmed) {
+    return true;
+  }
+
+  const withoutTags = trimmed.replace(DECISION_TAG_GLOBAL, "").trim();
+  if (!withoutTags) {
+    return true;
+  }
+
+  const substantiveLines = withoutTags
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !CONTINUATION_META_LINE.test(line));
+
+  return substantiveLines.length === 0;
+}
+
+/**
+ * Strip continuation meta-commentary and collapse duplicate trailing
+ * decision tags so merged reviewer turns do not accumulate [APPROVE] spam.
+ */
+export function sanitizeMergedContinuation(text: string): string {
+  const withoutMeta = text
+    .split(/\n+/)
+    .filter((line) => !CONTINUATION_META_LINE.test(line.trim()))
+    .join("\n")
+    .trim();
+
+  const tags = [...withoutMeta.matchAll(DECISION_TAG_GLOBAL)];
+  if (tags.length <= 1) {
+    return withoutMeta;
+  }
+
+  const lastTag = tags[tags.length - 1]![0];
+  const withoutTags = withoutMeta.replace(DECISION_TAG_GLOBAL, "").trimEnd();
+  return `${withoutTags}\n\n${lastTag}`;
 }
 
 export function buildTruncationContinuationPrompt(
@@ -288,7 +339,7 @@ export function buildTruncationContinuationPrompt(
   role: SimulationAgentRole = "frontend",
 ): string {
   const excerpt = tail.trim().slice(-600);
-  return `Your previous team message was cut off by the output limit. Continue from the exact next token — do not repeat sentences or headings already written, do not re-paste prior paragraphs, do not add meta-commentary about limits. Close any open backticks, parentheses, or JSON. ${finalSectionGuidance(role)} Last characters of your prior message:
+  return `Your previous team message was cut off by the output limit. Continue from the exact next token — do not repeat sentences or headings already written, do not re-paste prior paragraphs, do not add meta-commentary about limits or whether continuation is needed. Close any open backticks, parentheses, or JSON. ${finalSectionGuidance(role)} Last characters of your prior message:
 
 """${excerpt}"""`;
 }

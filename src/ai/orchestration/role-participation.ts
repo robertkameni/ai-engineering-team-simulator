@@ -81,3 +81,44 @@ export function canApproveWithFullParticipation(
 ): boolean {
   return listMissingPipelineRoles(transcript).length === 0;
 }
+
+/** Remaining turns at/under this count count as "near cap" for prefer-approve. */
+export const NEAR_CAP_APPROVE_REMAINING_TURNS = 2;
+
+/** Open review issues at/under this count are treated as minor near cap. */
+export const NEAR_CAP_APPROVE_MAX_OPEN_ISSUES = 2;
+
+/** Correction feedback excerpt cap when near the turn budget. */
+export const NEAR_CAP_FEEDBACK_EXCERPT_MAX_CHARS = 500;
+
+/**
+ * Near the turn cap, prefer [APPROVE] over burning remaining turns on
+ * correction cycles when every pipeline role has spoken, ops issues are
+ * addressed, and only minor open issues remain.
+ */
+export function shouldPreferNearCapApprove(params: {
+  readonly transcript: readonly TranscriptEntry[];
+  readonly turnCount: number;
+  readonly maxTurns: number;
+  readonly openIssueCount: number;
+  readonly unresolvedOpsIssueCount?: number;
+}): boolean {
+  const remaining = params.maxTurns - params.turnCount;
+  if (remaining > NEAR_CAP_APPROVE_REMAINING_TURNS) {
+    return false;
+  }
+  if (!canApproveWithFullParticipation(params.transcript)) {
+    return false;
+  }
+  if ((params.unresolvedOpsIssueCount ?? 0) > 0) {
+    return false;
+  }
+  return params.openIssueCount <= NEAR_CAP_APPROVE_MAX_OPEN_ISSUES;
+}
+
+/** Alias used by debate telemetry / tests for near-cap forced approve. */
+export function forcedApproveNearCap(
+  params: Parameters<typeof shouldPreferNearCapApprove>[0],
+): boolean {
+  return shouldPreferNearCapApprove(params);
+}

@@ -44,9 +44,9 @@ Model options are configured in `src/ai/agents/config.ts` via `DEEPSEEK_CHAT_OPT
 
 Simulation streams emit these SSE events (defined in `src/lib/simulation-stream.ts`):
 
-- `run_started` → `team_ready` → (`agent_start` → `text-delta` / `tool_start` → `tool_end` → `agent_end`)\* → `artifacts_start` → `done` | `error`
+- `run_started` → `team_ready` → (`agent_start` → `text-delta` / `tool_start` → `tool_end` → `agent_end`)\* → `artifacts_start` → (`artifact_complete`)\* → `all_artifacts_complete` → `done` | `error`
 
-Never invent new event types — use the existing contract. The `team_ready` event must fire immediately after classification.
+`/api/simulate` awaits core artifact synthesis before `done` (timeout → `done.artifactTimeout: true`; client polls with exponential backoff as fallback). Prefer these events over inventing new ones. The `team_ready` event must fire immediately after classification.
 
 ## Cost Tracking
 

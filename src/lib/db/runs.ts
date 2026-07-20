@@ -137,21 +137,31 @@ export async function appendMessage(
 ) {
   const now = new Date();
 
-  return prisma.$transaction([
-    prisma.message.create({
-      data: {
-        runId,
-        agentRole,
-        agentName,
-        content,
-        order,
-      },
-    }),
-    prisma.run.update({
+  // Sequential writes avoid Neon WebSocket pool stalls on `$transaction`
+  // ("Unable to start a transaction in the given time") during long debates.
+  const message = await prisma.message.create({
+    data: {
+      runId,
+      agentRole,
+      agentName,
+      content,
+      order,
+    },
+  });
+
+  try {
+    await prisma.run.update({
       where: { id: runId },
       data: { updatedAt: now },
-    }),
-  ]);
+    });
+  } catch (error) {
+    console.warn("appendMessage: failed to touch run updatedAt", {
+      runId,
+      error,
+    });
+  }
+
+  return message;
 }
 
 export async function getRunWithMessages(runId: string) {
@@ -395,9 +405,13 @@ function buildSummaryTelemetryFields(
 ) {
   return {
     postApproveTruncation: summaryPayload?.postApproveTruncation === true,
+    postApproveContinuationFailed:
+      summaryPayload?.postApproveContinuationFailed === true,
     debateDurationMs: summaryPayload?.debateDurationMs ?? null,
     artifactDurationMs: summaryPayload?.artifactDurationMs ?? null,
+    userWaitMs: summaryPayload?.userWaitMs ?? null,
     totalDurationMs: summaryPayload?.totalDurationMs ?? null,
+    artifactsPending: summaryPayload?.artifactsPending === true,
     peakPromptTokens: summaryPayload?.peakPromptTokens ?? null,
     stackValidationFailed: summaryPayload?.stackValidationFailed === true,
     crossValidationFailed: summaryPayload?.crossValidationFailed === true,

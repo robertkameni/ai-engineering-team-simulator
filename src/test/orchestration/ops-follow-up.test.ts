@@ -87,6 +87,8 @@ function buildBaseState(
     isArchitectRevision: false,
     hasTruncatedCriticalTurn: false,
     postApproveTruncation: false,
+    postApproveContinuationFailed: false,
+    truncationRecoveryAttemptedRoles: [],
     reviewIssues: [],
     isGateReroute: false,
     hasHadEarlyReview: false,
@@ -385,7 +387,7 @@ describe("ops follow-up observability checkpoint", () => {
     assert.equal(state.opsFollowUpCheckpoints[0], checkpoint);
   });
 
-  it("records backend-path evaluation as out-of-scope for trigger", () => {
+  it("keeps mid-debate backend corrections out of ops follow-up scope", () => {
     const ctx = buildTurnContext("software");
     const reviewIssues = createReviewIssues(
       [],
@@ -396,6 +398,7 @@ describe("ops follow-up observability checkpoint", () => {
       ctx.roster,
     );
     const state = buildBaseState(ctx.roster.devops.name, {
+      turnCount: 10,
       lastRejectFeedback: SUBSCRIPTION_STYLE_FEEDBACK(ctx.roster.devops.name),
       lastRejectTarget: "backend",
       transcript: [
@@ -421,6 +424,40 @@ describe("ops follow-up observability checkpoint", () => {
 
     assert.equal(state.opsFollowUpCheckpoints.length, 1);
     assert.equal(state.opsFollowUpCheckpoints[0], checkpoint);
+  });
+
+  it("triggers ops follow-up on near-cap backend correction with unresolved DevOps issues", () => {
+    const ctx = buildTurnContext("software");
+    const maxTurns = getMaxSimulationTurns("software");
+    const reviewIssues = createReviewIssues(
+      [],
+      "backend",
+      BACKEND_ONLY_FEEDBACK,
+      0,
+      maxTurns - 2,
+      ctx.roster,
+    );
+    const state = buildBaseState(ctx.roster.devops.name, {
+      turnCount: maxTurns - 2,
+      lastRejectFeedback: SUBSCRIPTION_STYLE_FEEDBACK(ctx.roster.devops.name),
+      lastRejectTarget: "backend",
+      transcript: [
+        { role: "reviewer", agentName: "Marcus", content: "Review" },
+        { role: "backend", agentName: "Kai", content: "Backend correction" },
+      ],
+      reviewIssues,
+    });
+
+    recordOpsFollowUpCheckpoint(state, ctx);
+    const checkpoint = state.opsFollowUpCheckpoint;
+
+    assert.equal(resolveLastCorrectionRole(state.transcript), "backend");
+    assert.equal(checkpoint?.opsFollowUpEvaluated, true);
+    assert.equal(checkpoint?.opsFollowUpTriggered, true);
+    assert.equal(checkpoint?.opsFollowUpEligible, true);
+    assert.equal(checkpoint?.opsFollowUpSkipReason, null);
+    assert.equal(checkpoint?.opsFollowUpLastCorrectionRole, "backend");
+    assert.ok((checkpoint?.opsFollowUpUnresolvedDevopsIssueCount ?? 0) >= 2);
   });
 });
 

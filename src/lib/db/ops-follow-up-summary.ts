@@ -192,6 +192,16 @@ export function appendOpsFollowUpMetadataLines(
 
   lines.push("**Ops follow-up evaluated:** yes");
   appendCheckpointLines(lines, fields, "Ops follow-up ");
+  lines.push(
+    `**opsIssuesUnresolved:** ${fields.opsFollowUpUnresolvedDevopsIssueCount}`,
+    `**opsIssueResolution:** ${
+      fields.opsFollowUpUnresolvedDevopsIssueCount === 0
+        ? "resolved"
+        : fields.opsFollowUpTriggered
+          ? "attempted"
+          : "unresolved"
+    }`,
+  );
   lines.push("");
 
   if (architectCheckpoint) {
@@ -251,6 +261,16 @@ export function appendOpsFollowUpMetadataHtml(
     '<p class="meta-block"><strong>Ops follow-up evaluated:</strong> yes</p>',
   );
   appendCheckpointHtml(parts, fields, "Ops follow-up ");
+  parts.push(
+    `<p class="meta-block"><strong>opsIssuesUnresolved:</strong> ${fields.opsFollowUpUnresolvedDevopsIssueCount}</p>`,
+    `<p class="meta-block"><strong>opsIssueResolution:</strong> ${
+      fields.opsFollowUpUnresolvedDevopsIssueCount === 0
+        ? "resolved"
+        : fields.opsFollowUpTriggered
+          ? "attempted"
+          : "unresolved"
+    }</p>`,
+  );
 
   if (architectCheckpoint) {
     parts.push(

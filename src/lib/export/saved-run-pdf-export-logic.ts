@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/run-access-denied-response";
 import type { RequireRunAccessResult } from "@/lib/auth/run-ownership";
 import type { RateLimitResult } from "@/lib/rate-limit-config";
+import { canExportApprovedRun } from "@/features/artifacts/artifact-panel-phase";
 import type { MockRun } from "@/features/agents/types";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 
@@ -61,6 +62,21 @@ export async function executeSavedRunPdfExport(
   const run = await hooks.getRunForWorkspaceIfOwned(runId, scope);
   if (!run) {
     return Response.json({ error: "Run not found" }, { status: 404 });
+  }
+
+  if (
+    !canExportApprovedRun({
+      debateOutcome: run.debateOutcome,
+      artifacts: run.artifacts,
+    })
+  ) {
+    return Response.json(
+      {
+        error:
+          "Artifacts are not ready for this approved run. Wait for synthesis to finish, then retry export.",
+      },
+      { status: 409 },
+    );
   }
 
   const roster = await hooks.getTeamRoster(runId);
