@@ -286,6 +286,10 @@ function finalSectionGuidance(role: SimulationAgentRole): string {
 const CONTINUATION_META_LINE =
   /^(?:no(?:\s+further)?\s+continuation\s+needed|already\s+complete|nothing\s+to\s+(?:add|continue)|done\.?|no_continuation_needed)$/i;
 
+/** Live models emit prose like "I have no continuation needed". */
+const CONTINUATION_META_INLINE =
+  /\b(?:i\s+have\s+)?no(?:\s+further)?\s+continuation\s+needed\b|\bnothing\s+(?:further\s+)?to\s+(?:add|continue)\b|\bno_continuation_needed\b/i;
+
 const DECISION_TAG_GLOBAL =
   /\[(?:APPROVE|REJECT:\s*(?:pm|architect|backend|frontend|devops))\]/gi;
 
@@ -308,9 +312,29 @@ export function isWorthlessContinuation(continuation: string): boolean {
   const substantiveLines = withoutTags
     .split(/\n+/)
     .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !CONTINUATION_META_LINE.test(line));
+    .filter((line) => {
+      if (line.length === 0) {
+        return false;
+      }
+      if (CONTINUATION_META_LINE.test(line)) {
+        return false;
+      }
+      if (CONTINUATION_META_INLINE.test(line) && line.length < 280) {
+        return false;
+      }
+      return true;
+    });
 
-  return substantiveLines.length === 0;
+  if (substantiveLines.length === 0) {
+    return true;
+  }
+
+  // Entire body is meta prose even if multi-sentence.
+  if (CONTINUATION_META_INLINE.test(withoutTags) && withoutTags.length < 400) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -320,7 +344,16 @@ export function isWorthlessContinuation(continuation: string): boolean {
 export function sanitizeMergedContinuation(text: string): string {
   const withoutMeta = text
     .split(/\n+/)
-    .filter((line) => !CONTINUATION_META_LINE.test(line.trim()))
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (CONTINUATION_META_LINE.test(trimmed)) {
+        return false;
+      }
+      if (CONTINUATION_META_INLINE.test(trimmed) && trimmed.length < 280) {
+        return false;
+      }
+      return true;
+    })
     .join("\n")
     .trim();
 

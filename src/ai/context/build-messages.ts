@@ -5,6 +5,11 @@ import { getTeamMember, type TeamRoster } from "@/ai/agents/roster";
 import { buildLanguageMatchDirective } from "@/ai/context/detect-product-language";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { buildSimulationStackReferenceDirective } from "@/ai/context/simulation-stack-reference";
+import {
+  estimatePromptTokensFromChars,
+  isPromptContextOverBudget,
+  truncatePromptContentToBudget,
+} from "@/ai/context/prompt-context-budget";
 import { windowTranscriptForTurn } from "@/ai/context/window-transcript";
 import { buildReviewerPreflightChecklist } from "@/ai/orchestration/reviewer-preflight";
 import { getAgentTurnPrompt } from "@/ai/prompts";
@@ -78,6 +83,53 @@ const STACK_REFERENCE_ROLES = new Set<SimulationAgentRole>([
   "devops",
 ]);
 
+function applyPromptContextBudget(messages: ModelMessage[]): {
+  readonly messages: ModelMessage[];
+  readonly contextBudgetExceeded: boolean;
+} {
+  const totalChars = messages.reduce((sum, message) => {
+    return (
+      sum + (typeof message.content === "string" ? message.content.length : 0)
+    );
+  }, 0);
+
+  if (
+    !isPromptContextOverBudget({
+      charCount: totalChars,
+      promptTokens: estimatePromptTokensFromChars(totalChars),
+    })
+  ) {
+    return { messages, contextBudgetExceeded: false };
+  }
+
+  console.warn("PROMPT CONTEXT BUDGET: truncating assembled messages", {
+    totalChars,
+    estimatedTokens: estimatePromptTokensFromChars(totalChars),
+  });
+
+  const truncated: ModelMessage[] = [];
+  for (let index = 0; index < messages.length; index += 1) {
+    const message = messages[index]!;
+    if (typeof message.content !== "string" || index === messages.length - 1) {
+      truncated.push(message);
+      continue;
+    }
+    const result = truncatePromptContentToBudget(message.content);
+    if (!result.wasTruncated) {
+      truncated.push(message);
+      continue;
+    }
+    // Rebuild string-content messages explicitly — spreading a tool message
+    // would widen content to string and fail ModelMessage assignability.
+    truncated.push({
+      role: message.role as "system" | "user" | "assistant",
+      content: result.content,
+    });
+  }
+
+  return { messages: truncated, contextBudgetExceeded: true };
+}
+
 export function buildAgentMessages(
   role: AgentRole,
   productIdea: string,
@@ -140,7 +192,7 @@ export function buildAgentMessages(
     ),
   });
 
-  return messages;
+  return applyPromptContextBudget(messages).messages;
 }
 
 function formatTranscriptMessage(entry: TranscriptEntry): string {

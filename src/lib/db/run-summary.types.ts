@@ -22,8 +22,13 @@ export interface RunSummaryPayload {
   readonly openReviewIssueCount?: number;
   readonly debateDurationMs?: number | null;
   readonly artifactDurationMs?: number | null;
-  /** Wall-clock wait for artifact synthesis (usually equals artifactDurationMs). */
+  /**
+   * User-experienced wait from run start until debate + artifacts are ready
+   * (≈ debateDurationMs + artifactDurationMs). Never artifact time alone.
+   */
   readonly userWaitMs?: number | null;
+  /** True when unproductive reject→correct cycles forced prefer-approve. */
+  readonly correctionLoopDetected?: boolean;
   /**
    * Debate + artifact phases. Provisional at debate end (debate only) until
    * synthesis settles and rewrites this to debate + artifact.

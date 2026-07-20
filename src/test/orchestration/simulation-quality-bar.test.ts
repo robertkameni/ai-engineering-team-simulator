@@ -68,6 +68,8 @@ function buildState(overrides: Partial<DebateState> = {}): DebateState {
     focusedOpsFollowUp: null,
     opsFollowUpCheckpoint: null,
     opsFollowUpCheckpoints: [],
+    consecutiveUnproductiveCycles: 0,
+    correctionLoopDetected: false,
     ...overrides,
   };
 }
