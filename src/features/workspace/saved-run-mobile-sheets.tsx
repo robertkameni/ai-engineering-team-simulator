@@ -21,6 +21,7 @@ interface SavedRunMobileSheetsProps {
   regenerateRunId?: string;
   canRegenerateArtifacts: boolean;
   debateOutcome?: DebateExitOutcome | null;
+  postApproveTruncation?: boolean;
   stackValidationFailed?: boolean;
   crossValidationFailed?: boolean;
   children: React.ReactNode;
@@ -35,6 +36,7 @@ export function SavedRunMobileSheets({
   regenerateRunId,
   canRegenerateArtifacts,
   debateOutcome = null,
+  postApproveTruncation = false,
   stackValidationFailed = false,
   crossValidationFailed = false,
   children,
@@ -64,6 +66,7 @@ export function SavedRunMobileSheets({
     regenerateRunId,
     canRegenerateArtifacts,
     debateOutcome,
+    postApproveTruncation,
     stackValidationFailed,
     crossValidationFailed,
   };

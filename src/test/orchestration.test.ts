@@ -422,12 +422,12 @@ describe("classify-project keyword helpers", () => {
 });
 
 describe("windowTranscriptForTurn", () => {
-  it("returns the full transcript for correction turns", () => {
+  it("summarizes correction turns instead of sending the full transcript", () => {
     const roster = createSimulationRoster("software");
     const transcript = Array.from({ length: 8 }, (_, index) => ({
       role: "pm" as const,
       agentName: roster.pm.name,
-      content: `Message ${index + 1}`,
+      content: `Message ${index + 1} `.repeat(20),
     }));
 
     const windowed = windowTranscriptForTurn(transcript, roster, {
@@ -438,8 +438,9 @@ describe("windowTranscriptForTurn", () => {
       },
     });
 
-    assert.equal(windowed.omittedSummary, null);
-    assert.equal(windowed.entries.length, 8);
+    assert.ok(windowed.omittedSummary?.includes("Earlier debate summary"));
+    assert.equal(windowed.entries.length, 1);
+    assert.ok(windowed.entries[0]?.content.includes("Message 8"));
   });
 
   it("windows long transcripts to recent messages with a summary", () => {
@@ -486,6 +487,7 @@ describe("buildReviewerPreflightChecklist", () => {
     assert.ok(checklist.includes("Missing roles"));
     assert.ok(checklist.includes("backup"));
     assert.ok(checklist.includes("onboarding"));
+    assert.ok(checklist.includes("not applicable yet"));
   });
 });
 

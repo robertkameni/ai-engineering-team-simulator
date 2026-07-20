@@ -24,6 +24,8 @@ export interface GenerateRunArtifactsResult {
   readonly crossValidationFailed: boolean;
   /** ARTIFACT TRUTHFULNESS GUARD — violations found during post-generation check. */
   readonly truthfulnessViolations: readonly ArtifactTruthfulnessViolationEntry[];
+  /** Wall-clock duration of the artifact synthesis phase. */
+  readonly artifactDurationMs?: number;
 }
 
 export interface StackRetryResult {

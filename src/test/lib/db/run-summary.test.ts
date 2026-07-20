@@ -36,7 +36,12 @@ describe("run summary helpers", () => {
       stackValidationFailed: undefined,
       crossValidationFailed: undefined,
       hasTruncatedCriticalTurn: undefined,
+      postApproveTruncation: undefined,
       openReviewIssueCount: undefined,
+      debateDurationMs: undefined,
+      artifactDurationMs: undefined,
+      totalDurationMs: undefined,
+      peakPromptTokens: undefined,
       ...DEFAULT_OPS_FIELDS,
     });
   });
@@ -99,7 +104,12 @@ describe("run summary helpers", () => {
       stackValidationFailed: true,
       crossValidationFailed: true,
       hasTruncatedCriticalTurn: undefined,
+      postApproveTruncation: undefined,
       openReviewIssueCount: undefined,
+      debateDurationMs: undefined,
+      artifactDurationMs: undefined,
+      totalDurationMs: undefined,
+      peakPromptTokens: undefined,
       ...DEFAULT_OPS_FIELDS,
     });
   });
@@ -160,7 +170,12 @@ describe("run summary helpers", () => {
       stackValidationFailed: true,
       crossValidationFailed: true,
       hasTruncatedCriticalTurn: undefined,
+      postApproveTruncation: undefined,
       openReviewIssueCount: undefined,
+      debateDurationMs: undefined,
+      artifactDurationMs: undefined,
+      totalDurationMs: undefined,
+      peakPromptTokens: undefined,
       ...DEFAULT_OPS_FIELDS,
     });
   });

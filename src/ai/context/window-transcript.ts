@@ -2,6 +2,10 @@ import type { TeamRoster } from "@/ai/agents/roster";
 import { getTeamMember } from "@/ai/agents/roster";
 import type { DebateTurnContext } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
+import {
+  summarizePriorTurns,
+  SUMMARIZED_PRIOR_TURNS_MAX_CHARS,
+} from "@/ai/context/summarize-prior-turns";
 
 export const TRANSCRIPT_WINDOW_RECENT_COUNT = 6;
 export const TRANSCRIPT_SUMMARY_EXCERPT_CHARS = 280;
@@ -46,13 +50,30 @@ export function buildOmittedTranscriptSummary(
   ].join("\n");
 }
 
+/**
+ * Correction / re-review / ops-follow-up paths previously sent the full
+ * transcript (31k–42k char architect dumps). Always summarize those paths.
+ */
+function windowHeavyContextTranscript(
+  transcript: TranscriptEntry[],
+  roster: TeamRoster,
+): WindowedTranscript {
+  const summarized = summarizePriorTurns(transcript, roster, {
+    maxChars: SUMMARIZED_PRIOR_TURNS_MAX_CHARS,
+  });
+  return {
+    omittedSummary: summarized.omittedSummary,
+    entries: summarized.entries,
+  };
+}
+
 export function windowTranscriptForTurn(
   transcript: TranscriptEntry[],
   roster: TeamRoster,
   debateContext: DebateTurnContext,
 ): WindowedTranscript {
   if (shouldUseFullTranscript(debateContext)) {
-    return { omittedSummary: null, entries: transcript };
+    return windowHeavyContextTranscript(transcript, roster);
   }
 
   if (transcript.length <= TRANSCRIPT_WINDOW_RECENT_COUNT) {
@@ -66,4 +87,12 @@ export function windowTranscriptForTurn(
     omittedSummary: buildOmittedTranscriptSummary(omitted, roster),
     entries: recent,
   };
+}
+
+/** Continuation streams: truncated turn + short summary only (no full transcript). */
+export function windowTranscriptForContinuation(
+  transcript: TranscriptEntry[],
+  roster: TeamRoster,
+): WindowedTranscript {
+  return windowHeavyContextTranscript(transcript, roster);
 }

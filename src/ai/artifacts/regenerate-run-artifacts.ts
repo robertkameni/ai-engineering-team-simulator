@@ -28,6 +28,7 @@ import {
 import { getRunWithMessages, touchRunActivity, updateRunStatus, updateRunSummary } from "@/lib/db/runs";
 import {
   mergeRunSummarySynthesisTelemetry,
+  mergeRunSummaryTimingTelemetry,
   RUN_SUMMARY_SYNTHESIS_VERSION,
 } from "@/lib/db/run-summary";
 import { reconcileStaleRunIfNeeded } from "@/lib/db/run-reconcile";
@@ -196,13 +197,19 @@ export async function regenerateRunArtifacts(
       },
     });
     const bundle = runArtifactsOutputToBundle(synthesisResult.artifacts);
+    const withSynthesis = mergeRunSummarySynthesisTelemetry(run.summary, {
+      synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
+      consistencyRetries: synthesisResult.consistencyRetries,
+      stackValidationFailed: synthesisResult.stackValidationFailed,
+      crossValidationFailed: synthesisResult.crossValidationFailed,
+    });
+    const peakPromptTokens =
+      options.usageAccumulator?.getTotals().peakPromptTokens ?? null;
     await updateRunSummary(
       runId,
-      mergeRunSummarySynthesisTelemetry(run.summary, {
-        synthesisVersion: RUN_SUMMARY_SYNTHESIS_VERSION,
-        consistencyRetries: synthesisResult.consistencyRetries,
-        stackValidationFailed: synthesisResult.stackValidationFailed,
-        crossValidationFailed: synthesisResult.crossValidationFailed,
+      mergeRunSummaryTimingTelemetry(withSynthesis, {
+        artifactDurationMs: synthesisResult.artifactDurationMs ?? null,
+        peakPromptTokens,
       }),
     );
     await updateArtifactStatus(runId, "ready");

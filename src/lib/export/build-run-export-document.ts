@@ -94,6 +94,13 @@ function appendMetadata(lines: string[], ctx: RunExportContext): void {
       run.usage.estimatedCostUsd > 0
         ? " · **Est. cost:** $" + run.usage.estimatedCostUsd.toFixed(4)
         : "";
+    const missingNote =
+      run.usage.usageMissing === true ? " · **usageMissing:** true" : "";
+    const peakNote =
+      run.usage.peakPromptTokens != null || run.peakPromptTokens != null
+        ? " · **Peak prompt:** " +
+          (run.usage.peakPromptTokens ?? run.peakPromptTokens)!.toLocaleString()
+        : "";
     lines.push(
       "**Usage:** " +
         run.usage.promptTokens.toLocaleString() +
@@ -102,9 +109,25 @@ function appendMetadata(lines: string[], ctx: RunExportContext): void {
         " completion · " +
         run.usage.totalTokens.toLocaleString() +
         " total" +
-        cost,
+        cost +
+        peakNote +
+        missingNote,
       "",
     );
+  }
+
+  if (run.debateDurationMs != null || run.artifactDurationMs != null || run.totalDurationMs != null) {
+    const parts: string[] = [];
+    if (run.debateDurationMs != null) {
+      parts.push("debate " + run.debateDurationMs + "ms");
+    }
+    if (run.artifactDurationMs != null) {
+      parts.push("artifacts " + run.artifactDurationMs + "ms");
+    }
+    if (run.totalDurationMs != null) {
+      parts.push("total " + run.totalDurationMs + "ms");
+    }
+    lines.push("**Duration:** " + parts.join(" · "), "");
   }
 
   if (run.debateOutcome) {
@@ -119,6 +142,12 @@ function appendMetadata(lines: string[], ctx: RunExportContext): void {
       );
     } else {
       lines.push("**Debate outcome:** " + label, "");
+    }
+    if (run.postApproveTruncation === true) {
+      lines.push(
+        "**Warning:** postApproveTruncation — reviewer approved but some critical turns were truncated.",
+        "",
+      );
     }
   }
 
@@ -155,6 +184,15 @@ function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
         ? " · <strong>Est. cost:</strong> $" +
           run.usage.estimatedCostUsd.toFixed(4)
         : "";
+    const missingNote =
+      run.usage.usageMissing === true
+        ? " · <strong>usageMissing:</strong> true"
+        : "";
+    const peakNote =
+      run.usage.peakPromptTokens != null || run.peakPromptTokens != null
+        ? " · <strong>Peak prompt:</strong> " +
+          (run.usage.peakPromptTokens ?? run.peakPromptTokens)!.toLocaleString()
+        : "";
     parts.push(
       '<p class="meta-block"><strong>Usage:</strong> ' +
         run.usage.promptTokens.toLocaleString() +
@@ -164,6 +202,26 @@ function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
         run.usage.totalTokens.toLocaleString() +
         " total" +
         cost +
+        peakNote +
+        missingNote +
+        "</p>",
+    );
+  }
+
+  if (run.debateDurationMs != null || run.artifactDurationMs != null || run.totalDurationMs != null) {
+    const partsDuration: string[] = [];
+    if (run.debateDurationMs != null) {
+      partsDuration.push("debate " + run.debateDurationMs + "ms");
+    }
+    if (run.artifactDurationMs != null) {
+      partsDuration.push("artifacts " + run.artifactDurationMs + "ms");
+    }
+    if (run.totalDurationMs != null) {
+      partsDuration.push("total " + run.totalDurationMs + "ms");
+    }
+    parts.push(
+      '<p class="meta-block"><strong>Duration:</strong> ' +
+        escapeHtml(partsDuration.join(" · ")) +
         "</p>",
     );
   }
@@ -183,6 +241,11 @@ function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
         '<p class="meta-block"><strong>Debate outcome:</strong> ' +
           label +
           "</p>",
+      );
+    }
+    if (run.postApproveTruncation === true) {
+      parts.push(
+        '<div class="export-warning"><strong>Warning:</strong> postApproveTruncation — reviewer approved but some critical turns were truncated.</div>',
       );
     }
   }

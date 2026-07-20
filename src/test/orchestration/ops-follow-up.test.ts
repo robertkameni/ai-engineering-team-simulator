@@ -86,6 +86,7 @@ function buildBaseState(
     ],
     isArchitectRevision: false,
     hasTruncatedCriticalTurn: false,
+    postApproveTruncation: false,
     reviewIssues: [],
     isGateReroute: false,
     hasHadEarlyReview: false,

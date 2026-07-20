@@ -47,6 +47,7 @@ export function SavedRunWorkspace({
       regenerateRunId={regenerateRunId}
       canRegenerateArtifacts={canRegenerateArtifacts}
       debateOutcome={run.debateOutcome ?? null}
+      postApproveTruncation={run.postApproveTruncation === true}
       stackValidationFailed={run.stackValidationFailed === true}
       crossValidationFailed={run.crossValidationFailed === true}
     >
@@ -72,6 +73,7 @@ export function SavedRunWorkspace({
               }))}
               teamRoster={teamRoster}
               debateOutcome={run.debateOutcome ?? null}
+              postApproveTruncation={run.postApproveTruncation === true}
               stackValidationFailed={run.stackValidationFailed === true}
               crossValidationFailed={run.crossValidationFailed === true}
             />

@@ -17,7 +17,13 @@ export interface RunSummaryPayload {
   readonly stackValidationFailed?: boolean;
   readonly crossValidationFailed?: boolean;
   readonly hasTruncatedCriticalTurn?: boolean;
+  /** Reviewer approved despite truncated critical turns — warning only. */
+  readonly postApproveTruncation?: boolean;
   readonly openReviewIssueCount?: number;
+  readonly debateDurationMs?: number | null;
+  readonly artifactDurationMs?: number | null;
+  readonly totalDurationMs?: number | null;
+  readonly peakPromptTokens?: number | null;
   readonly opsFollowUpEvaluated?: boolean;
   readonly opsFollowUpTriggered?: boolean;
   readonly opsFollowUpSkipReason?: string | null;

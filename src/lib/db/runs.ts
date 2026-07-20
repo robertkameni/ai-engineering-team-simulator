@@ -387,6 +387,17 @@ async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
       : null,
   );
 
+  const usage = mapUsageFromRun(run);
+  const usageWithTelemetry: typeof usage = {
+    ...usage,
+    peakPromptTokens: summaryPayload?.peakPromptTokens ?? usage.peakPromptTokens,
+    usageMissing:
+      usage.usageMissing === true ||
+      (usage.totalTokens === 0 && summaryPayload?.debateOutcome != null)
+        ? true
+        : usage.usageMissing,
+  };
+
   return {
     id: run.id,
     title,
@@ -394,11 +405,16 @@ async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
     status: runStatus,
     updatedAt: run.updatedAt.toISOString(),
     userId: run.userId,
-    usage: mapUsageFromRun(run),
+    usage: usageWithTelemetry,
     messages: mapDbMessagesToSimulation(run.messages, roster),
     artifacts,
     artifactsStatus,
     debateOutcome: parseDebateOutcomeFromRunSummary(run.summary),
+    postApproveTruncation: summaryPayload?.postApproveTruncation === true,
+    debateDurationMs: summaryPayload?.debateDurationMs ?? null,
+    artifactDurationMs: summaryPayload?.artifactDurationMs ?? null,
+    totalDurationMs: summaryPayload?.totalDurationMs ?? null,
+    peakPromptTokens: summaryPayload?.peakPromptTokens ?? null,
     stackValidationFailed: summaryPayload?.stackValidationFailed === true,
     crossValidationFailed: summaryPayload?.crossValidationFailed === true,
     ...opsFollowUp,
