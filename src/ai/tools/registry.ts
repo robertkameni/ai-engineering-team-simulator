@@ -162,12 +162,6 @@ const searchTechnicalNormTool = tool({
   },
 });
 
-/** @deprecated Use getAgentTools(role) for per-role tool access. */
-const agentTools = {
-  check_npm_package: checkNpmPackageTool,
-  search_technical_norm: searchTechnicalNormTool,
-};
-
 export function getAgentTools(role: SimulationAgentRole): ToolSet {
   switch (role) {
     case "architect":

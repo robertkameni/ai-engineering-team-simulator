@@ -2,11 +2,7 @@ import type { TeamRoster } from "@/ai/agents/roster";
 import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 
-import { mergeCorrectionTurns } from "@/ai/artifacts/merge-correction-turns";
-import {
-  buildCanonicalTranscriptForArtifacts,
-  prepareArtifactTranscript,
-} from "@/ai/artifacts/build-transcript";
+import { prepareArtifactTranscript } from "@/ai/artifacts/build-transcript";
 
 /** Max chars for the shared debate summary fed to all artifact generators. */
 export const COMPRESSED_DEBATE_SUMMARY_MAX_CHARS = 14_000;
@@ -52,27 +48,4 @@ export function buildCompressedDebateSummary(
   }
 
   return body;
-}
-
-/** @deprecated Prefer buildCompressedDebateSummary; kept for callers needing full text. */
-export function buildFullCanonicalTranscriptPrompt(
-  productIdea: string,
-  transcript: TranscriptEntry[],
-  roster: TeamRoster,
-): string {
-  const canonicalTranscript = buildCanonicalTranscriptForArtifacts(
-    mergeCorrectionTurns(transcript),
-  );
-  const teamLine = SIMULATION_AGENT_ORDER.map(
-    (role) => `${roster[role].name} (${roster[role].title})`,
-  ).join(", ");
-
-  const messages = canonicalTranscript
-    .map(
-      (entry) =>
-        `### ${entry.agentName} (${entry.role})\n\n${entry.content.trim()}`,
-    )
-    .join("\n\n---\n\n");
-
-  return `## Product idea\n\n${productIdea.trim()}\n\n## Team\n\n${teamLine}\n\n## Discussion (canonical — merged corrections, latest message per role)\n\n${messages}`;
 }
