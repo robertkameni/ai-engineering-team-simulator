@@ -1,5 +1,6 @@
 import type { DebateExitOutcome } from "@/ai/orchestration/reviewer-decision";
 
+import type { DebateFinalizationTelemetry } from "@/lib/db/debate-finalization-telemetry";
 import type {
   OpsFollowUpCheckpoint,
   OpsFollowUpLastCorrectionRole,
@@ -7,7 +8,15 @@ import type {
 
 export type RunSummaryDebateOutcome = DebateExitOutcome | "aborted";
 
-export type { OpsFollowUpLastCorrectionRole };
+export type { OpsFollowUpLastCorrectionRole, DebateFinalizationTelemetry };
+
+export interface ArtifactErrorTelemetry {
+  readonly message: string;
+  readonly failedArtifact: string | null;
+  readonly timestamp: string;
+  readonly retryFailed: boolean;
+  readonly errorCode?: string;
+}
 
 export interface RunSummaryPayload {
   readonly debateOutcome: RunSummaryDebateOutcome | null;
@@ -39,11 +48,22 @@ export interface RunSummaryPayload {
   /** Post-approve truncation recovery attempted but still truncated. */
   readonly postApproveContinuationFailed?: boolean;
   readonly peakPromptTokens?: number | null;
+  /**
+   * Authoritative finalization metadata (reason, reject/correction budgets,
+   * accepted critical risks, output diagnostics).
+   */
+  readonly finalization?: DebateFinalizationTelemetry;
+  /** Populated when core artifact synthesis fails after debate. */
+  readonly artifactError?: ArtifactErrorTelemetry | null;
   readonly opsFollowUpEvaluated?: boolean;
   readonly opsFollowUpTriggered?: boolean;
   readonly opsFollowUpSkipReason?: string | null;
   readonly opsFollowUpEligible?: boolean;
   readonly opsFollowUpUnresolvedDevopsIssueCount?: number;
+  readonly opsFollowUpOpenIssueCount?: number;
+  readonly opsFollowUpAddressedIssueCount?: number;
+  readonly opsFollowUpAcceptedRiskIssueCount?: number;
+  readonly opsFollowUpAcceptedRiskReasons?: readonly string[];
   readonly opsFollowUpLastCorrectionRole?: OpsFollowUpLastCorrectionRole | null;
   readonly opsFollowUpEvaluationTurn?: number | null;
   readonly opsFollowUpArchitectCheckpoint?: OpsFollowUpCheckpoint | null;

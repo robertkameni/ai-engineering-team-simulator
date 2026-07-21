@@ -202,7 +202,7 @@ function buildRunOwnershipWhere(
 }
 
 export function canAccessRun(
-  run: { userId: string | null; guestSessionId: string | null },
+  run: { userId: string | null; guestSessionId: string | null; },
   scope: RunOwnershipScope,
 ): boolean {
   if (scope.userId != null && run.userId === scope.userId) {
@@ -378,6 +378,15 @@ function buildOpsFollowUpFromSummary(
     opsFollowUpEligible: summaryPayload.opsFollowUpEligible ?? false,
     opsFollowUpUnresolvedDevopsIssueCount:
       summaryPayload.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+    opsFollowUpOpenIssueCount:
+      summaryPayload.opsFollowUpOpenIssueCount ??
+      summaryPayload.opsFollowUpUnresolvedDevopsIssueCount ??
+      0,
+    opsFollowUpAddressedIssueCount: summaryPayload.opsFollowUpAddressedIssueCount ?? 0,
+    opsFollowUpAcceptedRiskIssueCount:
+      summaryPayload.opsFollowUpAcceptedRiskIssueCount ?? 0,
+    opsFollowUpAcceptedRiskReasons:
+      summaryPayload.opsFollowUpAcceptedRiskReasons ?? [],
     opsFollowUpLastCorrectionRole:
       summaryPayload.opsFollowUpLastCorrectionRole ?? null,
     opsFollowUpEvaluationTurn:
@@ -417,6 +426,8 @@ function buildSummaryTelemetryFields(
     crossValidationFailed: summaryPayload?.crossValidationFailed === true,
     opsFollowUpArchitectCheckpoint:
       summaryPayload?.opsFollowUpArchitectCheckpoint ?? null,
+    finalization: summaryPayload?.finalization ?? null,
+    artifactError: summaryPayload?.artifactError ?? null,
   };
 }
 

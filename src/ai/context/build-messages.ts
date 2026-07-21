@@ -11,9 +11,19 @@ import {
   truncatePromptContentToBudget,
 } from "@/ai/context/prompt-context-budget";
 import { windowTranscriptForTurn } from "@/ai/context/window-transcript";
-import { buildReviewerPreflightChecklist } from "@/ai/orchestration/reviewer-preflight";
+import {
+  buildReviewerPreflightChecklist,
+  buildScopedReReviewChecklist,
+} from "@/ai/orchestration/reviewer-preflight";
+import type { ReviewIssue } from "@/ai/orchestration/review-issue-tracker";
 import { getAgentTurnPrompt } from "@/ai/prompts";
 import type { AgentRole } from "@/features/agents/types";
+
+export interface CorrectionIssueAssignment {
+  readonly issueId: string;
+  readonly excerpt: string;
+  readonly status: ReviewIssue["status"];
+}
 
 export interface DebateTurnContext {
   correction?: {
@@ -21,6 +31,7 @@ export interface DebateTurnContext {
     feedback: string;
     targetRole: SimulationAgentRole;
     nearCap?: boolean;
+    assignedIssues?: readonly CorrectionIssueAssignment[];
   };
   focusedOpsFollowUp?: {
     reviewerName: string;
@@ -29,6 +40,10 @@ export interface DebateTurnContext {
     architectCorrectionExcerpt?: string | null;
   };
   isReReview?: boolean;
+  /** Role whose correction is under scoped re-review. */
+  reReviewTargetRole?: SimulationAgentRole;
+  /** Open/addressed dispositions for the active reject target on scoped re-review. */
+  reReviewIssues?: readonly CorrectionIssueAssignment[];
   hasTeamDisagreement?: boolean;
   architectRevisionCritiques?: string[];
 }
@@ -37,15 +52,32 @@ function formatProductIdeaBlock(productIdea: string): string {
   return `## Product idea\n\n${productIdea}\n\n${buildLanguageMatchDirective(productIdea)}`;
 }
 
+function toCorrectionAssignments(
+  issues: readonly ReviewIssue[],
+  targetRole: SimulationAgentRole,
+): CorrectionIssueAssignment[] {
+  return issues
+    .filter((issue) => issue.targetRole === targetRole)
+    .map((issue) => ({
+      issueId: issue.id,
+      excerpt: issue.excerpt,
+      status: issue.status,
+    }));
+}
+
 export function resolveDebateTurnContext(
   role: SimulationAgentRole,
   transcript: TranscriptEntry[],
   roster: TeamRoster,
   lastRejectTarget: SimulationAgentRole | null,
   lastRejectFeedback: string | null,
-  options?: { readonly nearCapCorrection?: boolean },
+  options?: {
+    readonly nearCapCorrection?: boolean;
+    readonly reviewIssues?: readonly ReviewIssue[];
+  },
 ): DebateTurnContext {
   const reviewerName = getTeamMember(roster, "reviewer").name;
+  const reviewIssues = options?.reviewIssues ?? [];
 
   if (
     role === lastRejectTarget &&
@@ -59,6 +91,9 @@ export function resolveDebateTurnContext(
         feedback: lastRejectFeedback,
         targetRole: role,
         nearCap: options?.nearCapCorrection === true,
+        assignedIssues: toCorrectionAssignments(reviewIssues, role).filter(
+          (issue) => issue.status === "open",
+        ),
       },
     };
   }
@@ -70,7 +105,11 @@ export function resolveDebateTurnContext(
     transcript.length > 0 &&
     transcript[transcript.length - 1]?.role === lastRejectTarget
   ) {
-    return { isReReview: true };
+    return {
+      isReReview: true,
+      reReviewTargetRole: lastRejectTarget,
+      reReviewIssues: toCorrectionAssignments(reviewIssues, lastRejectTarget),
+    };
   }
 
   return {};
@@ -173,11 +212,17 @@ export function buildAgentMessages(
   }
 
   if (role === "reviewer" && transcript.length > 0) {
+    const checklist = debateContext.isReReview
+      ? buildScopedReReviewChecklist({
+          targetRole: debateContext.reReviewTargetRole ?? null,
+          issues: debateContext.reReviewIssues ?? [],
+          roster,
+        })
+      : buildReviewerPreflightChecklist(transcript, roster);
+
     messages.push({
       role: "user",
-      content: buildReviewerPreflightChecklist(transcript, roster, {
-        isReReview: debateContext.isReReview,
-      }),
+      content: checklist,
     });
   }
 

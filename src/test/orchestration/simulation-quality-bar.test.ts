@@ -12,6 +12,7 @@ import {
   maybeScheduleTruncationRecovery,
   resolveReviewerOutcome,
 } from "@/ai/orchestration/resolve-reviewer-outcome";
+import { decideDebateConvergence } from "@/ai/orchestration/debate-convergence-controller";
 import {
   shouldPreferNearCapApprove,
 } from "@/ai/orchestration/role-participation";
@@ -47,6 +48,7 @@ function fullParticipationTranscript(): TranscriptEntry[] {
 
 function buildState(overrides: Partial<DebateState> = {}): DebateState {
   return {
+    phase: "final_review",
     turnCount: 8,
     roleIndex: 0,
     returnToReviewer: false,
@@ -62,6 +64,7 @@ function buildState(overrides: Partial<DebateState> = {}): DebateState {
     postApproveContinuationFailed: false,
     truncationRecoveryAttemptedRoles: [],
     reviewIssues: [],
+    reviewIssueBaseline: null,
     isGateReroute: false,
     hasHadEarlyReview: true,
     hasHadOpsFollowUpForCurrentReject: false,
@@ -70,6 +73,9 @@ function buildState(overrides: Partial<DebateState> = {}): DebateState {
     opsFollowUpCheckpoints: [],
     consecutiveUnproductiveCycles: 0,
     correctionLoopDetected: false,
+    reviewerProposal: null,
+    finalizationProposal: null,
+    outputDiagnostics: null,
     ...overrides,
   };
 }
@@ -248,15 +254,16 @@ describe("truncation recovery before finalize approve", () => {
     });
     const ctx = buildCtx("software");
 
-    const directive = resolveReviewerOutcome(
+    resolveReviewerOutcome(
       "reviewer",
       "All gaps closed.\n\n[APPROVE]",
       state,
       ctx,
     );
+    const directive = decideDebateConvergence(state, { templateId: "software" });
 
-    assert.equal(directive.kind, "break");
-    if (directive.kind === "break") {
+    assert.equal(directive.kind, "finalize");
+    if (directive.kind === "finalize") {
       assert.equal(directive.outcome, "approved");
     }
     assert.equal(state.postApproveTruncation, false);
@@ -286,15 +293,16 @@ describe("truncation recovery before finalize approve", () => {
     });
     const ctx = buildCtx("software");
 
-    const directive = resolveReviewerOutcome(
+    resolveReviewerOutcome(
       "reviewer",
       "Still approving.\n\n[APPROVE]",
       state,
       ctx,
     );
+    const directive = decideDebateConvergence(state, { templateId: "software" });
 
-    assert.equal(directive.kind, "break");
-    if (directive.kind === "break") {
+    assert.equal(directive.kind, "finalize");
+    if (directive.kind === "finalize") {
       assert.equal(directive.outcome, "approved");
     }
     assert.equal(state.postApproveTruncation, true);
@@ -311,15 +319,16 @@ describe("near-cap approve via resolveReviewerOutcome", () => {
     });
     const ctx = buildCtx("software");
 
-    const directive = resolveReviewerOutcome(
+    resolveReviewerOutcome(
       "reviewer",
       "Still missing a minor nit.\n\n[REJECT: backend]",
       state,
       ctx,
     );
+    const directive = decideDebateConvergence(state, { templateId: "software" });
 
-    assert.equal(directive.kind, "break");
-    if (directive.kind === "break") {
+    assert.equal(directive.kind, "finalize");
+    if (directive.kind === "finalize") {
       assert.equal(directive.outcome, "approved");
     }
   });

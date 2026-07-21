@@ -22,6 +22,14 @@ export const artifactDocumentSchema = z.object({
     .min(1)
     .max(8)
     .describe("Grouped sections for the artifact tab"),
+  artifactSynthesisFailed: z
+    .boolean()
+    .optional()
+    .describe("True when this document is a failed-synthesis placeholder"),
+  artifactErrorMessage: z
+    .string()
+    .optional()
+    .describe("Error message when artifactSynthesisFailed is true"),
 });
 
 const runArtifactsOutputSchema = z.object({

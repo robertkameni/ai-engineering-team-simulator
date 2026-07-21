@@ -99,7 +99,7 @@ export function buildBackendInsufficientContinuationPrompt(): string {
 }
 
 export function buildArchitectInsufficientContinuationPrompt(): string {
-  return `CRITICAL — Your architecture deliverable is incomplete. Finish all mandatory ## sections (Architecture, Data Model, APIs & Integration, Async Write Atomicity, Decisions & Risks) and end the final paragraph with a complete sentence. Do not repeat completed sections.`;
+  return `CRITICAL — Your architecture deliverable is incomplete. Finish all mandatory ## sections (Summary, Decisions ≤5, Risks ≤3) and end the final paragraph with a complete sentence. Do not repeat completed sections.`;
 }
 
 export function buildDevOpsInsufficientContinuationPrompt(): string {
@@ -236,7 +236,7 @@ ${excerpt}${tail}
 
   return `## Review
 
-**Disagree** — architecture deliverable incomplete. Your post must include all mandatory \`##\` sections (Architecture, Data Model, APIs & Integration, Decisions & Risks) with production-grade depth, concrete stack choices, and trade-offs. Tool checks alone are not sufficient.
+**Disagree** — architecture deliverable incomplete. Your post must include all mandatory \`##\` sections (Summary, Decisions ≤5, Risks ≤3) with production-grade depth, concrete stack choices, and trade-offs. Tool checks alone are not sufficient.
 
 Excerpt:
 """

@@ -13,8 +13,20 @@ export interface OpsFollowUpCheckpoint {
   readonly opsFollowUpSkipReason: string | null;
   readonly opsFollowUpEligible: boolean;
   readonly opsFollowUpUnresolvedDevopsIssueCount: number;
+  readonly opsFollowUpOpenIssueCount: number;
+  readonly opsFollowUpAddressedIssueCount: number;
+  readonly opsFollowUpAcceptedRiskIssueCount: number;
+  readonly opsFollowUpAcceptedRiskReasons: readonly string[];
   readonly opsFollowUpLastCorrectionRole: OpsFollowUpLastCorrectionRole | null;
   readonly opsFollowUpEvaluationTurn: number | null;
+}
+
+function parseAcceptedRiskReasons(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((entry): entry is string => typeof entry === "string");
 }
 
 const CORRECTION_ROLES = new Set<OpsFollowUpLastCorrectionRole>([
@@ -58,6 +70,23 @@ function parseCheckpointObject(record: Record<string, unknown>): OpsFollowUpChec
       typeof record.opsFollowUpUnresolvedDevopsIssueCount === "number"
         ? record.opsFollowUpUnresolvedDevopsIssueCount
         : 0,
+    opsFollowUpOpenIssueCount:
+      typeof record.opsFollowUpOpenIssueCount === "number"
+        ? record.opsFollowUpOpenIssueCount
+        : typeof record.opsFollowUpUnresolvedDevopsIssueCount === "number"
+          ? record.opsFollowUpUnresolvedDevopsIssueCount
+          : 0,
+    opsFollowUpAddressedIssueCount:
+      typeof record.opsFollowUpAddressedIssueCount === "number"
+        ? record.opsFollowUpAddressedIssueCount
+        : 0,
+    opsFollowUpAcceptedRiskIssueCount:
+      typeof record.opsFollowUpAcceptedRiskIssueCount === "number"
+        ? record.opsFollowUpAcceptedRiskIssueCount
+        : 0,
+    opsFollowUpAcceptedRiskReasons: parseAcceptedRiskReasons(
+      record.opsFollowUpAcceptedRiskReasons,
+    ),
     opsFollowUpLastCorrectionRole: parseOpsFollowUpLastCorrectionRole(
       record.opsFollowUpLastCorrectionRole,
     ),
@@ -89,6 +118,10 @@ export function parseOpsFollowUpFields(
   | "opsFollowUpSkipReason"
   | "opsFollowUpEligible"
   | "opsFollowUpUnresolvedDevopsIssueCount"
+  | "opsFollowUpOpenIssueCount"
+  | "opsFollowUpAddressedIssueCount"
+  | "opsFollowUpAcceptedRiskIssueCount"
+  | "opsFollowUpAcceptedRiskReasons"
   | "opsFollowUpLastCorrectionRole"
   | "opsFollowUpEvaluationTurn"
   | "opsFollowUpArchitectCheckpoint"
@@ -123,6 +156,23 @@ export function parseOpsFollowUpFields(
       typeof record.opsFollowUpUnresolvedDevopsIssueCount === "number"
         ? record.opsFollowUpUnresolvedDevopsIssueCount
         : 0,
+    opsFollowUpOpenIssueCount:
+      typeof record.opsFollowUpOpenIssueCount === "number"
+        ? record.opsFollowUpOpenIssueCount
+        : typeof record.opsFollowUpUnresolvedDevopsIssueCount === "number"
+          ? record.opsFollowUpUnresolvedDevopsIssueCount
+          : 0,
+    opsFollowUpAddressedIssueCount:
+      typeof record.opsFollowUpAddressedIssueCount === "number"
+        ? record.opsFollowUpAddressedIssueCount
+        : 0,
+    opsFollowUpAcceptedRiskIssueCount:
+      typeof record.opsFollowUpAcceptedRiskIssueCount === "number"
+        ? record.opsFollowUpAcceptedRiskIssueCount
+        : 0,
+    opsFollowUpAcceptedRiskReasons: parseAcceptedRiskReasons(
+      record.opsFollowUpAcceptedRiskReasons,
+    ),
     opsFollowUpLastCorrectionRole: parseOpsFollowUpLastCorrectionRole(
       record.opsFollowUpLastCorrectionRole,
     ),
@@ -143,6 +193,10 @@ export function buildDefaultOpsFollowUpFields(): OpsFollowUpCheckpoint {
     opsFollowUpSkipReason: null,
     opsFollowUpEligible: false,
     opsFollowUpUnresolvedDevopsIssueCount: 0,
+    opsFollowUpOpenIssueCount: 0,
+    opsFollowUpAddressedIssueCount: 0,
+    opsFollowUpAcceptedRiskIssueCount: 0,
+    opsFollowUpAcceptedRiskReasons: [],
     opsFollowUpLastCorrectionRole: null,
     opsFollowUpEvaluationTurn: null,
   };
@@ -175,9 +229,20 @@ function appendCheckpointLines(
     `**${prefix}skip reason:** ` + skipReason,
     `**${prefix}unresolved DevOps issues:** ` +
       String(fields.opsFollowUpUnresolvedDevopsIssueCount),
+    `**${prefix}open DevOps issues:** ` + String(fields.opsFollowUpOpenIssueCount),
+    `**${prefix}addressed DevOps issues:** ` +
+      String(fields.opsFollowUpAddressedIssueCount),
+    `**${prefix}accepted-risk DevOps issues:** ` +
+      String(fields.opsFollowUpAcceptedRiskIssueCount),
     `**${prefix}last correction role:** ` + correctionRole,
     `**${prefix}evaluation turn:** ` + evaluationTurn,
   );
+  if (fields.opsFollowUpAcceptedRiskReasons.length > 0) {
+    lines.push(
+      `**${prefix}accepted-risk reasons:** ` +
+        fields.opsFollowUpAcceptedRiskReasons.join(" | "),
+    );
+  }
 }
 
 export function appendOpsFollowUpMetadataLines(
@@ -194,14 +259,22 @@ export function appendOpsFollowUpMetadataLines(
   appendCheckpointLines(lines, fields, "Ops follow-up ");
   lines.push(
     `**opsIssuesUnresolved:** ${fields.opsFollowUpUnresolvedDevopsIssueCount}`,
+    `**opsIssuesOpen:** ${fields.opsFollowUpOpenIssueCount}`,
+    `**opsIssuesAddressed:** ${fields.opsFollowUpAddressedIssueCount}`,
+    `**opsIssuesAcceptedRisk:** ${fields.opsFollowUpAcceptedRiskIssueCount}`,
     `**opsIssueResolution:** ${
-      fields.opsFollowUpUnresolvedDevopsIssueCount === 0
+      fields.opsFollowUpOpenIssueCount === 0
         ? "resolved"
         : fields.opsFollowUpTriggered
-          ? "attempted"
+          ? "in_progress"
           : "unresolved"
     }`,
   );
+  if (fields.opsFollowUpAcceptedRiskReasons.length > 0) {
+    lines.push(
+      `**opsAcceptedRiskReasons:** ${fields.opsFollowUpAcceptedRiskReasons.join(" | ")}`,
+    );
+  }
   lines.push("");
 
   if (architectCheckpoint) {
@@ -236,6 +309,15 @@ function appendCheckpointHtml(
     `<p class="meta-block"><strong>${prefix}unresolved DevOps issues:</strong> ` +
       String(fields.opsFollowUpUnresolvedDevopsIssueCount) +
       "</p>",
+    `<p class="meta-block"><strong>${prefix}open DevOps issues:</strong> ` +
+      String(fields.opsFollowUpOpenIssueCount) +
+      "</p>",
+    `<p class="meta-block"><strong>${prefix}addressed DevOps issues:</strong> ` +
+      String(fields.opsFollowUpAddressedIssueCount) +
+      "</p>",
+    `<p class="meta-block"><strong>${prefix}accepted-risk DevOps issues:</strong> ` +
+      String(fields.opsFollowUpAcceptedRiskIssueCount) +
+      "</p>",
     `<p class="meta-block"><strong>${prefix}last correction role:</strong> ` +
       correctionRole +
       "</p>",
@@ -243,6 +325,13 @@ function appendCheckpointHtml(
       evaluationTurn +
       "</p>",
   );
+  if (fields.opsFollowUpAcceptedRiskReasons.length > 0) {
+    parts.push(
+      `<p class="meta-block"><strong>${prefix}accepted-risk reasons:</strong> ` +
+        fields.opsFollowUpAcceptedRiskReasons.join(" | ") +
+        "</p>",
+    );
+  }
 }
 
 export function appendOpsFollowUpMetadataHtml(
@@ -263,14 +352,22 @@ export function appendOpsFollowUpMetadataHtml(
   appendCheckpointHtml(parts, fields, "Ops follow-up ");
   parts.push(
     `<p class="meta-block"><strong>opsIssuesUnresolved:</strong> ${fields.opsFollowUpUnresolvedDevopsIssueCount}</p>`,
+    `<p class="meta-block"><strong>opsIssuesOpen:</strong> ${fields.opsFollowUpOpenIssueCount}</p>`,
+    `<p class="meta-block"><strong>opsIssuesAddressed:</strong> ${fields.opsFollowUpAddressedIssueCount}</p>`,
+    `<p class="meta-block"><strong>opsIssuesAcceptedRisk:</strong> ${fields.opsFollowUpAcceptedRiskIssueCount}</p>`,
     `<p class="meta-block"><strong>opsIssueResolution:</strong> ${
-      fields.opsFollowUpUnresolvedDevopsIssueCount === 0
+      fields.opsFollowUpOpenIssueCount === 0
         ? "resolved"
         : fields.opsFollowUpTriggered
-          ? "attempted"
+          ? "in_progress"
           : "unresolved"
     }</p>`,
   );
+  if (fields.opsFollowUpAcceptedRiskReasons.length > 0) {
+    parts.push(
+      `<p class="meta-block"><strong>opsAcceptedRiskReasons:</strong> ${fields.opsFollowUpAcceptedRiskReasons.join(" | ")}</p>`,
+    );
+  }
 
   if (architectCheckpoint) {
     parts.push(

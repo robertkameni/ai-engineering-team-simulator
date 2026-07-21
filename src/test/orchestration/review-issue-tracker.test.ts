@@ -1,15 +1,19 @@
-import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import { createSimulationRoster } from "@/ai/agents/roster";
 import {
-  createReviewIssues,
-  markIssuesAttempted,
-  markIssuesFailedValidation,
-  markIssuesAddressed,
   buildIssueSnapshot,
+  createReviewIssueBaseline,
+  createReviewIssues,
+  createReviewIssuesWithinBaseline,
+  markIssuesAcceptedRisk,
+  markIssuesAddressed,
+  markIssuesAttempted,
   type ReviewIssue,
 } from "@/ai/orchestration/review-issue-tracker";
+
+const SOFTWARE_ROSTER = createSimulationRoster("software");
 
 const FEEDBACK_WITH_CONCERNS = `**Disagree** The caching strategy needs clarification.
 
@@ -17,10 +21,24 @@ const FEEDBACK_WITH_CONCERNS = `**Disagree** The caching strategy needs clarific
 
 **Refine** The API contract for user endpoints is inconsistent with the proposed data model.`;
 
-const SOFTWARE_ROSTER = createSimulationRoster("software");
+function buildOpenIssue(overrides: Partial<ReviewIssue> = {}): ReviewIssue {
+  return {
+    id: "ri_1",
+    targetRole: "devops",
+    keywords: ["backup", "restore", "testing"],
+    excerpt: "Backup restore testing workflow missing",
+    status: "open",
+    severity: "blocker",
+    createdOnCycle: 0,
+    lastAttemptedOnTurn: null,
+    lastConfirmedOnTurn: 8,
+    acceptedRisk: null,
+    ...overrides,
+  };
+}
 
 describe("createReviewIssues", () => {
-  it("creates issues from reviewer rejection feedback", () => {
+  it("creates open issues from reviewer rejection feedback", () => {
     const issues = createReviewIssues(
       [],
       "backend",
@@ -30,409 +48,172 @@ describe("createReviewIssues", () => {
       SOFTWARE_ROSTER,
     );
 
-    assert.ok(issues.length >= 2, `Expected at least 2 issues, got ${issues.length}`);
-    for (const issue of issues) {
-      assert.strictEqual(issue.status, "open");
-      assert.strictEqual(issue.createdOnCycle, 0);
-      assert.strictEqual(issue.lastConfirmedOnTurn, 3);
-      assert.ok(issue.id.startsWith("ri_"));
-      assert.ok(issue.keywords.length >= 2);
-      assert.ok(issue.excerpt.length > 0);
-      assert.ok(issue.severity === "blocker" || issue.severity === "concern");
-    }
-
-    assert.ok(
-      issues.some((i) => i.excerpt.toLowerCase().includes("caching")),
-      "Expected a caching-related issue",
-    );
-    assert.ok(
-      issues.some((i) => i.targetRole === "devops"),
-      "Expected operational observability gap to route to devops",
-    );
+    assert.ok(issues.length >= 2);
+    assert.ok(issues.every((issue) => issue.status === "open"));
+    assert.ok(issues.every((issue) => issue.acceptedRisk === null));
   });
 
-  it("assigns per-line ownership when reviewer rejects architect with mixed gaps", () => {
-    const feedback = `
-**Disagree** Service boundary between billing and analytics is unclear.
+  it("keeps resolved issues closed when concerns reappear", () => {
+    const addressed = buildOpenIssue({
+      targetRole: "backend",
+      keywords: ["caching", "strategy", "clarification"],
+      excerpt: "The caching strategy needs clarification",
+      status: "addressed",
+    });
 
-**UNRESOLVED** ${SOFTWARE_ROSTER.devops.name}'s backup restore workflow is missing from the deployment plan.
-
-**Refine** The API pagination contract is inconsistent with the frontend dashboard needs.
-`;
-    const issues = createReviewIssues([], "architect", feedback, 0, 8, SOFTWARE_ROSTER);
-
-    assert.ok(issues.some((issue) => issue.targetRole === "architect"));
-    assert.ok(issues.some((issue) => issue.targetRole === "devops"));
-  });
-
-  it("reactivates existing issues as still_open when the same concern reappears", () => {
-    const existing: ReviewIssue[] = [
-      {
-        id: "ri_1",
-        targetRole: "backend",
-        keywords: ["caching", "strategy", "clarification"],
-        excerpt: "The caching strategy needs clarification",
-        status: "attempted",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: 4,
-        lastConfirmedOnTurn: 1,
+    const acceptedRisk = buildOpenIssue({
+      id: "ri_2",
+      targetRole: "devops",
+      keywords: ["observability", "tooling", "finalized"],
+      excerpt: "Observability tooling was not finalized",
+      status: "accepted_risk",
+      acceptedRisk: {
+        reason: "Known launch tradeoff",
+        acceptedByRole: "reviewer",
+        acceptedOnTurn: 9,
       },
-    ];
+    });
 
     const newIssues = createReviewIssues(
-      existing,
+      [addressed, acceptedRisk],
       "backend",
-      "**Disagree** The caching strategy needs clarification.",
+      `**Disagree** The caching strategy needs clarification.
+
+**UNRESOLVED** Observability tooling was not finalized.`,
       1,
-      7,
+      12,
       SOFTWARE_ROSTER,
     );
 
-    assert.strictEqual(newIssues.length, 0, "Should not create duplicates");
-    assert.strictEqual(existing[0]!.status, "still_open");
-    assert.strictEqual(existing[0]!.lastConfirmedOnTurn, 7);
+    assert.equal(newIssues.length, 0);
+    assert.equal(addressed.status, "addressed");
+    assert.equal(acceptedRisk.status, "accepted_risk");
+  });
+});
+
+describe("monotonic issue transitions", () => {
+  it("records attempts without changing active status", () => {
+    const issue = buildOpenIssue();
+    markIssuesAttempted([issue], "devops", 11);
+
+    assert.equal(issue.status, "open");
+    assert.equal(issue.lastAttemptedOnTurn, 11);
   });
 
-  it("deduplicates by keyword overlap", () => {
-    const existing: ReviewIssue[] = [
-      {
-        id: "ri_1",
-        targetRole: "devops",
-        keywords: ["observability", "tooling", "finalized"],
-        excerpt: "Observability tooling was not finalized",
-        status: "attempted",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: 3,
-        lastConfirmedOnTurn: 0,
-      },
-    ];
+  it("moves open issues to addressed", () => {
+    const issue = buildOpenIssue();
+    markIssuesAddressed([issue]);
 
-    const newIssues = createReviewIssues(
-      existing,
-      "backend",
-      "**UNRESOLVED** Observability tooling was not finalized.",
-      1,
-      6,
-      SOFTWARE_ROSTER,
+    assert.equal(issue.status, "addressed");
+  });
+
+  it("does not reopen addressed issues", () => {
+    const issue = buildOpenIssue({ status: "addressed" });
+    markIssuesAttempted([issue], "devops", 11);
+    markIssuesAddressed([issue]);
+
+    assert.equal(issue.status, "addressed");
+  });
+
+  it("accepts risk only with a reason", () => {
+    const issue = buildOpenIssue();
+
+    assert.throws(
+      () => {
+        markIssuesAcceptedRisk([issue], {
+          reason: "   ",
+          acceptedByRole: "reviewer",
+          acceptedOnTurn: 13,
+        });
+      },
+      /reason/i,
     );
+  });
 
-    assert.strictEqual(newIssues.length, 0, "Should not create duplicates");
-    assert.strictEqual(existing[0]!.status, "still_open");
+  it("stores accepted-risk reason and keeps issue closed", () => {
+    const issue = buildOpenIssue();
+
+    markIssuesAcceptedRisk([issue], {
+      reason: "Restore drills require external environment approval",
+      acceptedByRole: "reviewer",
+      acceptedOnTurn: 13,
+    });
+    markIssuesAttempted([issue], "devops", 15);
+    markIssuesAddressed([issue]);
+
+    assert.equal(issue.status, "accepted_risk");
+    assert.equal(
+      issue.acceptedRisk?.reason,
+      "Restore drills require external environment approval",
+    );
+    assert.equal(issue.acceptedRisk?.acceptedByRole, "reviewer");
   });
 });
 
-describe("markIssuesAttempted", () => {
-  it("marks open issues for the target role as attempted", () => {
-    const issues: ReviewIssue[] = [
-      {
-        id: "ri_1",
-        targetRole: "backend",
-        keywords: ["caching"],
-        excerpt: "Caching concern",
-        status: "open",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: null,
-        lastConfirmedOnTurn: 1,
-      },
-      {
-        id: "ri_2",
-        targetRole: "architect",
-        keywords: ["api"],
-        excerpt: "API concern",
-        status: "open",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: null,
-        lastConfirmedOnTurn: 1,
-      },
-    ];
+describe("baseline issue scoping", () => {
+  it("rejects unrelated issue additions after baseline freeze", () => {
+    const existingIssue = buildOpenIssue();
+    const baseline = createReviewIssueBaseline([existingIssue]);
 
-    markIssuesAttempted(issues, "backend", 5);
+    const result = createReviewIssuesWithinBaseline({
+      existingIssues: [existingIssue],
+      rejectRole: "backend",
+      feedbackText:
+        "**Disagree** Outbox ordering is unresolved and requires queue semantics.",
+      cycleIndex: 1,
+      turnCount: 12,
+      roster: SOFTWARE_ROSTER,
+      baseline,
+    });
 
-    assert.strictEqual(issues[0]!.status, "attempted");
-    assert.strictEqual(issues[0]!.lastAttemptedOnTurn, 5);
-    assert.strictEqual(issues[1]!.status, "open", "architect issues should not change");
+    assert.equal(result.newIssues.length, 0);
+    assert.equal(result.blockedNewIssuesCount > 0, true);
   });
 
-  it("marks still_open issues as attempted", () => {
-    const issues: ReviewIssue[] = [
-      {
-        id: "ri_1",
-        targetRole: "backend",
-        keywords: ["caching"],
-        excerpt: "Caching concern",
-        status: "still_open",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: null,
-        lastConfirmedOnTurn: 1,
-      },
-    ];
+  it("allows re-review to update existing baseline issues", () => {
+    const existingIssue = buildOpenIssue({
+      targetRole: "backend",
+      keywords: ["caching", "strategy", "clarification"],
+      excerpt: "The caching strategy needs clarification",
+      lastConfirmedOnTurn: 4,
+    });
+    const baseline = createReviewIssueBaseline([existingIssue]);
 
-    markIssuesAttempted(issues, "backend", 7);
+    const result = createReviewIssuesWithinBaseline({
+      existingIssues: [existingIssue],
+      rejectRole: "backend",
+      feedbackText: "**Disagree** The caching strategy needs clarification.",
+      cycleIndex: 1,
+      turnCount: 12,
+      roster: SOFTWARE_ROSTER,
+      baseline,
+    });
 
-    assert.strictEqual(issues[0]!.status, "attempted");
-    assert.strictEqual(issues[0]!.lastAttemptedOnTurn, 7);
-  });
-
-  it("does not change already addressed issues", () => {
-    const issues: ReviewIssue[] = [
-      {
-        id: "ri_1",
-        targetRole: "backend",
-        keywords: ["caching"],
-        excerpt: "Caching concern",
-        status: "addressed",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: 5,
-        lastConfirmedOnTurn: 1,
-      },
-    ];
-
-    markIssuesAttempted(issues, "backend", 9);
-
-    assert.strictEqual(issues[0]!.status, "addressed");
-  });
-});
-
-describe("markIssuesFailedValidation", () => {
-  it("marks non-addressed issues as failed_validation for the target role", () => {
-    const issues: ReviewIssue[] = [
-      {
-        id: "ri_1",
-        targetRole: "backend",
-        keywords: ["caching"],
-        excerpt: "Caching concern",
-        status: "attempted",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: 5,
-        lastConfirmedOnTurn: 1,
-      },
-      {
-        id: "ri_2",
-        targetRole: "backend",
-        keywords: ["observability"],
-        excerpt: "Observability concern",
-        status: "open",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: null,
-        lastConfirmedOnTurn: 1,
-      },
-      {
-        id: "ri_3",
-        targetRole: "architect",
-        keywords: ["api"],
-        excerpt: "API concern",
-        status: "still_open",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: null,
-        lastConfirmedOnTurn: 1,
-      },
-    ];
-
-    markIssuesFailedValidation(issues, "backend");
-
-    assert.strictEqual(issues[0]!.status, "failed_validation");
-    assert.strictEqual(issues[1]!.status, "failed_validation");
-    assert.strictEqual(issues[2]!.status, "still_open", "architect issues should not change");
-  });
-
-  it("leaves addressed issues unchanged", () => {
-    const issues: ReviewIssue[] = [
-      {
-        id: "ri_1",
-        targetRole: "backend",
-        keywords: ["caching"],
-        excerpt: "Caching concern",
-        status: "addressed",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: 5,
-        lastConfirmedOnTurn: 1,
-      },
-    ];
-
-    markIssuesFailedValidation(issues, "backend");
-
-    assert.strictEqual(issues[0]!.status, "addressed");
-  });
-});
-
-describe("markIssuesAddressed", () => {
-  it("marks all issues as addressed regardless of role", () => {
-    const issues: ReviewIssue[] = [
-      {
-        id: "ri_1",
-        targetRole: "backend",
-        keywords: ["caching"],
-        excerpt: "Caching concern",
-        status: "open",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: null,
-        lastConfirmedOnTurn: 1,
-      },
-      {
-        id: "ri_2",
-        targetRole: "architect",
-        keywords: ["api"],
-        excerpt: "API concern",
-        status: "attempted",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: 5,
-        lastConfirmedOnTurn: 1,
-      },
-      {
-        id: "ri_3",
-        targetRole: "frontend",
-        keywords: ["ui"],
-        excerpt: "UI concern",
-        status: "failed_validation",
-        severity: "blocker",
-        createdOnCycle: 1,
-        lastAttemptedOnTurn: 6,
-        lastConfirmedOnTurn: 3,
-      },
-    ];
-
-    markIssuesAddressed(issues);
-
-    assert.strictEqual(issues[0]!.status, "addressed");
-    assert.strictEqual(issues[1]!.status, "addressed");
-    assert.strictEqual(issues[2]!.status, "addressed");
+    assert.equal(result.newIssues.length, 0);
+    assert.equal(result.updatedIssueIds.includes(existingIssue.id), true);
+    assert.equal(existingIssue.lastConfirmedOnTurn, 12);
   });
 });
 
 describe("buildIssueSnapshot", () => {
-  it("computes correct summary statistics", () => {
-    const issues: ReviewIssue[] = [
-      {
-        id: "ri_1",
-        targetRole: "backend",
-        keywords: ["caching"],
-        excerpt: "Caching concern",
-        status: "open",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: null,
-        lastConfirmedOnTurn: 1,
-      },
-      {
-        id: "ri_2",
-        targetRole: "backend",
-        keywords: ["observability"],
-        excerpt: "Observability concern",
-        status: "still_open",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: null,
-        lastConfirmedOnTurn: 1,
-      },
-      {
+  it("computes open/addressed/accepted totals", () => {
+    const snapshot = buildIssueSnapshot([
+      buildOpenIssue({ id: "ri_1", status: "open" }),
+      buildOpenIssue({ id: "ri_2", status: "addressed" }),
+      buildOpenIssue({
         id: "ri_3",
-        targetRole: "architect",
-        keywords: ["api"],
-        excerpt: "API concern",
-        status: "failed_validation",
-        severity: "blocker",
-        createdOnCycle: 0,
-        lastAttemptedOnTurn: null,
-        lastConfirmedOnTurn: 1,
-      },
-      {
-        id: "ri_4",
-        targetRole: "frontend",
-        keywords: ["ui"],
-        excerpt: "UI concern",
-        status: "addressed",
-        severity: "concern",
-        createdOnCycle: 1,
-        lastAttemptedOnTurn: 6,
-        lastConfirmedOnTurn: 3,
-      },
-    ];
+        status: "accepted_risk",
+        acceptedRisk: {
+          reason: "Deferred until phase 2",
+          acceptedByRole: "reviewer",
+          acceptedOnTurn: 10,
+        },
+      }),
+    ]);
 
-    const snapshot = buildIssueSnapshot(issues);
-
-    assert.strictEqual(snapshot.totalCreated, 4);
-    assert.strictEqual(snapshot.totalOpen, 2);
-    assert.strictEqual(snapshot.totalFailed, 1);
-  });
-
-  it("handles empty issues array", () => {
-    const snapshot = buildIssueSnapshot([]);
-
-    assert.strictEqual(snapshot.totalCreated, 0);
-    assert.strictEqual(snapshot.totalOpen, 0);
-    assert.strictEqual(snapshot.totalFailed, 0);
-  });
-});
-
-const BACKEND_ONLY_LIFECYCLE_FEEDBACK = `**Disagree** The caching strategy needs clarification.
-
-**Refine** The API contract for user endpoints is inconsistent with the proposed data model.`;
-
-describe("structured issue lifecycle — end-to-end", () => {
-  it("reviewer reject → correction attempt → failed validation → re-reject → addressed", () => {
-    let allIssues: ReviewIssue[] = [];
-
-    // Step 1: Reviewer rejects backend
-    const cycle0 = createReviewIssues(
-      allIssues,
-      "backend",
-      BACKEND_ONLY_LIFECYCLE_FEEDBACK,
-      0,
-      3,
-      SOFTWARE_ROSTER,
-    );
-    allIssues.push(...cycle0);
-    assert.ok(allIssues.length >= 2);
-    assert.ok(allIssues.every((i) => i.status === "open"));
-
-    // Step 2: Correction turn marks issues as attempted
-    markIssuesAttempted(allIssues, "backend", 5);
-    assert.ok(
-      allIssues.every((i) => i.status === "attempted"),
-      `Expected all attempted, got: ${allIssues.map((i) => `${i.status}`).join(", ")}`,
-    );
-
-    // Step 3: Validation fails
-    markIssuesFailedValidation(allIssues, "backend");
-    assert.ok(
-      allIssues.every((i) => i.status === "failed_validation"),
-      `Expected all failed_validation, got: ${allIssues.map((i) => `${i.status}`).join(", ")}`,
-    );
-
-    // Step 4: Reviewer rejects again (same concerns) — issues reactivated as still_open
-    const cycle1 = createReviewIssues(
-      allIssues,
-      "backend",
-      BACKEND_ONLY_LIFECYCLE_FEEDBACK,
-      1,
-      8,
-      SOFTWARE_ROSTER,
-    );
-    allIssues.push(...cycle1);
-    assert.ok(
-      allIssues.every(
-        (i) => i.status === "still_open" || i.status === "failed_validation",
-      ),
-    );
-
-    // Step 5: Reviewer finally approves
-    markIssuesAddressed(allIssues);
-    assert.ok(allIssues.every((i) => i.status === "addressed"));
-
-    const snapshot = buildIssueSnapshot(allIssues);
-    assert.strictEqual(snapshot.totalOpen, 0);
-    assert.strictEqual(snapshot.totalCreated, allIssues.length);
+    assert.equal(snapshot.totalCreated, 3);
+    assert.equal(snapshot.totalOpen, 1);
+    assert.equal(snapshot.totalAddressed, 1);
+    assert.equal(snapshot.totalAcceptedRisk, 1);
   });
 });

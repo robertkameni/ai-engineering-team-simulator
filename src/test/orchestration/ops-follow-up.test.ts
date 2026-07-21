@@ -13,14 +13,16 @@ import {
   hasOperationalOpenGaps,
   isArchitectCorrectionAfterReview,
   isSoftwareTemplate,
-  markDevOpsOperationalIssuesAttempted,
   matchesOperationalCategory,
-  recordOpsFollowUpCheckpoint,
-  resolveLastCorrectionRole,
   scheduleOpsFollowUpTurn,
-  selectOpsFollowUpSummary,
   shouldTriggerOpsFollowUp,
 } from "@/ai/orchestration/ops-follow-up";
+import {
+  recordOpsFollowUpCheckpoint,
+  resolveLastCorrectionRole,
+  selectOpsFollowUpSummary,
+} from "@/ai/orchestration/ops-follow-up-checkpoint";
+import { resolveOpsIssueDispositions } from "@/ai/orchestration/ops-issue-disposition";
 import { createReviewIssues } from "@/ai/orchestration/review-issue-tracker";
 import { getMaxSimulationTurns } from "@/ai/orchestration/reviewer-decision";
 import type { ReviewIssue } from "@/ai/orchestration/review-issue-tracker";
@@ -72,7 +74,8 @@ function buildBaseState(
   overrides: Partial<DebateState> = {},
 ): DebateState {
   return {
-    turnCount: 10,
+    phase: "correction_wave",
+    turnCount: 7,
     roleIndex: 0,
     returnToReviewer: true,
     nextRole: "architect",
@@ -90,6 +93,7 @@ function buildBaseState(
     postApproveContinuationFailed: false,
     truncationRecoveryAttemptedRoles: [],
     reviewIssues: [],
+    reviewIssueBaseline: null,
     isGateReroute: false,
     hasHadEarlyReview: false,
     hasHadOpsFollowUpForCurrentReject: false,
@@ -98,6 +102,9 @@ function buildBaseState(
     opsFollowUpCheckpoints: [],
     consecutiveUnproductiveCycles: 0,
     correctionLoopDetected: false,
+    reviewerProposal: null,
+    finalizationProposal: null,
+    outputDiagnostics: null,
     ...overrides,
   };
 }
@@ -346,6 +353,33 @@ describe("focused ops follow-up prompt", () => {
 });
 
 describe("ops follow-up observability checkpoint", () => {
+  it("persists unresolved count from tracked open DevOps issues only", () => {
+    const ctx = buildTurnContext("software");
+    const trackedIssue: ReviewIssue = {
+      id: "ri_tracked",
+      targetRole: "devops",
+      keywords: ["backup", "restore", "workflow"],
+      excerpt: "Backup restore workflow remains open",
+      status: "open",
+      severity: "blocker",
+      createdOnCycle: 0,
+      lastAttemptedOnTurn: null,
+      lastConfirmedOnTurn: 8,
+      acceptedRisk: null,
+    };
+    const state = buildBaseState(ctx.roster.devops.name, {
+      reviewIssues: [trackedIssue],
+    });
+
+    const evaluation = recordOpsFollowUpCheckpoint(state, ctx);
+
+    assert.ok((evaluation?.unresolvedDevOpsIssueCount ?? 0) > 1);
+    assert.equal(
+      state.opsFollowUpCheckpoint?.opsFollowUpUnresolvedDevopsIssueCount,
+      1,
+    );
+  });
+
   it("records triggered architect-path evaluation", () => {
     const ctx = buildTurnContext("software");
     const state = buildBaseState(ctx.roster.devops.name);
@@ -359,8 +393,9 @@ describe("ops follow-up observability checkpoint", () => {
     assert.equal(checkpoint?.opsFollowUpTriggered, true);
     assert.equal(checkpoint?.opsFollowUpSkipReason, null);
     assert.equal(checkpoint?.opsFollowUpLastCorrectionRole, "architect");
-    assert.equal(checkpoint?.opsFollowUpUnresolvedDevopsIssueCount >= 2, true);
-    assert.equal(checkpoint?.opsFollowUpEvaluationTurn, 10);
+    assert.equal(checkpoint?.opsFollowUpUnresolvedDevopsIssueCount, 0);
+    assert.equal(checkpoint?.opsFollowUpOpenIssueCount, 0);
+    assert.equal(checkpoint?.opsFollowUpEvaluationTurn, 7);
 
     assert.equal(state.opsFollowUpCheckpoints.length, 1);
     assert.equal(state.opsFollowUpCheckpoints[0], checkpoint);
@@ -400,7 +435,7 @@ describe("ops follow-up observability checkpoint", () => {
       ctx.roster,
     );
     const state = buildBaseState(ctx.roster.devops.name, {
-      turnCount: 10,
+      turnCount: 7,
       lastRejectFeedback: SUBSCRIPTION_STYLE_FEEDBACK(ctx.roster.devops.name),
       lastRejectTarget: "backend",
       transcript: [
@@ -419,7 +454,7 @@ describe("ops follow-up observability checkpoint", () => {
     assert.equal(checkpoint?.opsFollowUpEligible, true);
     assert.equal(checkpoint?.opsFollowUpSkipReason, null);
     assert.equal(checkpoint?.opsFollowUpLastCorrectionRole, "backend");
-    assert.ok((checkpoint?.opsFollowUpUnresolvedDevopsIssueCount ?? 0) >= 2);
+    assert.equal(checkpoint?.opsFollowUpUnresolvedDevopsIssueCount, 0);
 
     assert.equal(state.opsFollowUpCheckpoints.length, 1);
     assert.equal(state.opsFollowUpCheckpoints[0], checkpoint);
@@ -456,7 +491,7 @@ describe("ops follow-up observability checkpoint", () => {
     assert.equal(checkpoint?.opsFollowUpEligible, true);
     assert.equal(checkpoint?.opsFollowUpSkipReason, null);
     assert.equal(checkpoint?.opsFollowUpLastCorrectionRole, "backend");
-    assert.ok((checkpoint?.opsFollowUpUnresolvedDevopsIssueCount ?? 0) >= 2);
+    assert.equal(checkpoint?.opsFollowUpUnresolvedDevopsIssueCount, 0);
   });
 });
 
@@ -500,7 +535,7 @@ describe("checkpoint history and selectOpsFollowUpSummary", () => {
     ];
     state.lastRejectFeedback = ARCHITECT_ONLY_FEEDBACK;
     state.lastRejectTarget = "frontend";
-    state.turnCount = 14;
+    state.turnCount = 8;
 
     recordOpsFollowUpCheckpoint(state, ctx);
 
@@ -518,12 +553,12 @@ describe("checkpoint history and selectOpsFollowUpSummary", () => {
 
     // The architect cycle is the one that triggered
     assert.equal(summary.relevantArchitect?.opsFollowUpTriggered, true);
-    assert.equal(summary.relevantArchitect?.opsFollowUpEvaluationTurn, 10);
+    assert.equal(summary.relevantArchitect?.opsFollowUpEvaluationTurn, 7);
 
     // The frontend cycle did not trigger — architect guard fires before gap check
     assert.equal(summary.last?.opsFollowUpTriggered, false);
     assert.equal(summary.last?.opsFollowUpSkipReason, "not_architect_correction_after_review");
-    assert.equal(summary.last?.opsFollowUpEvaluationTurn, 14);
+    assert.equal(summary.last?.opsFollowUpEvaluationTurn, 8);
   });
 
   it("returns null relevantArchitect when no architect correction occurred", () => {
@@ -583,7 +618,7 @@ describe("checkpoint history and selectOpsFollowUpSummary", () => {
 });
 
 describe("review issue tracking compatibility", () => {
-  it("marks DevOps operational issues as attempted during ops follow-up", () => {
+  it("resolves all open DevOps issues as addressed for substantive closure", () => {
     const issues: ReviewIssue[] = [
       {
         id: "ri_1",
@@ -595,6 +630,7 @@ describe("review issue tracking compatibility", () => {
         createdOnCycle: 0,
         lastAttemptedOnTurn: null,
         lastConfirmedOnTurn: 8,
+        acceptedRisk: null,
       },
       {
         id: "ri_2",
@@ -606,13 +642,78 @@ describe("review issue tracking compatibility", () => {
         createdOnCycle: 0,
         lastAttemptedOnTurn: null,
         lastConfirmedOnTurn: 8,
+        acceptedRisk: null,
       },
     ];
 
-    markDevOpsOperationalIssuesAttempted(issues, 11);
+    const result = resolveOpsIssueDispositions(
+      issues,
+      `## Operational Closure
+- Backup restore drill added and tested in staging.
+- Alerting thresholds documented and wired to pager.
+Conclusion: all listed blockers now have acceptance criteria and owners.`,
+      11,
+    );
 
-    assert.equal(issues[0]!.status, "attempted");
+    assert.equal(result.addressedCount, 1);
+    assert.equal(result.acceptedRiskCount, 0);
+    assert.equal(issues[0]!.status, "addressed");
     assert.equal(issues[0]!.lastAttemptedOnTurn, 11);
     assert.equal(issues[1]!.status, "open");
+  });
+
+  it("requires and stores accepted-risk reason when explicitly provided", () => {
+    const issues: ReviewIssue[] = [
+      {
+        id: "ri_1",
+        targetRole: "devops",
+        keywords: ["backup", "restore", "testing"],
+        excerpt: "Backup restore testing workflow missing",
+        status: "open",
+        severity: "blocker",
+        createdOnCycle: 0,
+        lastAttemptedOnTurn: null,
+        lastConfirmedOnTurn: 8,
+        acceptedRisk: null,
+      },
+    ];
+
+    const result = resolveOpsIssueDispositions(
+      issues,
+      "ACCEPTED_RISK: Backup restore drill deferred due to regulated sandbox freeze window.",
+      12,
+    );
+
+    assert.equal(result.addressedCount, 0);
+    assert.equal(result.acceptedRiskCount, 1);
+    assert.equal(issues[0]!.status, "accepted_risk");
+    assert.equal(
+      issues[0]!.acceptedRisk?.reason,
+      "Backup restore drill deferred due to regulated sandbox freeze window.",
+    );
+  });
+
+  it("throws when explicit accepted risk omits reason", () => {
+    const issues: ReviewIssue[] = [
+      {
+        id: "ri_1",
+        targetRole: "devops",
+        keywords: ["backup", "restore", "testing"],
+        excerpt: "Backup restore testing workflow missing",
+        status: "open",
+        severity: "blocker",
+        createdOnCycle: 0,
+        lastAttemptedOnTurn: null,
+        lastConfirmedOnTurn: 8,
+        acceptedRisk: null,
+      },
+    ];
+
+    assert.throws(
+      () => {
+        resolveOpsIssueDispositions(issues, "ACCEPTED_RISK", 12);
+      },
+      /reason/i,
+    );
   });
 });

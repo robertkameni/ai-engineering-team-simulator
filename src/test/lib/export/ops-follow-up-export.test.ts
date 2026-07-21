@@ -17,6 +17,10 @@ function buildExportRun(overrides: Partial<MockRun> = {}): MockRun {
     opsFollowUpSkipReason: "no_unresolved_devops_issues",
     opsFollowUpEligible: false,
     opsFollowUpUnresolvedDevopsIssueCount: 0,
+    opsFollowUpOpenIssueCount: 0,
+    opsFollowUpAddressedIssueCount: 2,
+    opsFollowUpAcceptedRiskIssueCount: 1,
+    opsFollowUpAcceptedRiskReasons: ["Restore drill deferred to audited staging window"],
     opsFollowUpLastCorrectionRole: "architect",
     opsFollowUpEvaluationTurn: 11,
     ...overrides,
@@ -35,6 +39,13 @@ describe("ops follow-up export metadata", () => {
       /\*\*Ops follow-up skip reason:\*\* no_unresolved_devops_issues/,
     );
     assert.match(markdown, /\*\*Ops follow-up unresolved DevOps issues:\*\* 0/);
+    assert.match(markdown, /\*\*Ops follow-up open DevOps issues:\*\* 0/);
+    assert.match(markdown, /\*\*Ops follow-up addressed DevOps issues:\*\* 2/);
+    assert.match(markdown, /\*\*Ops follow-up accepted-risk DevOps issues:\*\* 1/);
+    assert.match(
+      markdown,
+      /\*\*opsAcceptedRiskReasons:\*\* Restore drill deferred to audited staging window/,
+    );
     assert.match(markdown, /\*\*Ops follow-up last correction role:\*\* architect/);
     assert.match(markdown, /\*\*Ops follow-up evaluation turn:\*\* 11/);
   });

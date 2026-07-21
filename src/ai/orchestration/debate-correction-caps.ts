@@ -1,6 +1,6 @@
 import type { SimulationAgentRole } from "@/ai/agents/config";
 
-export const MAX_CORRECTIONS_PER_ROLE = 2;
+export const MAX_CORRECTIONS_PER_ROLE = 3;
 
 export function canCorrectRole(
   counts: Readonly<Partial<Record<SimulationAgentRole, number>>>,

@@ -1,12 +1,7 @@
-import "server-only";
-
 import { isDebateComplete } from "@/ai/orchestration/reviewer-decision";
 import type { RegenerateRunArtifactsError } from "@/ai/artifacts/regenerate-run-artifacts.types";
-import { toAppArtifactStatus } from "@/lib/db/artifact-status";
-import { toAppRunStatus } from "@/lib/db/run-status";
-
-type AppRunStatus = ReturnType<typeof toAppRunStatus>;
-type AppArtifactStatus = ReturnType<typeof toAppArtifactStatus>;
+import type { RunStatus as AppRunStatus } from "@/features/agents/types";
+import type { AppArtifactStatus } from "@/lib/db/artifact-status";
 
 export function getRegenerateBlockingError(
   status: AppRunStatus,
@@ -35,7 +30,7 @@ export function getRegenerateBlockingError(
 }
 
 export function isDebateCompleteFromMessages(
-  messages: readonly { agentRole: string; content: string }[],
+  messages: readonly { agentRole: string; content: string; }[],
 ): boolean {
   return isDebateComplete(
     messages.map((message) => ({
@@ -43,4 +38,19 @@ export function isDebateCompleteFromMessages(
       content: message.content,
     })),
   );
+}
+
+/**
+ * Artifact synthesis eligibility must honor controller-approved outcomes even
+ * when the final reviewer message still contains [REJECT] (deterministic
+ * finalization). Message-tag heuristics alone falsely block those runs.
+ */
+export function isDebateCompleteForArtifactSynthesis(params: {
+  readonly messages: readonly { agentRole: string; content: string; }[];
+  readonly debateOutcome: string | null | undefined;
+}): boolean {
+  if (params.debateOutcome === "approved") {
+    return true;
+  }
+  return isDebateCompleteFromMessages(params.messages);
 }

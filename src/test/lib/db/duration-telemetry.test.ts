@@ -90,4 +90,34 @@ describe("duration telemetry", () => {
     assert.equal(parsed?.totalDurationMs, 90_906);
     assert.equal(parsed?.artifactsPending, false);
   });
+
+  it("preserves finalization telemetry across timing merges", () => {
+    const provisional = buildRunSummaryPayload({
+      debateOutcome: "approved",
+      turnCount: 9,
+      debateDurationMs: 100_000,
+      artifactDurationMs: null,
+      totalDurationMs: 100_000,
+      artifactsPending: true,
+      finalization: {
+        reason: "Deterministic debate finalization.",
+        rejectCount: 2,
+        correctionsByRole: { architect: 1 },
+        acceptedCriticalRisks: [],
+        outputDiagnostics: null,
+      },
+    });
+
+    const merged = mergeRunSummaryTimingTelemetry(provisional, {
+      artifactDurationMs: 40_000,
+      userWaitMs: 140_000,
+      totalDurationMs: 140_000,
+      artifactsPending: false,
+    });
+
+    const parsed = parseRunSummary(merged);
+    assert.equal(parsed?.finalization?.reason, "Deterministic debate finalization.");
+    assert.equal(parsed?.finalization?.rejectCount, 2);
+    assert.equal(parsed?.finalization?.correctionsByRole.architect, 1);
+  });
 });

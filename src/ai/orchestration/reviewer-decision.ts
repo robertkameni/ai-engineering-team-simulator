@@ -6,7 +6,7 @@ import {
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 
-const SOFTWARE_MAX_TURNS = 20;
+const SOFTWARE_MAX_TURNS = 10;
 const PHYSICAL_MAX_TURNS = 16;
 
 export function getMaxSimulationTurns(templateId: TeamTemplateId): number {
@@ -22,11 +22,8 @@ export function canScheduleArchitectRevision(
   return turnCount + MIN_TURNS_FOR_REVISION_FINISH <= maxTurns;
 }
 
-/** After this many reviewer [REJECT] decisions, debate exits with cap_reached.
- *  Raised from 2 → 4 to allow more granular per-role correction cycles
- *  before global debate closure. Per-role caps (MAX_CORRECTIONS_PER_ROLE = 2)
- *  still prevent individual roles from being corrected infinitely. */
-export const MAX_REVIEWER_REJECTION_CYCLES = 4;
+/** After this many reviewer [REJECT] decisions, controller advances to final review. */
+export const MAX_REVIEWER_REJECTION_CYCLES = 5;
 
 export function hasExceededReviewerRejectionCap(rejectionCount: number): boolean {
   return rejectionCount >= MAX_REVIEWER_REJECTION_CYCLES;
@@ -56,9 +53,9 @@ export type DebateExitOutcome =
    *  critical-role turns were truncated. The approval is downgraded. */
   | "degraded_truncated"
   /** BUDGET-AWARE REVIEWER GUARD — reviewer issued [REJECT] but the
-   *  remaining turn budget is insufficient for a complete correction
-   *  → re-review → closure cycle. The debate exits with open gaps
-   *  preserved rather than entering a doomed reject path. */
+ *  remaining turn budget is insufficient for a complete correction
+ *  → re-review → closure cycle. The debate exits with open gaps
+ *  preserved rather than entering a doomed reject path. */
   | "insufficient_budget";
 
 export interface ParsedReviewerDecision {

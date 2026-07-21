@@ -38,9 +38,15 @@ export async function GET(_request: Request, { params }: RouteParams) {
     opsFollowUpEligible: run.opsFollowUpEligible === true,
     opsFollowUpUnresolvedDevopsIssueCount:
       run.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+    opsFollowUpOpenIssueCount:
+      run.opsFollowUpOpenIssueCount ?? run.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+    opsFollowUpAddressedIssueCount: run.opsFollowUpAddressedIssueCount ?? 0,
+    opsFollowUpAcceptedRiskIssueCount: run.opsFollowUpAcceptedRiskIssueCount ?? 0,
+    opsFollowUpAcceptedRiskReasons: run.opsFollowUpAcceptedRiskReasons ?? [],
     opsFollowUpLastCorrectionRole: run.opsFollowUpLastCorrectionRole ?? null,
     opsFollowUpEvaluationTurn: run.opsFollowUpEvaluationTurn ?? null,
     opsFollowUpArchitectCheckpoint: run.opsFollowUpArchitectCheckpoint ?? null,
+    finalization: run.finalization ?? null,
   });
 }
 

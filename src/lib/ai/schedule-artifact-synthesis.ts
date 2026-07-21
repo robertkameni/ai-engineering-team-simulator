@@ -1,18 +1,31 @@
 import "server-only";
 
+import {
+  buildFailedArtifactPlaceholder,
+  listMissingCoreArtifactTypes,
+} from "@/ai/artifacts/failed-artifact-placeholder";
 import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
 import { CORE_ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
-import type { ArtifactType } from "@/features/artifacts/schemas";
+import { isArtifactType, type ArtifactType } from "@/features/artifacts/schemas";
 import {
   createRunUsageAccumulator,
   type RunUsageAccumulator,
 } from "@/lib/ai/run-usage-accumulator";
 import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
+import { saveSingleArtifact } from "@/lib/db/artifacts";
 import { reconcileRunFailure } from "@/lib/db/run-reconcile";
 import {
+  computeTotalDurationMs,
+  computeUserWaitMs,
+  mergeRunSummaryTimingTelemetry,
+  parseRunSummary,
+} from "@/lib/db/run-summary";
+import {
   getRunUsageTotalsById,
+  getRunWithMessages,
   setRunUsageTotals,
   updateRunStatus,
+  updateRunSummary,
 } from "@/lib/db/runs";
 import { resolveRequestOrigin } from "@/lib/http/resolve-request-origin";
 
@@ -134,6 +147,7 @@ export async function scheduleCoreArtifactSynthesis({
       runId,
       error: second.error,
     });
+    await persistSoftBlockArtifactFailure(runId, second.error, true);
     await reconcileRunFailure(runId, {
       debateComplete: true,
       artifactPhaseStarted: true,
@@ -143,6 +157,7 @@ export async function scheduleCoreArtifactSynthesis({
   }
 
   if (isRetryableSoftError) {
+    await persistSoftBlockArtifactFailure(runId, first.error, false);
     await reconcileRunFailure(runId, {
       debateComplete: true,
       artifactPhaseStarted: true,
@@ -151,6 +166,59 @@ export async function scheduleCoreArtifactSynthesis({
   }
 
   return first;
+}
+
+async function persistSoftBlockArtifactFailure(
+  runId: string,
+  errorCode: string | null,
+  retryFailed: boolean,
+): Promise<void> {
+  const run = await getRunWithMessages(runId);
+  if (!run) {
+    return;
+  }
+
+  const message =
+    errorCode === "run_in_progress"
+      ? "Artifact synthesis blocked: run still treated as in progress after debate approval (message-tag debate-complete check disagreed with summary debateOutcome)."
+      : `Artifact synthesis blocked: ${errorCode ?? "unknown"}`;
+
+  const present = new Set(
+    run.artifacts
+      .map((artifact) => artifact.type)
+      .filter((type): type is ArtifactType => isArtifactType(type)),
+  );
+  const missing = listMissingCoreArtifactTypes(present);
+  for (const type of missing) {
+    await saveSingleArtifact(
+      runId,
+      type,
+      buildFailedArtifactPlaceholder(type, message),
+    );
+  }
+
+  const existing = parseRunSummary(run.summary);
+  const timingParams = {
+    debateDurationMs: existing?.debateDurationMs ?? null,
+    artifactDurationMs: existing?.artifactDurationMs ?? 0,
+  };
+
+  await updateRunSummary(
+    runId,
+    mergeRunSummaryTimingTelemetry(run.summary, {
+      artifactDurationMs: timingParams.artifactDurationMs,
+      totalDurationMs: computeTotalDurationMs(timingParams),
+      userWaitMs: computeUserWaitMs(timingParams),
+      artifactsPending: false,
+      artifactError: {
+        message,
+        failedArtifact: missing[0] ?? null,
+        timestamp: new Date().toISOString(),
+        retryFailed,
+        errorCode: errorCode ?? "soft_block",
+      },
+    }),
+  );
 }
 
 /**

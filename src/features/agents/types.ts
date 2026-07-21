@@ -8,6 +8,7 @@ import type {
   OpsFollowUpCheckpoint,
   OpsFollowUpLastCorrectionRole,
 } from "@/lib/db/ops-follow-up-summary";
+import type { DebateFinalizationTelemetry } from "@/lib/db/debate-finalization-telemetry";
 
 export type { DebateExitOutcome };
 
@@ -45,7 +46,7 @@ export interface SimulationMessage {
     text: string;
   };
   isStreaming?: boolean;
-  activeTools?: { name: string; args: unknown }[];
+  activeTools?: { name: string; args: unknown; }[];
   createdAt: string;
 }
 
@@ -77,9 +78,23 @@ export interface MockRun {
   opsFollowUpSkipReason?: string | null;
   opsFollowUpEligible?: boolean;
   opsFollowUpUnresolvedDevopsIssueCount?: number;
+  opsFollowUpOpenIssueCount?: number;
+  opsFollowUpAddressedIssueCount?: number;
+  opsFollowUpAcceptedRiskIssueCount?: number;
+  opsFollowUpAcceptedRiskReasons?: readonly string[];
   opsFollowUpLastCorrectionRole?: OpsFollowUpLastCorrectionRole | null;
   opsFollowUpEvaluationTurn?: number | null;
   opsFollowUpArchitectCheckpoint?: OpsFollowUpCheckpoint | null;
+  /** Deterministic debate finalization telemetry. */
+  finalization?: DebateFinalizationTelemetry | null;
+  /** Populated when core artifact synthesis fails after debate. */
+  artifactError?: {
+    readonly message: string;
+    readonly failedArtifact: string | null;
+    readonly timestamp: string;
+    readonly retryFailed: boolean;
+    readonly errorCode?: string;
+  } | null;
 }
 
 export interface MockArtifactSection {

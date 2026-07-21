@@ -217,6 +217,14 @@ ${openGapsSystemRule ? `- ${openGapsSystemRule}\n` : ""}- Write as a polished in
 - Omit sections with no substance from the debate.
 - **No code blocks or code fences** (\`\`\`). This is a specification document for developers to implement from. Describe everything in prose. Use inline backticks only for single terms like file names, env vars, or function names.`;
 
+  console.info("ARTIFACT SYNTHESIS start", {
+    artifactType: type,
+    templateId,
+    promptChars: prompt.length,
+    promptPreview: prompt.slice(0, 500),
+    debateOutcome: debateOutcome ?? null,
+  });
+
   try {
     if (usageAccumulator) {
       assertSimulationWithinBudget(usageAccumulator);
@@ -244,13 +252,24 @@ ${openGapsSystemRule ? `- ${openGapsSystemRule}\n` : ""}- Write as a polished in
     }
 
     if (structured.output) {
+      console.info("ARTIFACT SYNTHESIS structured ok", {
+        artifactType: type,
+        sectionCount: structured.output.sections.length,
+      });
       return structured.output;
     }
+
+    console.warn("ARTIFACT SYNTHESIS structured empty output", {
+      artifactType: type,
+    });
   } catch (error) {
     if (isSimulationBudgetExceeded(error)) {
       throw error;
     }
-    console.warn(`Structured ${type} artifact failed, trying JSON fallback:`, error);
+    console.warn(`Structured ${type} artifact failed, trying JSON fallback:`, {
+      artifactType: type,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   if (usageAccumulator) {

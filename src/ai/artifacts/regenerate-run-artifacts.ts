@@ -7,16 +7,25 @@ import type {
 } from "@/ai/artifacts/regenerate-run-artifacts.types";
 import {
   getRegenerateBlockingError,
-  isDebateCompleteFromMessages,
+  isDebateCompleteForArtifactSynthesis,
 } from "@/ai/artifacts/regenerate-run-eligibility";
+import {
+  buildFailedArtifactPlaceholder,
+  listMissingCoreArtifactTypes,
+} from "@/ai/artifacts/failed-artifact-placeholder";
 import {
   mapMessagesToTranscript,
   prepareArtifactGenerationContext,
 } from "@/ai/artifacts/run-artifact-context";
-import { isSimulationBudgetExceeded } from "@/ai/orchestration/simulation-budget";
+import {
+  isSimulationBudgetExceeded,
+} from "@/ai/orchestration/simulation-budget";
+import { parseDebateOutcomeFromRunSummary } from "@/ai/orchestration/reviewer-decision";
+import { CORE_ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
 import {
   ARTIFACT_TYPES,
 } from "@/features/artifacts/schemas";
+import type { ArtifactType } from "@/features/artifacts/schemas";
 import type { PartialRunArtifacts } from "@/features/artifacts/types";
 import {
   runArtifactsOutputToBundle,
@@ -41,6 +50,7 @@ import {
   parseRunSummary,
   RUN_SUMMARY_SYNTHESIS_VERSION,
 } from "@/lib/db/run-summary";
+import type { ArtifactErrorTelemetry } from "@/lib/db/run-summary.types";
 import { reconcileStaleRunIfNeeded } from "@/lib/db/run-reconcile";
 import { toAppRunStatus } from "@/lib/db/run-status";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
@@ -74,6 +84,7 @@ async function persistArtifactTiming(
     readonly artifactDurationMs: number | null;
     readonly peakPromptTokens?: number | null;
     readonly artifactsPending: boolean;
+    readonly artifactError?: ArtifactErrorTelemetry | null;
   },
 ): Promise<void> {
   const existing = parseRunSummary(existingSummary);
@@ -93,8 +104,31 @@ async function persistArtifactTiming(
       userWaitMs,
       artifactsPending: params.artifactsPending,
       peakPromptTokens: params.peakPromptTokens,
+      artifactError: params.artifactError,
     }),
   );
+}
+
+async function persistMissingArtifactPlaceholders(
+  runId: string,
+  errorMessage: string,
+  onArtifactComplete?: (type: ArtifactType) => void,
+): Promise<readonly ArtifactType[]> {
+  const existing = await getRunWithMessages(runId);
+  const present = new Set(
+    (existing?.artifacts ?? [])
+      .map((artifact) => artifact.type)
+      .filter((type): type is ArtifactType =>
+        (CORE_ARTIFACT_TYPES as readonly string[]).includes(type),
+      ),
+  );
+  const missing = listMissingCoreArtifactTypes(present);
+  for (const type of missing) {
+    const placeholder = buildFailedArtifactPlaceholder(type, errorMessage);
+    await saveSingleArtifact(runId, type, placeholder);
+    onArtifactComplete?.(type);
+  }
+  return missing;
 }
 
 async function finalizeRegenerateFailure(
@@ -103,11 +137,22 @@ async function finalizeRegenerateFailure(
   existingSummary: string | null,
   artifactDurationMs: number | null,
   peakPromptTokens: number | null,
+  artifactError: ArtifactErrorTelemetry,
+  onArtifactComplete?: (type: ArtifactType) => void,
 ): Promise<void> {
+  const missing = await persistMissingArtifactPlaceholders(
+    runId,
+    artifactError.message,
+    onArtifactComplete,
+  );
   await persistArtifactTiming(runId, existingSummary, {
     artifactDurationMs,
     peakPromptTokens,
     artifactsPending: false,
+    artifactError: {
+      ...artifactError,
+      failedArtifact: missing[0] ?? artifactError.failedArtifact,
+    },
   });
   await updateArtifactStatus(runId, "failed");
   if (status === "running") {
@@ -136,6 +181,7 @@ async function finalizeRegenerateSuccess(
     artifactDurationMs: synthesisResult.artifactDurationMs ?? null,
     peakPromptTokens,
     artifactsPending: false,
+    artifactError: null,
   });
   await updateArtifactStatus(runId, "ready");
 
@@ -170,12 +216,25 @@ export async function regenerateRunArtifacts(
 
   const status = toAppRunStatus(run.status);
   const artifactStatus = toAppArtifactStatus(run.artifactStatus);
+  const debateOutcome = parseDebateOutcomeFromRunSummary(run.summary);
+  const debateComplete = isDebateCompleteForArtifactSynthesis({
+    messages: run.messages,
+    debateOutcome,
+  });
   const blockingError = getRegenerateBlockingError(
     status,
     artifactStatus,
-    isDebateCompleteFromMessages(run.messages),
+    debateComplete,
   );
   if (blockingError) {
+    console.warn("Artifact synthesis blocked", {
+      runId,
+      blockingError,
+      debateOutcome,
+      debateComplete,
+      status,
+      artifactStatus,
+    });
     return { ok: false, error: blockingError, artifactDurationMs: null };
   }
 
@@ -255,6 +314,14 @@ export async function regenerateRunArtifacts(
         run.summary,
         artifactDurationMs,
         peakPromptTokens,
+        {
+          message: `Budget exceeded during artifact synthesis ($${error.estimatedCostUsd.toFixed(4)} / $${error.maxCostUsd.toFixed(2)}).`,
+          failedArtifact: null,
+          timestamp: new Date().toISOString(),
+          retryFailed: false,
+          errorCode: "budget_exceeded",
+        },
+        options.onArtifactComplete,
       );
       return {
         ok: false,
@@ -263,6 +330,8 @@ export async function regenerateRunArtifacts(
       };
     }
 
+    const message =
+      error instanceof Error ? error.message : "Artifact generation failed";
     console.error("Regenerate artifacts failed:", {
       runId,
       artifactDurationMs,
@@ -274,12 +343,19 @@ export async function regenerateRunArtifacts(
       run.summary,
       artifactDurationMs,
       peakPromptTokens,
+      {
+        message,
+        failedArtifact: null,
+        timestamp: new Date().toISOString(),
+        retryFailed: false,
+        errorCode: "generation_failed",
+      },
+      options.onArtifactComplete,
     );
     return {
       ok: false,
       error: "generation_failed",
-      message:
-        error instanceof Error ? error.message : "Artifact generation failed",
+      message,
       artifactDurationMs,
     };
   }

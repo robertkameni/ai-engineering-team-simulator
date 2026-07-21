@@ -119,14 +119,39 @@ export async function generateRunArtifacts({
       priorArtifactsPrompt,
     );
 
-    const document = await generateArtifactDocument(
-      type,
-      prompt,
-      templateId,
-      productIdea,
-      usageAccumulator,
+    console.info("ARTIFACT SYNTHESIS queue", {
+      artifactType: type,
+      promptChars: prompt.length,
+      promptPreview: prompt.slice(0, 500),
       debateOutcome,
-    );
+      isUnapproved,
+    });
+
+    let document: Awaited<ReturnType<typeof generateArtifactDocument>>;
+    try {
+      document = await generateArtifactDocument(
+        type,
+        prompt,
+        templateId,
+        productIdea,
+        usageAccumulator,
+        debateOutcome,
+      );
+    } catch (error) {
+      console.error("ARTIFACT SYNTHESIS failed", {
+        artifactType: type,
+        durationMs: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+
+    console.info("ARTIFACT SYNTHESIS ok", {
+      artifactType: type,
+      durationMs: Date.now() - startedAt,
+      sectionCount: document.sections.length,
+      failedPlaceholder: document.artifactSynthesisFailed === true,
+    });
 
     const truthfulnessResult = validateArtifactTruthfulness(
       document,

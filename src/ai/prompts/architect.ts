@@ -12,11 +12,11 @@ Propose a detailed, production-grade v1 technical architecture that structurally
 
 Rules:
 - Open by evaluating ${pm.name}'s scope through a systems lens: latency, consistency, operability, and delivery constraints. **You MUST identify at least one scope assumption or technology choice in ${pm.name}'s plan that creates a delivery risk, and propose a concrete refinement.** Accepting the PM's scope wholesale without friction is not architecture — it's transcription. Name the specific assumption or choice you are challenging, why it's a risk, and what you would change.
-- You MUST cover these topics using dense multi-paragraph prose or structured bullets:
-  - ## Architecture: System topology (tiers, sync/async boundaries, failure domains, deployment units). Justify topology vs. alternatives (monolith vs. services, BFF vs. direct client, etc.).
-  - ## Data Model: Entity-relationship narrative with cardinality, indexing rationale, migration/versioning strategy, and hot-path read/write patterns.
-  - ## APIs & Integration: Protocol choices, idempotency, versioning, backpressure, caching layers — each with an explicit trade-off sentence. **Caching layers must be fully specified**: what is cached, at which layer (DB, in-process, HTTP), TTL, and invalidation trigger. Do not open this subsection and leave it incomplete.
-  - ## Decisions & Risks: ADR-style entries — Decision / Alternatives considered / Why chosen / Operational cost.
+- **Output contract (hard):** structure the reply as ## Summary, then at most **five** ## Decision entries, then at most **three** ## Risk entries. Do not emit repeated Bottleneck/Issue dump sections.
+- You MUST still cover these topics using dense multi-paragraph prose or structured bullets under that contract:
+  - ## Summary: System topology (tiers, sync/async boundaries, failure domains, deployment units) plus data-model cardinality and hot-path read/write patterns.
+  - ## Decisions (≤5): ADR-style entries — Decision / Alternatives considered / Why chosen / Operational cost. Include API/protocol and caching choices here.
+  - ## Risks (≤3): Highest-impact operability / consistency / delivery risks with mitigations.
 - **Async write atomicity**: For every design that writes to two stores in sequence (e.g., application table + job queue, event log + cache), explicitly state the failure mode if the process crashes between writes and the mitigation (shared connection, outbox pattern, saga, etc.). Do not delegate this analysis to the backend — define the contract here.
 - **Worker isolation**: If you propose background workers (queues, schedulers), specify concurrency model, priority strategy, and how workers avoid starving real-time request handling or exhausting external API rate limits.
 - Translate section titles into the same language as the Product Idea.
@@ -31,9 +31,9 @@ export function buildArchitectTurnPrompt(): string {
 
 /** Appended on tool-less retry when the first stream lacked required ## sections. */
 export function buildArchitectToollessRetryUserPrompt(): string {
-  return `CRITICAL — Your previous reply did not include the required ## sections (Architecture, Data Model, APIs & Integration, Decisions & Risks) with sufficient depth.
+  return `CRITICAL — Your previous reply did not include the required ## Summary / ## Decisions / ## Risks sections with sufficient depth.
 
-Post the FULL architectural design now in the team channel. Use npm tool results for version numbers when available; otherwise cite the verified stack reference without inventing older major versions. Do NOT call any tools — output only complete markdown sections.`;
+Post the FULL architectural design now in the team channel using ## Summary, at most five ## Decision entries, and at most three ## Risk entries. Use npm tool results for version numbers when available; otherwise cite the verified stack reference without inventing older major versions. Do NOT call any tools — output only complete markdown sections.`;
 }
 
 /**
