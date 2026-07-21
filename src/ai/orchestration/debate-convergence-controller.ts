@@ -8,6 +8,7 @@ import {
 } from "@/ai/orchestration/role-participation";
 import {
   getLatestTruncatedCriticalRoles,
+  hasCurrentCriticalTruncation,
   syncHasTruncatedCriticalTurn,
 } from "@/ai/orchestration/truncation-approval-gate";
 import type {
@@ -310,6 +311,26 @@ function maybeScheduleApprovedRecovery(
   };
 }
 
+function syncApprovedFinalizationFlags(
+  state: DebateConvergenceState,
+): void {
+  syncHasTruncatedCriticalTurn(state, state.transcript);
+  if (!hasCurrentCriticalTruncation(state.transcript)) {
+    state.postApproveTruncation = false;
+    state.hasTruncatedCriticalTurn = false;
+    if (state.truncationRecoveryAttemptedRoles.length > 0) {
+      state.postApproveContinuationFailed = false;
+    }
+    return;
+  }
+
+  state.postApproveTruncation = true;
+  state.hasTruncatedCriticalTurn = true;
+  if (state.truncationRecoveryAttemptedRoles.length > 0) {
+    state.postApproveContinuationFailed = true;
+  }
+}
+
 function decideApprovedPath(
   state: DebateConvergenceState,
   templateId: TeamTemplateId,
@@ -326,6 +347,7 @@ function decideApprovedPath(
   }
 
   if (isSoftwareBoundedTemplate(templateId) && state.turnCount >= SOFTWARE_FINALIZATION_PRIORITY_TURN) {
+    syncApprovedFinalizationFlags(state);
     return applyFinalization(
       state,
       state.turnCount,

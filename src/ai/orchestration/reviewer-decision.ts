@@ -5,12 +5,9 @@ import {
 } from "@/ai/agents/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
-import {
-  PHYSICAL_MAX_TURNS,
-  SOFTWARE_MAX_CORRECTIONS_PER_ROLE,
-  SOFTWARE_MAX_REVIEWER_REJECTIONS,
-  SOFTWARE_MAX_TURNS,
-} from "@/ai/orchestration/debate-convergence-controller";
+
+const SOFTWARE_MAX_TURNS = 10;
+const PHYSICAL_MAX_TURNS = 16;
 
 export function getMaxSimulationTurns(templateId: TeamTemplateId): number {
   return templateId === "physical" ? PHYSICAL_MAX_TURNS : SOFTWARE_MAX_TURNS;
@@ -26,7 +23,7 @@ export function canScheduleArchitectRevision(
 }
 
 /** After this many reviewer [REJECT] decisions, controller advances to final review. */
-export const MAX_REVIEWER_REJECTION_CYCLES = SOFTWARE_MAX_REVIEWER_REJECTIONS;
+export const MAX_REVIEWER_REJECTION_CYCLES = 5;
 
 export function hasExceededReviewerRejectionCap(rejectionCount: number): boolean {
   return rejectionCount >= MAX_REVIEWER_REJECTION_CYCLES;

@@ -45,28 +45,38 @@ import {
   buildReviewerTurnPrompt,
 } from "@/ai/prompts/reviewer";
 
-function buildCorrectionTurnPrompt(
+export function buildCorrectionTurnPrompt(
   role: SimulationAgentRole,
   reviewerName: string,
   feedbackExcerpt: string,
   nearCap = false,
+  assignedIssues: readonly { readonly issueId: string; readonly excerpt: string }[] = [],
 ): string {
   const excerpt = truncateFeedbackExcerpt(feedbackExcerpt, { nearCap });
+  const issueBlock =
+    assignedIssues.length > 0
+      ? assignedIssues
+          .map((issue) => `- ${issue.issueId}: ${issue.excerpt}`)
+          .join("\n")
+      : "- (no tracked issue IDs — address only the reviewer objections below)";
+
   return `
 
-CRITICAL — ${reviewerName} rejected your previous ${role} proposal. Quote their specific objection below, then address each flagged flaw with concrete revisions to your plan.
+CRITICAL — ${reviewerName} rejected your previous ${role} proposal. Address ONLY the assigned issue IDs below. Do NOT restate your full prior plan.
+
+Assigned issue IDs:
+${issueBlock}
 
 Reviewer feedback:
 """
 ${excerpt}
 """
 
-This is a CORRECTION turn — do NOT repost your full prior plan verbatim.
-- Start with a "## Changes" section listing only deltas vs your previous message in the transcript.
-- Quote each reviewer objection before your fix.
-- Keep cross-critique brief; prioritize resolving flagged flaws.
-
-You must respond point-by-point. Do not ignore their criticism. Re-engage the cross-critique rule only when relevant to a flagged flaw.`;
+This is a CORRECTION turn — targeted deltas only:
+- Start with a "## Changes" section listing only deltas vs your previous message.
+- Reference each assigned issue ID explicitly before the fix.
+- Prohibit full-plan restatement, section dumps, and unrelated redesign.
+- Keep cross-critique brief; prioritize resolving flagged issue IDs.`;
 }
 
 function resolvePromptTemplateId(templateId: TeamTemplateId): "software" | "physical" {
@@ -210,6 +220,7 @@ export function getAgentTurnPrompt(
       correction.reviewerName,
       correction.feedback,
       correction.nearCap === true,
+      correction.assignedIssues ?? [],
     );
   }
 

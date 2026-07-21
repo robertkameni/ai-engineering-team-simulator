@@ -15,7 +15,8 @@ function buildState(
   overrides: Partial<DebateState> = {},
 ): DebateState {
   return {
-    turnCount: 10,
+    phase: "final_review",
+    turnCount: 8,
     roleIndex: 0,
     returnToReviewer: false,
     nextRole: "reviewer",
@@ -39,6 +40,9 @@ function buildState(
     opsFollowUpCheckpoints: [],
     consecutiveUnproductiveCycles: 0,
     correctionLoopDetected: false,
+    reviewerProposal: null,
+    finalizationProposal: null,
+    outputDiagnostics: null,
     ...overrides,
   };
 }

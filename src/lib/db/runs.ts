@@ -426,6 +426,7 @@ function buildSummaryTelemetryFields(
     crossValidationFailed: summaryPayload?.crossValidationFailed === true,
     opsFollowUpArchitectCheckpoint:
       summaryPayload?.opsFollowUpArchitectCheckpoint ?? null,
+    finalization: summaryPayload?.finalization ?? null,
   };
 }
 

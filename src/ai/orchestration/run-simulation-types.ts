@@ -15,6 +15,7 @@ import type {
   ReviewIssue,
   ReviewIssueBaseline,
 } from "@/ai/orchestration/review-issue-tracker";
+import type { SectionDumpDiagnostics } from "@/ai/orchestration/section-dump-normalizer";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
@@ -75,6 +76,8 @@ export interface DebateState extends DebateConvergenceState {
   correctionLoopDetected: boolean;
   reviewerProposal: ReviewerTurnProposal | null;
   finalizationProposal: DebateFinalizationProposal | null;
+  /** Latest section-dump / hard-cap diagnostics from turn persistence. */
+  outputDiagnostics: SectionDumpDiagnostics | null;
 }
 
 export interface TurnContext {

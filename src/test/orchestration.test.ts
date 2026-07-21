@@ -64,9 +64,9 @@ describe("canScheduleArchitectRevision", () => {
   });
 
   it("allows revision later in software template due to higher cap", () => {
-    // Software has 20 turns — at turn 17, 4 turns remain → revision allowed
+    // Software has 10 turns — at turn 6, 4 turns remain → revision allowed
     const maxTurns = getMaxSimulationTurns("software");
-    assert.equal(maxTurns, 20);
+    assert.equal(maxTurns, 10);
     assert.equal(
       canScheduleArchitectRevision(maxTurns - MIN_TURNS_FOR_REVISION_FINISH, maxTurns),
       true,
@@ -89,12 +89,12 @@ describe("hasExceededReviewerRejectionCap", () => {
     assert.equal(hasExceededReviewerRejectionCap(MAX_REVIEWER_REJECTION_CYCLES + 1), true);
   });
 
-  it("allows 4 rejection cycles (raised from 2 for more granular corrections)", () => {
-    assert.equal(MAX_REVIEWER_REJECTION_CYCLES, 4);
+  it("allows 5 rejection cycles under the deterministic controller budget", () => {
+    assert.equal(MAX_REVIEWER_REJECTION_CYCLES, 5);
     // Per-role correction cap still limits individual roles
-    assert.equal(MAX_CORRECTIONS_PER_ROLE, 2);
+    assert.equal(MAX_CORRECTIONS_PER_ROLE, 3);
     // A role can exhaust its per-role cap without tripping the global cap
-    assert.equal(hasExceededReviewerRejectionCap(3), false);
+    assert.equal(hasExceededReviewerRejectionCap(4), false);
   });
 });
 
@@ -463,13 +463,15 @@ describe("windowTranscriptForTurn", () => {
 });
 
 describe("debate correction caps", () => {
-  it("allows two corrections per role", () => {
+  it("allows three corrections per role", () => {
     assert.equal(canCorrectRole({}, "pm"), true);
     const afterFirst = incrementRoleCorrectionCount({}, "pm");
     assert.equal(canCorrectRole(afterFirst, "pm"), true);
     const afterSecond = incrementRoleCorrectionCount(afterFirst, "pm");
-    assert.equal(canCorrectRole(afterSecond, "pm"), false);
-    assert.equal(MAX_CORRECTIONS_PER_ROLE, 2);
+    assert.equal(canCorrectRole(afterSecond, "pm"), true);
+    const afterThird = incrementRoleCorrectionCount(afterSecond, "pm");
+    assert.equal(canCorrectRole(afterThird, "pm"), false);
+    assert.equal(MAX_CORRECTIONS_PER_ROLE, 3);
   });
 });
 
@@ -500,18 +502,18 @@ describe("getMaxSimulationTurns (adaptive cap)", () => {
     assert.equal(getMaxSimulationTurns("physical"), 16);
   });
 
-  it("returns 20 for software templates", () => {
-    assert.equal(getMaxSimulationTurns("software"), 20);
+  it("returns 10 for software templates", () => {
+    assert.equal(getMaxSimulationTurns("software"), 10);
   });
 
-  it("returns 20 for hybrid templates", () => {
-    assert.equal(getMaxSimulationTurns("hybrid"), 20);
+  it("returns 10 for hybrid templates", () => {
+    assert.equal(getMaxSimulationTurns("hybrid"), 10);
   });
 
   it("accepts all known TeamTemplateId values", () => {
     for (const id of ["software", "physical", "hybrid"] as const) {
       const cap = getMaxSimulationTurns(id);
-      assert.ok(cap >= 16, `${id} cap too low: ${cap}`);
+      assert.ok(cap >= 10, `${id} cap too low: ${cap}`);
     }
   });
 });
@@ -536,14 +538,14 @@ describe("isDebateComplete with templateId", () => {
     assert.equal(isDebateComplete(physicalMessages, "physical"), true);
   });
 
-  it("uses a 20-turn cap for software runs", () => {
-    const softwareMessages = Array.from({ length: 18 }, (_, index) => ({
+  it("uses a 10-turn cap for software runs", () => {
+    const softwareMessages = Array.from({ length: 8 }, (_, index) => ({
       agentRole: index % 2 === 0 ? "pm" : "architect",
       content: `turn ${index}`,
     }));
     assert.equal(isDebateComplete(softwareMessages, "software"), false);
 
-    const fullMessages = Array.from({ length: 20 }, (_, index) => ({
+    const fullMessages = Array.from({ length: 10 }, (_, index) => ({
       agentRole: index % 2 === 0 ? "pm" : "architect",
       content: `turn ${index}`,
     }));
@@ -575,12 +577,12 @@ describe("insufficient_budget outcome", () => {
 
 // PHASE 1 + 2 — canScheduleArchitectRevision respects adaptive caps
 describe("canScheduleArchitectRevision with adaptive caps", () => {
-  it("allows revision at turn 16 in software (cap 20, 4 turns remain)", () => {
-    assert.equal(canScheduleArchitectRevision(16, 20), true);
+  it("allows revision at turn 6 in software (cap 10, 4 turns remain)", () => {
+    assert.equal(canScheduleArchitectRevision(6, 10), true);
   });
 
-  it("blocks revision at turn 17 in software (cap 20, 3 turns remain)", () => {
-    assert.equal(canScheduleArchitectRevision(17, 20), false);
+  it("blocks revision at turn 7 in software (cap 10, 3 turns remain)", () => {
+    assert.equal(canScheduleArchitectRevision(7, 10), false);
   });
 
   it("allows revision at turn 12 in physical (cap 16, 4 turns remain)", () => {

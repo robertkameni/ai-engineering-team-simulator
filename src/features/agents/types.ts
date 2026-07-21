@@ -8,6 +8,7 @@ import type {
   OpsFollowUpCheckpoint,
   OpsFollowUpLastCorrectionRole,
 } from "@/lib/db/ops-follow-up-summary";
+import type { DebateFinalizationTelemetry } from "@/lib/db/debate-finalization-telemetry";
 
 export type { DebateExitOutcome };
 
@@ -84,6 +85,8 @@ export interface MockRun {
   opsFollowUpLastCorrectionRole?: OpsFollowUpLastCorrectionRole | null;
   opsFollowUpEvaluationTurn?: number | null;
   opsFollowUpArchitectCheckpoint?: OpsFollowUpCheckpoint | null;
+  /** Deterministic debate finalization telemetry. */
+  finalization?: DebateFinalizationTelemetry | null;
 }
 
 export interface MockArtifactSection {

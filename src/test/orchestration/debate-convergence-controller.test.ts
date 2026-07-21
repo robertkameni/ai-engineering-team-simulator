@@ -81,6 +81,7 @@ function buildState(overrides: Partial<DebateState> = {}): DebateState {
     correctionLoopDetected: false,
     reviewerProposal: null,
     finalizationProposal: null,
+    outputDiagnostics: null,
     ...overrides,
   };
 }
@@ -218,7 +219,7 @@ describe("decideDebateConvergence", () => {
     assertSchedule(finalReviewDirective, "final_review", "reviewer");
   });
 
-  it("prioritizes finalization flow at turn 8 instead of another correction", () => {
+  it("prioritizes finalization at turn 8 instead of another correction", () => {
     const directive = decideDebateConvergence(
       buildState({
         phase: "correction_wave",
@@ -243,7 +244,10 @@ describe("decideDebateConvergence", () => {
       { templateId: "software" },
     );
 
-    assertSchedule(directive, "final_review", "reviewer");
+    assert.equal(directive.kind, "finalize");
+    if (directive.kind === "finalize") {
+      assert.equal(directive.outcome, "approved");
+    }
   });
 
   it("advances to final review when rejection or correction budgets are exhausted", () => {

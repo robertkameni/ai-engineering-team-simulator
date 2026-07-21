@@ -74,7 +74,8 @@ function buildBaseState(
   overrides: Partial<DebateState> = {},
 ): DebateState {
   return {
-    turnCount: 10,
+    phase: "correction_wave",
+    turnCount: 7,
     roleIndex: 0,
     returnToReviewer: true,
     nextRole: "architect",
@@ -101,6 +102,9 @@ function buildBaseState(
     opsFollowUpCheckpoints: [],
     consecutiveUnproductiveCycles: 0,
     correctionLoopDetected: false,
+    reviewerProposal: null,
+    finalizationProposal: null,
+    outputDiagnostics: null,
     ...overrides,
   };
 }
@@ -391,7 +395,7 @@ describe("ops follow-up observability checkpoint", () => {
     assert.equal(checkpoint?.opsFollowUpLastCorrectionRole, "architect");
     assert.equal(checkpoint?.opsFollowUpUnresolvedDevopsIssueCount, 0);
     assert.equal(checkpoint?.opsFollowUpOpenIssueCount, 0);
-    assert.equal(checkpoint?.opsFollowUpEvaluationTurn, 10);
+    assert.equal(checkpoint?.opsFollowUpEvaluationTurn, 7);
 
     assert.equal(state.opsFollowUpCheckpoints.length, 1);
     assert.equal(state.opsFollowUpCheckpoints[0], checkpoint);
@@ -431,7 +435,7 @@ describe("ops follow-up observability checkpoint", () => {
       ctx.roster,
     );
     const state = buildBaseState(ctx.roster.devops.name, {
-      turnCount: 10,
+      turnCount: 7,
       lastRejectFeedback: SUBSCRIPTION_STYLE_FEEDBACK(ctx.roster.devops.name),
       lastRejectTarget: "backend",
       transcript: [
@@ -531,7 +535,7 @@ describe("checkpoint history and selectOpsFollowUpSummary", () => {
     ];
     state.lastRejectFeedback = ARCHITECT_ONLY_FEEDBACK;
     state.lastRejectTarget = "frontend";
-    state.turnCount = 14;
+    state.turnCount = 8;
 
     recordOpsFollowUpCheckpoint(state, ctx);
 
@@ -549,12 +553,12 @@ describe("checkpoint history and selectOpsFollowUpSummary", () => {
 
     // The architect cycle is the one that triggered
     assert.equal(summary.relevantArchitect?.opsFollowUpTriggered, true);
-    assert.equal(summary.relevantArchitect?.opsFollowUpEvaluationTurn, 10);
+    assert.equal(summary.relevantArchitect?.opsFollowUpEvaluationTurn, 7);
 
     // The frontend cycle did not trigger — architect guard fires before gap check
     assert.equal(summary.last?.opsFollowUpTriggered, false);
     assert.equal(summary.last?.opsFollowUpSkipReason, "not_architect_correction_after_review");
-    assert.equal(summary.last?.opsFollowUpEvaluationTurn, 14);
+    assert.equal(summary.last?.opsFollowUpEvaluationTurn, 8);
   });
 
   it("returns null relevantArchitect when no architect correction occurred", () => {

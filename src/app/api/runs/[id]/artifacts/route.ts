@@ -62,6 +62,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     opsFollowUpEvaluationTurn: summaryPayload?.opsFollowUpEvaluationTurn ?? null,
     opsFollowUpArchitectCheckpoint:
       summaryPayload?.opsFollowUpArchitectCheckpoint ?? null,
+    finalization: summaryPayload?.finalization ?? null,
   });
 }
 

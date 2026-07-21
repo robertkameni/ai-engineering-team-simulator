@@ -47,6 +47,7 @@ interface MetadataWriter {
   appendDebateOutcome: (params: DebateOutcomeMetadata) => void;
   appendSynthesisValidationWarning: (message: string) => void;
   appendOpsFollowUp: (fields: RunOpsFollowUpExportFields) => void;
+  appendFinalization: (summary: string) => void;
 }
 
 interface DebateOutcomeMetadata {
@@ -215,6 +216,21 @@ function appendRunMetadata(writer: MetadataWriter, run: MockRun): void {
   }
 
   writer.appendOpsFollowUp(resolveRunOpsFollowUpFields(run));
+
+  if (run.finalization) {
+    const accepted = run.finalization.acceptedCriticalRisks.length;
+    const corrections = Object.entries(run.finalization.correctionsByRole)
+      .map(([role, count]) => `${role}:${count}`)
+      .join(", ");
+    writer.appendFinalization(
+      `${run.finalization.reason} · rejects ${run.finalization.rejectCount}` +
+        (corrections ? ` · corrections ${corrections}` : "") +
+        ` · acceptedCriticalRisks ${accepted}` +
+        (run.finalization.outputDiagnostics?.wasNormalized
+          ? " · sectionDumpNormalized"
+          : ""),
+    );
+  }
 }
 
 function createMarkdownMetadataWriter(lines: string[]): MetadataWriter {
@@ -249,6 +265,9 @@ function createMarkdownMetadataWriter(lines: string[]): MetadataWriter {
     },
     appendOpsFollowUp: (fields) => {
       appendOpsFollowUpMetadataLines(lines, fields.last, fields.architectCheckpoint);
+    },
+    appendFinalization: (summary) => {
+      lines.push("**Finalization:** " + summary, "");
     },
   };
 }
@@ -315,6 +334,13 @@ function createHtmlMetadataWriter(parts: string[]): MetadataWriter {
     },
     appendOpsFollowUp: (fields) => {
       appendOpsFollowUpMetadataHtml(parts, fields.last, fields.architectCheckpoint);
+    },
+    appendFinalization: (summary) => {
+      parts.push(
+        '<p class="meta-block"><strong>Finalization:</strong> ' +
+          escapeHtml(summary) +
+          "</p>",
+      );
     },
   };
 }

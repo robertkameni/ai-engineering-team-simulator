@@ -43,3 +43,5 @@ next-env.d.ts
 # prisma v7 generated client
 /src/generated
 .fallow/
+
+/.live-verify/*

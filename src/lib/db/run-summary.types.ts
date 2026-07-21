@@ -1,5 +1,6 @@
 import type { DebateExitOutcome } from "@/ai/orchestration/reviewer-decision";
 
+import type { DebateFinalizationTelemetry } from "@/lib/db/debate-finalization-telemetry";
 import type {
   OpsFollowUpCheckpoint,
   OpsFollowUpLastCorrectionRole,
@@ -7,7 +8,7 @@ import type {
 
 export type RunSummaryDebateOutcome = DebateExitOutcome | "aborted";
 
-export type { OpsFollowUpLastCorrectionRole };
+export type { OpsFollowUpLastCorrectionRole, DebateFinalizationTelemetry };
 
 export interface RunSummaryPayload {
   readonly debateOutcome: RunSummaryDebateOutcome | null;
@@ -39,6 +40,11 @@ export interface RunSummaryPayload {
   /** Post-approve truncation recovery attempted but still truncated. */
   readonly postApproveContinuationFailed?: boolean;
   readonly peakPromptTokens?: number | null;
+  /**
+   * Authoritative finalization metadata (reason, reject/correction budgets,
+   * accepted critical risks, output diagnostics).
+   */
+  readonly finalization?: DebateFinalizationTelemetry;
   readonly opsFollowUpEvaluated?: boolean;
   readonly opsFollowUpTriggered?: boolean;
   readonly opsFollowUpSkipReason?: string | null;

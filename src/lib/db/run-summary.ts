@@ -3,6 +3,7 @@ import type {
   RunSummaryPayload,
   RunSummarySynthesisTelemetry,
 } from "@/lib/db/run-summary.types";
+import { parseDebateFinalizationTelemetry } from "@/lib/db/debate-finalization-telemetry";
 import { parseOpsFollowUpFields } from "@/lib/db/ops-follow-up-summary";
 
 export const RUN_SUMMARY_SYNTHESIS_VERSION = 2;
@@ -85,6 +86,7 @@ function pickPreservedDebateFields(
   | "totalDurationMs"
   | "artifactsPending"
   | "peakPromptTokens"
+  | "finalization"
 > {
   return {
     hasTruncatedCriticalTurn: existing?.hasTruncatedCriticalTurn,
@@ -98,6 +100,7 @@ function pickPreservedDebateFields(
     totalDurationMs: existing?.totalDurationMs,
     artifactsPending: existing?.artifactsPending,
     peakPromptTokens: existing?.peakPromptTokens,
+    finalization: existing?.finalization,
   };
 }
 
@@ -162,6 +165,10 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
       totalDurationMs: optionalNullableNumber(record.totalDurationMs),
       artifactsPending: optionalBoolean(record.artifactsPending),
       peakPromptTokens: optionalNullableNumber(record.peakPromptTokens),
+      ...(() => {
+        const finalization = parseDebateFinalizationTelemetry(record.finalization);
+        return finalization ? { finalization } : {};
+      })(),
       ...opsFollowUpFields,
     };
   } catch {
@@ -277,6 +284,8 @@ export function mergeRunSummaryTimingTelemetry(
       timing.peakPromptTokens,
       existing?.peakPromptTokens,
     ),
+    correctionLoopDetected: existing?.correctionLoopDetected,
+    finalization: existing?.finalization,
     ...pickOpsFollowUpFields(existing),
   });
 }

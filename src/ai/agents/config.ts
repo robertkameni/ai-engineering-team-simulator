@@ -73,7 +73,7 @@ const ACTIVE_AGENTS: Record<SimulationAgentRole, AgentModelConfig> = {
 export const TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS = 1800;
 
 /** Max continuation streams per agent turn when output looks truncated. */
-export const MAX_TRUNCATION_CONTINUATIONS = 3;
+export const MAX_TRUNCATION_CONTINUATIONS = 1;
 
 export function getAgentConfig(role: SimulationAgentRole): AgentModelConfig {
   return ACTIVE_AGENTS[role];

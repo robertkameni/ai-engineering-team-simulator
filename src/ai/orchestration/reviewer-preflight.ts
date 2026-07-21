@@ -3,6 +3,7 @@ import {
   type SimulationAgentRole,
 } from "@/ai/agents/config";
 import { getTeamMember, type TeamRoster } from "@/ai/agents/roster";
+import type { CorrectionIssueAssignment } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { hasFrontendRisksSection } from "@/ai/orchestration/looks-like-truncated-agent-output";
 
@@ -32,10 +33,13 @@ function hasCrossCritiqueSignal(content: string, roster: TeamRoster): boolean {
   return teammateNames.some((name) => content.includes(name));
 }
 
+/**
+ * Full preflight for the initial reviewer pass only. Scoped re-review uses
+ * {@link buildScopedReReviewChecklist} instead.
+ */
 export function buildReviewerPreflightChecklist(
   transcript: TranscriptEntry[],
   roster: TeamRoster,
-  options?: { isReReview?: boolean },
 ): string {
   const spokenRoles = new Set(
     transcript.map((entry) => entry.role).filter((role) => role !== "reviewer"),
@@ -71,14 +75,10 @@ export function buildReviewerPreflightChecklist(
 
   const pipelineComplete = missingRoles.length === 0;
 
-  const reviewGuidance = options?.isReReview
-    ? "RE-REVIEW: The corrected agent just spoke. If they addressed your prior objections with concrete changes, issue [APPROVE] on the last line alone. Reject only when a named concern is still missing from their latest message. Do not claim all gaps are resolved while any named objection remains open."
-    : "FIRST-PASS REVIEW: Apply your ZERO-APPROVE DEFAULT — reject the single most severe unresolved gap unless every mitigation already appears in a teammate's prior message (not your own review). End with [APPROVE] or [REJECT: role] alone on the absolute last line.";
-
   return [
     "## Debate pre-flight checklist (server-computed)",
     "",
-    reviewGuidance,
+    "FIRST-PASS REVIEW: Apply your ZERO-APPROVE DEFAULT — reject the single most severe unresolved gap unless every mitigation already appears in a teammate's prior message (not your own review). End with [APPROVE] or [REJECT: role] alone on the absolute last line.",
     "",
     "### Pipeline coverage",
     pipelineComplete
@@ -95,5 +95,38 @@ export function buildReviewerPreflightChecklist(
     ...operationalLines,
     "",
     `Turns so far: ${transcript.length}. Pipeline order: ${SIMULATION_AGENT_ORDER.join(" → ")}.`,
+  ].join("\n");
+}
+
+/**
+ * Correction-scoped re-review checklist. Omits full pipeline/ops preflight and
+ * asks only whether assigned issue IDs were addressed.
+ */
+export function buildScopedReReviewChecklist(params: {
+  readonly targetRole: SimulationAgentRole | null;
+  readonly issues: readonly CorrectionIssueAssignment[];
+  readonly roster: TeamRoster;
+}): string {
+  const targetLabel = params.targetRole
+    ? `${getTeamMember(params.roster, params.targetRole).name} (${params.targetRole})`
+    : "the corrected agent";
+
+  const issueLines =
+    params.issues.length > 0
+      ? params.issues.map((issue) => {
+          return `- ${issue.issueId} [${issue.status}]: ${issue.excerpt}`;
+        })
+      : ["- (no tracked issue IDs — judge only the prior named objections)"];
+
+  return [
+    "## Scoped re-review checklist (server-computed)",
+    "",
+    `Evaluate only whether ${targetLabel} addressed the assigned issue IDs below.`,
+    "Do NOT reopen the full preflight, invent unrelated blockers, or expand the issue set.",
+    "If every assigned open issue is addressed with concrete changes, emit [APPROVE] alone on the last line.",
+    "Reject only when a listed issue ID remains unresolved in the latest correction.",
+    "",
+    "### Assigned issue dispositions",
+    ...issueLines,
   ].join("\n");
 }

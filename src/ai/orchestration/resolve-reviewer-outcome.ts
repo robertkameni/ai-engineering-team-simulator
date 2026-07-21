@@ -1,6 +1,7 @@
 import type { SimulationAgentRole } from "@/ai/agents/config";
 import { incrementRoleCorrectionCount } from "@/ai/orchestration/debate-correction-caps";
 import { parseReviewerDecisionWithMangleRecovery } from "@/ai/orchestration/normalize-mangled-decision-tag";
+import { getMaxSimulationTurns } from "@/ai/orchestration/reviewer-decision";
 import {
   shouldScheduleMissingRoleFirstTurn,
 } from "@/ai/orchestration/role-participation";
@@ -113,74 +114,6 @@ export function maybeScheduleTruncationRecovery(
     state.postApproveContinuationFailed = true;
   }
   return null;
-}
-
-/**
- * Prefer approve when a correction loop is detected or near turn-cap with
- * minor open issues. Returns null when neither path applies.
- */
-function preferLoopOrNearCapApprove(
-  state: DebateState,
-  ctx: TurnContext,
-  maxTurns: number,
-  openIssueCount: number,
-): TurnDirective | null {
-  const unresolvedOpsIssueCount = unresolvedOpsCount(state);
-
-  if (
-    shouldPreferCorrectionLoopApprove({
-      transcript: state.transcript,
-      correctionLoopDetected: state.correctionLoopDetected,
-      unresolvedOpsIssueCount,
-    })
-  ) {
-    console.info(
-      "CORRECTION LOOP APPROVE: unproductive reject cycles — preferring approve",
-      {
-        runId: ctx.runId,
-        turnCount: state.turnCount,
-        consecutiveUnproductiveCycles: state.consecutiveUnproductiveCycles,
-        openIssueCount,
-      },
-    );
-    markIssuesAddressed(state.reviewIssues);
-    return { kind: "break", outcome: "approved" };
-  }
-
-  if (
-    shouldPreferNearCapApprove({
-      transcript: state.transcript,
-      turnCount: state.turnCount,
-      maxTurns,
-      openIssueCount,
-      unresolvedOpsIssueCount,
-    })
-  ) {
-    console.info("NEAR-CAP APPROVE: preferring approve over further reject cycles", {
-      runId: ctx.runId,
-      turnCount: state.turnCount,
-      maxTurns,
-      openIssueCount,
-    });
-    markIssuesAddressed(state.reviewIssues);
-    return { kind: "break", outcome: "approved" };
-  }
-
-  return null;
-}
-
-function preferNearCapApproveOrCap(
-  state: DebateState,
-  ctx: TurnContext,
-  maxTurns: number,
-): TurnDirective {
-  const openIssueCount = buildIssueSnapshot(state.reviewIssues).totalOpen;
-  const approve = preferLoopOrNearCapApprove(state, ctx, maxTurns, openIssueCount);
-  if (approve) {
-    return approve;
-  }
-
-  return { kind: "break", outcome: "cap_reached" };
 }
 
 function resolveRejectDecision(
