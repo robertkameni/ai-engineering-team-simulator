@@ -47,6 +47,16 @@ export async function GET(_request: Request, { params }: RouteParams) {
     opsFollowUpEligible: summaryPayload?.opsFollowUpEligible === true,
     opsFollowUpUnresolvedDevopsIssueCount:
       summaryPayload?.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+    opsFollowUpOpenIssueCount:
+      summaryPayload?.opsFollowUpOpenIssueCount ??
+      summaryPayload?.opsFollowUpUnresolvedDevopsIssueCount ??
+      0,
+    opsFollowUpAddressedIssueCount:
+      summaryPayload?.opsFollowUpAddressedIssueCount ?? 0,
+    opsFollowUpAcceptedRiskIssueCount:
+      summaryPayload?.opsFollowUpAcceptedRiskIssueCount ?? 0,
+    opsFollowUpAcceptedRiskReasons:
+      summaryPayload?.opsFollowUpAcceptedRiskReasons ?? [],
     opsFollowUpLastCorrectionRole:
       summaryPayload?.opsFollowUpLastCorrectionRole ?? null,
     opsFollowUpEvaluationTurn: summaryPayload?.opsFollowUpEvaluationTurn ?? null,

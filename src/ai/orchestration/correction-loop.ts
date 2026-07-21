@@ -30,10 +30,7 @@ function keywordKey(keywords: readonly string[]): string {
   return keywords.slice(0, 4).join("|");
 }
 
-/**
- * True when this reject largely restates an already-open / still_open issue
- * for the same role (ping-pong / duplicate rejection).
- */
+/** True when this reject largely restates an already-open issue. */
 export function isDuplicateRejectReason(params: {
   readonly rejectRole: SimulationAgentRole;
   readonly feedbackText: string;
@@ -42,9 +39,7 @@ export function isDuplicateRejectReason(params: {
   const openForRole = params.reviewIssues.filter(
     (issue) =>
       issue.targetRole === params.rejectRole &&
-      (issue.status === "open" ||
-        issue.status === "still_open" ||
-        issue.status === "attempted"),
+      issue.status === "open",
   );
   if (openForRole.length === 0) {
     return false;

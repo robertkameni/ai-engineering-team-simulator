@@ -6,7 +6,18 @@ import {
   type IssueSeverity,
 } from "@/ai/orchestration/issue-ownership";
 
-export type IssueStatus = "open" | "attempted" | "addressed" | "still_open" | "failed_validation";
+export type IssueStatus = "open" | "addressed" | "accepted_risk";
+
+type AcceptedRiskPrimitive = string | number | boolean | null;
+
+type AcceptedRiskMetadata = Readonly<Record<string, AcceptedRiskPrimitive>>;
+
+export interface IssueAcceptedRisk {
+  readonly reason: string;
+  readonly acceptedByRole: SimulationAgentRole | "reviewer";
+  readonly acceptedOnTurn: number | null;
+  readonly metadata?: AcceptedRiskMetadata;
+}
 
 export interface ReviewIssue {
   id: string;
@@ -18,13 +29,35 @@ export interface ReviewIssue {
   createdOnCycle: number;
   lastAttemptedOnTurn: number | null;
   lastConfirmedOnTurn: number | null;
+  acceptedRisk?: IssueAcceptedRisk | null;
 }
 
 export interface ReviewIssueSnapshot {
   issues: ReviewIssue[];
   totalCreated: number;
   totalOpen: number;
-  totalFailed: number;
+  totalAddressed: number;
+  totalAcceptedRisk: number;
+}
+
+export interface ReviewIssueBaseline {
+  readonly issueIds: ReadonlySet<string>;
+}
+
+export interface BaselineIssueCreationParams {
+  readonly existingIssues: ReviewIssue[];
+  readonly rejectRole: SimulationAgentRole;
+  readonly feedbackText: string;
+  readonly cycleIndex: number;
+  readonly turnCount: number;
+  readonly roster: TeamRoster;
+  readonly baseline: ReviewIssueBaseline;
+}
+
+export interface BaselineIssueCreationResult {
+  readonly newIssues: ReviewIssue[];
+  readonly blockedNewIssuesCount: number;
+  readonly updatedIssueIds: string[];
 }
 
 let issueCounter = 0;
@@ -87,14 +120,15 @@ function findForRole(
   });
 }
 
-export function createReviewIssues(
+function createReviewIssuesInternal(
   existingIssues: ReviewIssue[],
   rejectRole: SimulationAgentRole,
   feedbackText: string,
   cycleIndex: number,
   turnCount: number,
   roster: TeamRoster,
-): ReviewIssue[] {
+  baseline: ReviewIssueBaseline | null,
+): BaselineIssueCreationResult {
   const concerns = feedbackText
     .split("\n")
     .map((line) => line.trim())
@@ -109,14 +143,18 @@ export function createReviewIssues(
     );
 
   const newIssues: ReviewIssue[] = [];
+  const updatedIssueIds: string[] = [];
+  let blockedNewIssuesCount = 0;
 
   for (const concern of concerns) {
     const issueOwner = inferIssueOwnerFromConcern(concern, roster, rejectRole);
-    const existing = findForRole(existingIssues, issueOwner, concern);
+    const existing = findForRole(existingIssues, issueOwner, concern).filter(
+      (issue) => baseline === null || baseline.issueIds.has(issue.id),
+    );
     if (existing.length > 0) {
       for (const issue of existing) {
-        issue.status = "still_open";
         issue.lastConfirmedOnTurn = turnCount;
+        updatedIssueIds.push(issue.id);
       }
       continue;
     }
@@ -124,6 +162,11 @@ export function createReviewIssues(
     const excerpt = normalizeExcerpt(concern);
     const keywords = extractKeywords(excerpt);
     if (keywords.length < 2) {
+      continue;
+    }
+
+    if (baseline !== null) {
+      blockedNewIssuesCount += 1;
       continue;
     }
 
@@ -137,10 +180,50 @@ export function createReviewIssues(
       createdOnCycle: cycleIndex,
       lastAttemptedOnTurn: null,
       lastConfirmedOnTurn: turnCount,
+      acceptedRisk: null,
     });
   }
 
-  return newIssues;
+  return { newIssues, blockedNewIssuesCount, updatedIssueIds };
+}
+
+export function createReviewIssues(
+  existingIssues: ReviewIssue[],
+  rejectRole: SimulationAgentRole,
+  feedbackText: string,
+  cycleIndex: number,
+  turnCount: number,
+  roster: TeamRoster,
+): ReviewIssue[] {
+  return createReviewIssuesInternal(
+    existingIssues,
+    rejectRole,
+    feedbackText,
+    cycleIndex,
+    turnCount,
+    roster,
+    null,
+  ).newIssues;
+}
+
+export function createReviewIssueBaseline(
+  issues: readonly ReviewIssue[],
+): ReviewIssueBaseline {
+  return { issueIds: new Set(issues.map((issue) => issue.id)) };
+}
+
+export function createReviewIssuesWithinBaseline(
+  params: BaselineIssueCreationParams,
+): BaselineIssueCreationResult {
+  return createReviewIssuesInternal(
+    params.existingIssues,
+    params.rejectRole,
+    params.feedbackText,
+    params.cycleIndex,
+    params.turnCount,
+    params.roster,
+    params.baseline,
+  );
 }
 
 export function markIssuesAttempted(
@@ -152,8 +235,7 @@ export function markIssuesAttempted(
     if (issue.targetRole !== targetRole) {
       continue;
     }
-    if (issue.status === "open" || issue.status === "still_open") {
-      issue.status = "attempted";
+    if (issue.status === "open") {
       issue.lastAttemptedOnTurn = turnCount;
     }
   }
@@ -163,21 +245,39 @@ export function markIssuesFailedValidation(
   issues: ReviewIssue[],
   targetRole: SimulationAgentRole,
 ): void {
-  for (const issue of issues) {
-    if (issue.targetRole !== targetRole) {
-      continue;
-    }
-    if (issue.status !== "addressed") {
-      issue.status = "failed_validation";
-    }
-  }
+  void issues;
+  void targetRole;
 }
 
 export function markIssuesAddressed(issues: ReviewIssue[]): void {
   for (const issue of issues) {
-    if (issue.status !== "addressed") {
+    if (issue.status === "open") {
       issue.status = "addressed";
     }
+  }
+}
+
+function normalizeAcceptedRiskReason(reason: string): string {
+  const normalized = reason.trim();
+  if (normalized.length === 0) {
+    throw new Error("Accepted risk disposition requires a reason.");
+  }
+  return normalized;
+}
+
+export function markIssuesAcceptedRisk(
+  issues: ReviewIssue[],
+  disposition: IssueAcceptedRisk,
+): void {
+  const reason = normalizeAcceptedRiskReason(disposition.reason);
+  const acceptedRisk: IssueAcceptedRisk = { ...disposition, reason };
+
+  for (const issue of issues) {
+    if (issue.status !== "open") {
+      continue;
+    }
+    issue.status = "accepted_risk";
+    issue.acceptedRisk = acceptedRisk;
   }
 }
 
@@ -185,9 +285,9 @@ export function buildIssueSnapshot(issues: ReviewIssue[]): ReviewIssueSnapshot {
   return {
     issues,
     totalCreated: issues.length,
-    totalOpen: issues.filter((i) => i.status === "open" || i.status === "still_open").length,
-    totalFailed: issues.filter(
-      (i) => i.status === "failed_validation",
-    ).length,
+    totalOpen: issues.filter((issue) => issue.status === "open").length,
+    totalAddressed: issues.filter((issue) => issue.status === "addressed").length,
+    totalAcceptedRisk: issues.filter((issue) => issue.status === "accepted_risk")
+      .length,
   };
 }

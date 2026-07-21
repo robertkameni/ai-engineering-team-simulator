@@ -45,6 +45,10 @@ function pickOpsFollowUpFields(
   | "opsFollowUpSkipReason"
   | "opsFollowUpEligible"
   | "opsFollowUpUnresolvedDevopsIssueCount"
+  | "opsFollowUpOpenIssueCount"
+  | "opsFollowUpAddressedIssueCount"
+  | "opsFollowUpAcceptedRiskIssueCount"
+  | "opsFollowUpAcceptedRiskReasons"
   | "opsFollowUpLastCorrectionRole"
   | "opsFollowUpEvaluationTurn"
   | "opsFollowUpArchitectCheckpoint"
@@ -56,6 +60,10 @@ function pickOpsFollowUpFields(
     opsFollowUpEligible: existing?.opsFollowUpEligible,
     opsFollowUpUnresolvedDevopsIssueCount:
       existing?.opsFollowUpUnresolvedDevopsIssueCount,
+    opsFollowUpOpenIssueCount: existing?.opsFollowUpOpenIssueCount,
+    opsFollowUpAddressedIssueCount: existing?.opsFollowUpAddressedIssueCount,
+    opsFollowUpAcceptedRiskIssueCount: existing?.opsFollowUpAcceptedRiskIssueCount,
+    opsFollowUpAcceptedRiskReasons: existing?.opsFollowUpAcceptedRiskReasons,
     opsFollowUpLastCorrectionRole: existing?.opsFollowUpLastCorrectionRole,
     opsFollowUpEvaluationTurn: existing?.opsFollowUpEvaluationTurn,
     opsFollowUpArchitectCheckpoint: existing?.opsFollowUpArchitectCheckpoint,

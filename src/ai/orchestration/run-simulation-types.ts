@@ -2,10 +2,19 @@ import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { TranscriptEntry } from "@/ai/context/transcript";
+import type {
+  DebateConvergenceState,
+  DebateFinalizationProposal,
+  DebatePhase,
+  ReviewerTurnProposal,
+} from "@/ai/orchestration/debate-convergence-controller";
 import type { DebateExitOutcome } from "@/ai/orchestration/reviewer-decision";
 import type { FocusedOpsFollowUpContext } from "@/ai/orchestration/ops-follow-up";
 import type { OpsFollowUpCheckpoint } from "@/lib/db/ops-follow-up-summary";
-import type { ReviewIssue } from "@/ai/orchestration/review-issue-tracker";
+import type {
+  ReviewIssue,
+  ReviewIssueBaseline,
+} from "@/ai/orchestration/review-issue-tracker";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
@@ -27,7 +36,8 @@ export type TurnDirective =
   | { kind: "reroute"; targetRole: SimulationAgentRole; }
   | { kind: "progress"; };
 
-export interface DebateState {
+export interface DebateState extends DebateConvergenceState {
+  phase: DebatePhase;
   turnCount: number;
   roleIndex: number;
   returnToReviewer: boolean;
@@ -53,6 +63,7 @@ export interface DebateState {
    */
   truncationRecoveryAttemptedRoles: SimulationAgentRole[];
   reviewIssues: ReviewIssue[];
+  reviewIssueBaseline: ReviewIssueBaseline | null;
   isGateReroute: boolean;
   hasHadEarlyReview: boolean;
   hasHadOpsFollowUpForCurrentReject: boolean;
@@ -62,6 +73,8 @@ export interface DebateState {
   /** Consecutive unproductive reject cycles → prefer approve. */
   consecutiveUnproductiveCycles: number;
   correctionLoopDetected: boolean;
+  reviewerProposal: ReviewerTurnProposal | null;
+  finalizationProposal: DebateFinalizationProposal | null;
 }
 
 export interface TurnContext {

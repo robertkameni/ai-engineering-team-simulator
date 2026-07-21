@@ -67,12 +67,14 @@ import { assertNotAborted, isSimulationAborted } from "./simulation-abort";
 import { streamAgentTurn } from "./stream-agent-turn";
 import type { StreamAgentTurnResult } from "./stream-agent-turn";
 import {
-  markDevOpsOperationalIssuesAttempted,
   scheduleOpsFollowUpTurn,
-  recordOpsFollowUpCheckpoint,
-  selectOpsFollowUpSummary,
   getUnresolvedDevOpsIssues,
 } from "@/ai/orchestration/ops-follow-up";
+import {
+  recordOpsFollowUpCheckpoint,
+  selectOpsFollowUpSummary,
+} from "@/ai/orchestration/ops-follow-up-checkpoint";
+import { resolveOpsIssueDispositions } from "@/ai/orchestration/ops-issue-disposition";
 import { opsFollowUpFieldsFromCheckpoint } from "@/lib/db/ops-follow-up-summary";
 import {
   validateCorrectionTurn,
@@ -147,6 +149,7 @@ export async function runSimulation(
       postApproveContinuationFailed: false,
       truncationRecoveryAttemptedRoles: [],
       reviewIssues: [],
+      reviewIssueBaseline: null,
       isGateReroute: false,
       hasHadEarlyReview: false,
       hasHadOpsFollowUpForCurrentReject: false,
@@ -688,7 +691,7 @@ async function runDebateTurn(
     debateContext,
     contentToPersist,
   );
-  markDevOpsIssuesIfNeeded(state, role);
+  markDevOpsIssuesIfNeeded(state, role, contentToPersist);
 
   await persistTurn(
     role,
@@ -719,12 +722,13 @@ async function runDebateTurn(
 function markDevOpsIssuesIfNeeded(
   state: DebateState,
   role: SimulationAgentRole,
+  contentToPersist: string,
 ): void {
   if (!state.focusedOpsFollowUp || role !== "devops") {
     return;
   }
 
-  markDevOpsOperationalIssuesAttempted(state.reviewIssues, state.turnCount);
+  resolveOpsIssueDispositions(state.reviewIssues, contentToPersist, state.turnCount);
 }
 
 function validateCorrectionIfNeeded(

@@ -44,6 +44,10 @@ export interface RunSummaryPayload {
   readonly opsFollowUpSkipReason?: string | null;
   readonly opsFollowUpEligible?: boolean;
   readonly opsFollowUpUnresolvedDevopsIssueCount?: number;
+  readonly opsFollowUpOpenIssueCount?: number;
+  readonly opsFollowUpAddressedIssueCount?: number;
+  readonly opsFollowUpAcceptedRiskIssueCount?: number;
+  readonly opsFollowUpAcceptedRiskReasons?: readonly string[];
   readonly opsFollowUpLastCorrectionRole?: OpsFollowUpLastCorrectionRole | null;
   readonly opsFollowUpEvaluationTurn?: number | null;
   readonly opsFollowUpArchitectCheckpoint?: OpsFollowUpCheckpoint | null;

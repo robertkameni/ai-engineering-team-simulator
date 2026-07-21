@@ -164,11 +164,12 @@ describe("v3 residual: correction loop detection", () => {
         targetRole: "architect",
         keywords: ["outbox", "atomicity", "webhook", "stripe"],
         excerpt: "missing outbox atomicity for stripe webhooks",
-        status: "still_open",
+        status: "open",
         severity: "blocker",
         createdOnCycle: 0,
         lastAttemptedOnTurn: 4,
         lastConfirmedOnTurn: 6,
+        acceptedRisk: null,
       },
     ];
 

@@ -14,6 +14,10 @@ const DEFAULT_OPS_FIELDS = {
   opsFollowUpSkipReason: null,
   opsFollowUpEligible: false,
   opsFollowUpUnresolvedDevopsIssueCount: 0,
+  opsFollowUpOpenIssueCount: 0,
+  opsFollowUpAddressedIssueCount: 0,
+  opsFollowUpAcceptedRiskIssueCount: 0,
+  opsFollowUpAcceptedRiskReasons: [],
   opsFollowUpLastCorrectionRole: null,
   opsFollowUpEvaluationTurn: null,
   opsFollowUpArchitectCheckpoint: null,
@@ -59,6 +63,10 @@ describe("run summary helpers", () => {
       opsFollowUpSkipReason: null,
       opsFollowUpEligible: true,
       opsFollowUpUnresolvedDevopsIssueCount: 2,
+      opsFollowUpOpenIssueCount: 2,
+      opsFollowUpAddressedIssueCount: 0,
+      opsFollowUpAcceptedRiskIssueCount: 0,
+      opsFollowUpAcceptedRiskReasons: [],
       opsFollowUpLastCorrectionRole: "architect",
       opsFollowUpEvaluationTurn: 11,
     });
@@ -70,6 +78,10 @@ describe("run summary helpers", () => {
     assert.equal(parsed?.opsFollowUpSkipReason, null);
     assert.equal(parsed?.opsFollowUpEligible, true);
     assert.equal(parsed?.opsFollowUpUnresolvedDevopsIssueCount, 2);
+    assert.equal(parsed?.opsFollowUpOpenIssueCount, 2);
+    assert.equal(parsed?.opsFollowUpAddressedIssueCount, 0);
+    assert.equal(parsed?.opsFollowUpAcceptedRiskIssueCount, 0);
+    assert.deepEqual(parsed?.opsFollowUpAcceptedRiskReasons, []);
     assert.equal(parsed?.opsFollowUpLastCorrectionRole, "architect");
     assert.equal(parsed?.opsFollowUpEvaluationTurn, 11);
   });

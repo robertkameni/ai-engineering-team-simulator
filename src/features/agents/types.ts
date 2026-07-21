@@ -77,6 +77,10 @@ export interface MockRun {
   opsFollowUpSkipReason?: string | null;
   opsFollowUpEligible?: boolean;
   opsFollowUpUnresolvedDevopsIssueCount?: number;
+  opsFollowUpOpenIssueCount?: number;
+  opsFollowUpAddressedIssueCount?: number;
+  opsFollowUpAcceptedRiskIssueCount?: number;
+  opsFollowUpAcceptedRiskReasons?: readonly string[];
   opsFollowUpLastCorrectionRole?: OpsFollowUpLastCorrectionRole | null;
   opsFollowUpEvaluationTurn?: number | null;
   opsFollowUpArchitectCheckpoint?: OpsFollowUpCheckpoint | null;

@@ -66,6 +66,12 @@ function resolveRunOpsFollowUpFields(run: MockRun): RunOpsFollowUpExportFields {
           opsFollowUpEligible: run.opsFollowUpEligible ?? false,
           opsFollowUpUnresolvedDevopsIssueCount:
             run.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+          opsFollowUpOpenIssueCount:
+            run.opsFollowUpOpenIssueCount ?? run.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+          opsFollowUpAddressedIssueCount: run.opsFollowUpAddressedIssueCount ?? 0,
+          opsFollowUpAcceptedRiskIssueCount:
+            run.opsFollowUpAcceptedRiskIssueCount ?? 0,
+          opsFollowUpAcceptedRiskReasons: run.opsFollowUpAcceptedRiskReasons ?? [],
           opsFollowUpLastCorrectionRole:
             run.opsFollowUpLastCorrectionRole ?? null,
           opsFollowUpEvaluationTurn: run.opsFollowUpEvaluationTurn ?? null,

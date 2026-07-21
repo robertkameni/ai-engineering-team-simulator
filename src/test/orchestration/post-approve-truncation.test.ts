@@ -30,6 +30,7 @@ function buildState(
     postApproveContinuationFailed: false,
     truncationRecoveryAttemptedRoles: [],
     reviewIssues: [],
+    reviewIssueBaseline: null,
     isGateReroute: false,
     hasHadEarlyReview: true,
     hasHadOpsFollowUpForCurrentReject: false,

@@ -1,6 +1,8 @@
 import type { SimulationAgentRole } from "@/ai/agents/config";
 
-export const MAX_CORRECTIONS_PER_ROLE = 2;
+import { SOFTWARE_MAX_CORRECTIONS_PER_ROLE } from "@/ai/orchestration/debate-convergence-controller";
+
+export const MAX_CORRECTIONS_PER_ROLE = SOFTWARE_MAX_CORRECTIONS_PER_ROLE;
 
 export function canCorrectRole(
   counts: Readonly<Partial<Record<SimulationAgentRole, number>>>,
