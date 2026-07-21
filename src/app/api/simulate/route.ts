@@ -122,7 +122,9 @@ export async function POST(request: Request) {
         }
 
         if (synthesis.completed && !synthesis.timedOut) {
-          send({ type: "all_artifacts_complete" });
+          if (synthesis.ok) {
+            send({ type: "all_artifacts_complete" });
+          }
           send({ type: "done", runId });
           return;
         }

@@ -5,6 +5,7 @@ import type {
 } from "@/lib/db/run-summary.types";
 import { parseDebateFinalizationTelemetry } from "@/lib/db/debate-finalization-telemetry";
 import { parseOpsFollowUpFields } from "@/lib/db/ops-follow-up-summary";
+import type { ArtifactErrorTelemetry } from "@/lib/db/run-summary.types";
 
 export const RUN_SUMMARY_SYNTHESIS_VERSION = 2;
 
@@ -31,6 +32,32 @@ function optionalNullableNumber(value: unknown): number | null | undefined {
 
 function optionalBoolean(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
+}
+
+function parseArtifactErrorTelemetry(
+  value: unknown,
+): ArtifactErrorTelemetry | null | undefined {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.message !== "string" || typeof record.timestamp !== "string") {
+    return undefined;
+  }
+  return {
+    message: record.message,
+    failedArtifact:
+      typeof record.failedArtifact === "string" || record.failedArtifact === null
+        ? (record.failedArtifact as string | null)
+        : null,
+    timestamp: record.timestamp,
+    retryFailed: record.retryFailed === true,
+    errorCode:
+      typeof record.errorCode === "string" ? record.errorCode : undefined,
+  };
 }
 
 export function buildRunSummaryPayload(payload: RunSummaryPayload): string {
@@ -87,6 +114,7 @@ function pickPreservedDebateFields(
   | "artifactsPending"
   | "peakPromptTokens"
   | "finalization"
+  | "artifactError"
 > {
   return {
     hasTruncatedCriticalTurn: existing?.hasTruncatedCriticalTurn,
@@ -101,6 +129,7 @@ function pickPreservedDebateFields(
     artifactsPending: existing?.artifactsPending,
     peakPromptTokens: existing?.peakPromptTokens,
     finalization: existing?.finalization,
+    artifactError: existing?.artifactError,
   };
 }
 
@@ -136,7 +165,7 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
     const record = parsed as Record<string, unknown>;
     const debateOutcome =
       typeof record.debateOutcome === "string" &&
-      VALID_DEBATE_OUTCOMES.has(record.debateOutcome)
+        VALID_DEBATE_OUTCOMES.has(record.debateOutcome)
         ? (record.debateOutcome as RunSummaryPayload["debateOutcome"])
         : null;
 
@@ -168,6 +197,10 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
       ...(() => {
         const finalization = parseDebateFinalizationTelemetry(record.finalization);
         return finalization ? { finalization } : {};
+      })(),
+      ...(() => {
+        const artifactError = parseArtifactErrorTelemetry(record.artifactError);
+        return artifactError !== undefined ? { artifactError } : {};
       })(),
       ...opsFollowUpFields,
     };
@@ -245,6 +278,7 @@ export function mergeRunSummaryTimingTelemetry(
     readonly peakPromptTokens?: number | null;
     readonly postApproveTruncation?: boolean;
     readonly postApproveContinuationFailed?: boolean;
+    readonly artifactError?: ArtifactErrorTelemetry | null;
   },
 ): string {
   const existing = parseRunSummary(existingSummary);
@@ -286,6 +320,10 @@ export function mergeRunSummaryTimingTelemetry(
     ),
     correctionLoopDetected: existing?.correctionLoopDetected,
     finalization: existing?.finalization,
+    artifactError:
+      timing.artifactError !== undefined
+        ? timing.artifactError
+        : existing?.artifactError,
     ...pickOpsFollowUpFields(existing),
   });
 }

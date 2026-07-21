@@ -10,6 +10,14 @@ export type RunSummaryDebateOutcome = DebateExitOutcome | "aborted";
 
 export type { OpsFollowUpLastCorrectionRole, DebateFinalizationTelemetry };
 
+export interface ArtifactErrorTelemetry {
+  readonly message: string;
+  readonly failedArtifact: string | null;
+  readonly timestamp: string;
+  readonly retryFailed: boolean;
+  readonly errorCode?: string;
+}
+
 export interface RunSummaryPayload {
   readonly debateOutcome: RunSummaryDebateOutcome | null;
   readonly turnCount: number | null;
@@ -45,6 +53,8 @@ export interface RunSummaryPayload {
    * accepted critical risks, output diagnostics).
    */
   readonly finalization?: DebateFinalizationTelemetry;
+  /** Populated when core artifact synthesis fails after debate. */
+  readonly artifactError?: ArtifactErrorTelemetry | null;
   readonly opsFollowUpEvaluated?: boolean;
   readonly opsFollowUpTriggered?: boolean;
   readonly opsFollowUpSkipReason?: string | null;

@@ -46,7 +46,7 @@ export interface SimulationMessage {
     text: string;
   };
   isStreaming?: boolean;
-  activeTools?: { name: string; args: unknown }[];
+  activeTools?: { name: string; args: unknown; }[];
   createdAt: string;
 }
 
@@ -87,6 +87,14 @@ export interface MockRun {
   opsFollowUpArchitectCheckpoint?: OpsFollowUpCheckpoint | null;
   /** Deterministic debate finalization telemetry. */
   finalization?: DebateFinalizationTelemetry | null;
+  /** Populated when core artifact synthesis fails after debate. */
+  artifactError?: {
+    readonly message: string;
+    readonly failedArtifact: string | null;
+    readonly timestamp: string;
+    readonly retryFailed: boolean;
+    readonly errorCode?: string;
+  } | null;
 }
 
 export interface MockArtifactSection {

@@ -202,7 +202,7 @@ function buildRunOwnershipWhere(
 }
 
 export function canAccessRun(
-  run: { userId: string | null; guestSessionId: string | null },
+  run: { userId: string | null; guestSessionId: string | null; },
   scope: RunOwnershipScope,
 ): boolean {
   if (scope.userId != null && run.userId === scope.userId) {
@@ -427,6 +427,7 @@ function buildSummaryTelemetryFields(
     opsFollowUpArchitectCheckpoint:
       summaryPayload?.opsFollowUpArchitectCheckpoint ?? null,
     finalization: summaryPayload?.finalization ?? null,
+    artifactError: summaryPayload?.artifactError ?? null,
   };
 }
 

@@ -48,6 +48,7 @@ interface MetadataWriter {
   appendSynthesisValidationWarning: (message: string) => void;
   appendOpsFollowUp: (fields: RunOpsFollowUpExportFields) => void;
   appendFinalization: (summary: string) => void;
+  appendArtifactError: (error: NonNullable<MockRun["artifactError"]>) => void;
 }
 
 interface DebateOutcomeMetadata {
@@ -61,22 +62,22 @@ function resolveRunOpsFollowUpFields(run: MockRun): RunOpsFollowUpExportFields {
   const last = opsFollowUpFieldsFromCheckpoint(
     run.opsFollowUpEvaluated
       ? {
-          opsFollowUpEvaluated: run.opsFollowUpEvaluated,
-          opsFollowUpTriggered: run.opsFollowUpTriggered ?? false,
-          opsFollowUpSkipReason: run.opsFollowUpSkipReason ?? null,
-          opsFollowUpEligible: run.opsFollowUpEligible ?? false,
-          opsFollowUpUnresolvedDevopsIssueCount:
-            run.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
-          opsFollowUpOpenIssueCount:
-            run.opsFollowUpOpenIssueCount ?? run.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
-          opsFollowUpAddressedIssueCount: run.opsFollowUpAddressedIssueCount ?? 0,
-          opsFollowUpAcceptedRiskIssueCount:
-            run.opsFollowUpAcceptedRiskIssueCount ?? 0,
-          opsFollowUpAcceptedRiskReasons: run.opsFollowUpAcceptedRiskReasons ?? [],
-          opsFollowUpLastCorrectionRole:
-            run.opsFollowUpLastCorrectionRole ?? null,
-          opsFollowUpEvaluationTurn: run.opsFollowUpEvaluationTurn ?? null,
-        }
+        opsFollowUpEvaluated: run.opsFollowUpEvaluated,
+        opsFollowUpTriggered: run.opsFollowUpTriggered ?? false,
+        opsFollowUpSkipReason: run.opsFollowUpSkipReason ?? null,
+        opsFollowUpEligible: run.opsFollowUpEligible ?? false,
+        opsFollowUpUnresolvedDevopsIssueCount:
+          run.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+        opsFollowUpOpenIssueCount:
+          run.opsFollowUpOpenIssueCount ?? run.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+        opsFollowUpAddressedIssueCount: run.opsFollowUpAddressedIssueCount ?? 0,
+        opsFollowUpAcceptedRiskIssueCount:
+          run.opsFollowUpAcceptedRiskIssueCount ?? 0,
+        opsFollowUpAcceptedRiskReasons: run.opsFollowUpAcceptedRiskReasons ?? [],
+        opsFollowUpLastCorrectionRole:
+          run.opsFollowUpLastCorrectionRole ?? null,
+        opsFollowUpEvaluationTurn: run.opsFollowUpEvaluationTurn ?? null,
+      }
       : null,
   );
   return { last, architectCheckpoint: run.opsFollowUpArchitectCheckpoint ?? null };
@@ -224,12 +225,16 @@ function appendRunMetadata(writer: MetadataWriter, run: MockRun): void {
       .join(", ");
     writer.appendFinalization(
       `${run.finalization.reason} · rejects ${run.finalization.rejectCount}` +
-        (corrections ? ` · corrections ${corrections}` : "") +
-        ` · acceptedCriticalRisks ${accepted}` +
-        (run.finalization.outputDiagnostics?.wasNormalized
-          ? " · sectionDumpNormalized"
-          : ""),
+      (corrections ? ` · corrections ${corrections}` : "") +
+      ` · acceptedCriticalRisks ${accepted}` +
+      (run.finalization.outputDiagnostics?.wasNormalized
+        ? " · sectionDumpNormalized"
+        : ""),
     );
+  }
+
+  if (run.artifactError) {
+    writer.appendArtifactError(run.artifactError);
   }
 }
 
@@ -269,6 +274,31 @@ function createMarkdownMetadataWriter(lines: string[]): MetadataWriter {
     appendFinalization: (summary) => {
       lines.push("**Finalization:** " + summary, "");
     },
+    appendArtifactError: (error) => {
+      lines.push(
+        "**Artifact error:** " +
+        (error.failedArtifact ?? "unknown") +
+        " — " +
+        error.message,
+        "",
+      );
+      lines.push(
+        "```artifactError",
+        JSON.stringify(
+          {
+            failedArtifact: error.failedArtifact,
+            message: error.message,
+            timestamp: error.timestamp,
+            retryFailed: error.retryFailed,
+            errorCode: error.errorCode ?? null,
+          },
+          null,
+          2,
+        ),
+        "```",
+        "",
+      );
+    },
   };
 }
 
@@ -277,29 +307,29 @@ function createHtmlMetadataWriter(parts: string[]): MetadataWriter {
     appendPrompt: (prompt) => {
       parts.push(
         '<p class="meta-block"><strong>Prompt:</strong> ' +
-          formatInlineMarkdown(prompt) +
-          "</p>",
+        formatInlineMarkdown(prompt) +
+        "</p>",
       );
     },
     appendSimulatedDate: (dateLabel) => {
       parts.push(
         '<p class="meta-block"><strong>Simulated:</strong> ' +
-          escapeHtml(dateLabel) +
-          "</p>",
+        escapeHtml(dateLabel) +
+        "</p>",
       );
     },
     appendUsage: (value) => {
       parts.push(
         '<p class="meta-block"><strong>Usage:</strong> ' +
-          value.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>") +
-          "</p>",
+        value.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>") +
+        "</p>",
       );
     },
     appendDuration: (value) => {
       parts.push(
         '<p class="meta-block"><strong>Duration:</strong> ' +
-          escapeHtml(value) +
-          "</p>",
+        escapeHtml(value) +
+        "</p>",
       );
     },
     appendDebateOutcome: ({ label, isUnapproved, warningMessage, hasPostApproveTruncation }) => {
@@ -307,16 +337,16 @@ function createHtmlMetadataWriter(parts: string[]): MetadataWriter {
       if (isUnapproved) {
         parts.push(
           '<div class="export-warning"><strong>Debate outcome:</strong> ' +
-            escapedLabel +
-            " — " +
-            escapeHtml(warningMessage) +
-            "</div>",
+          escapedLabel +
+          " — " +
+          escapeHtml(warningMessage) +
+          "</div>",
         );
       } else {
         parts.push(
           '<p class="meta-block"><strong>Debate outcome:</strong> ' +
-            escapedLabel +
-            "</p>",
+          escapedLabel +
+          "</p>",
         );
       }
       if (hasPostApproveTruncation) {
@@ -328,8 +358,8 @@ function createHtmlMetadataWriter(parts: string[]): MetadataWriter {
     appendSynthesisValidationWarning: (message) => {
       parts.push(
         '<div class="export-warning"><strong>Artifact validation:</strong> ' +
-          escapeHtml(message) +
-          "</div>",
+        escapeHtml(message) +
+        "</div>",
       );
     },
     appendOpsFollowUp: (fields) => {
@@ -338,8 +368,34 @@ function createHtmlMetadataWriter(parts: string[]): MetadataWriter {
     appendFinalization: (summary) => {
       parts.push(
         '<p class="meta-block"><strong>Finalization:</strong> ' +
-          escapeHtml(summary) +
-          "</p>",
+        escapeHtml(summary) +
+        "</p>",
+      );
+    },
+    appendArtifactError: (error) => {
+      parts.push(
+        '<div class="export-warning"><strong>Artifact error:</strong> ' +
+        escapeHtml(error.failedArtifact ?? "unknown") +
+        " — " +
+        escapeHtml(error.message) +
+        "</div>",
+      );
+      parts.push(
+        "<pre><code>" +
+        escapeHtml(
+          JSON.stringify(
+            {
+              failedArtifact: error.failedArtifact,
+              message: error.message,
+              timestamp: error.timestamp,
+              retryFailed: error.retryFailed,
+              errorCode: error.errorCode ?? null,
+            },
+            null,
+            2,
+          ),
+        ) +
+        "</code></pre>",
       );
     },
   };
@@ -353,12 +409,12 @@ function appendMetadataHtml(parts: string[], ctx: RunExportContext): void {
   appendRunMetadata(createHtmlMetadataWriter(parts), ctx.run);
 }
 
-function markdownLinesForHeading(block: Extract<MessageBlock, { type: "heading" }>): string[] {
+function markdownLinesForHeading(block: Extract<MessageBlock, { type: "heading"; }>): string[] {
   const prefix = block.level === 2 ? "## " : "### ";
   return [prefix + block.text, ""];
 }
 
-function markdownLinesForQuote(block: Extract<MessageBlock, { type: "quote" }>): string[] {
+function markdownLinesForQuote(block: Extract<MessageBlock, { type: "quote"; }>): string[] {
   return [
     "> **" + block.agentName + ":** " + block.text,
     block.verdict ? "> *" + block.verdict + "*" : "",
@@ -393,12 +449,12 @@ function blocksToMarkdown(blocks: MessageBlock[]): string[] {
   return lines;
 }
 
-function htmlForHeading(block: Extract<MessageBlock, { type: "heading" }>): string {
+function htmlForHeading(block: Extract<MessageBlock, { type: "heading"; }>): string {
   const tag = block.level === 2 ? "h2" : "h3";
   return "<" + tag + ">" + escapeHtml(block.text) + "</" + tag + ">";
 }
 
-function htmlForQuote(block: Extract<MessageBlock, { type: "quote" }>): string {
+function htmlForQuote(block: Extract<MessageBlock, { type: "quote"; }>): string {
   const verdictHtml = block.verdict
     ? "<p><em>" + escapeHtml(block.verdict) + "</em></p>"
     : "";
@@ -412,15 +468,15 @@ function htmlForQuote(block: Extract<MessageBlock, { type: "quote" }>): string {
   );
 }
 
-function htmlForEmphasis(block: Extract<MessageBlock, { type: "emphasis" }>): string {
+function htmlForEmphasis(block: Extract<MessageBlock, { type: "emphasis"; }>): string {
   return "<p><strong>" + escapeHtml(block.text) + "</strong></p>";
 }
 
-function htmlForParagraph(block: Extract<MessageBlock, { type: "paragraph" }>): string {
+function htmlForParagraph(block: Extract<MessageBlock, { type: "paragraph"; }>): string {
   return "<p>" + formatInlineMarkdown(block.text) + "</p>";
 }
 
-function htmlForBullet(block: Extract<MessageBlock, { type: "bullet" }>): string {
+function htmlForBullet(block: Extract<MessageBlock, { type: "bullet"; }>): string {
   return "<li>" + formatInlineMarkdown(block.text) + "</li>";
 }
 
@@ -574,10 +630,10 @@ export function buildRunStyledMarkdown(ctx: RunExportContext): string {
     parts.push(
       '<div class="message message--' + roleClass + '">',
       '<h3 class="message-heading">' +
-        escapeHtml(name) +
-        ' <span style="font-weight:400;color:#5c5c6e">(' +
-        escapeHtml(title) +
-        ")</span></h3>",
+      escapeHtml(name) +
+      ' <span style="font-weight:400;color:#5c5c6e">(' +
+      escapeHtml(title) +
+      ")</span></h3>",
       '<div class="message-body">' + bodyHtml + "</div>",
       "</div>",
     );
