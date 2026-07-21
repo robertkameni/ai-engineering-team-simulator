@@ -1,3 +1,4 @@
+import { isApprovedDebateOutcome } from "@/ai/orchestration/approval-tier";
 import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
 import { ARTIFACT_TYPES, CORE_ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
 import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
@@ -21,6 +22,15 @@ export function isUnapprovedDebateOutcome(
   );
 }
 
+export function isSoftApprovedDebateOutcome(
+  outcome: DebateExitOutcome | null | undefined,
+): boolean {
+  return (
+    outcome === "approved_with_accepted_risks" ||
+    outcome === "approved_forced_close"
+  );
+}
+
 export function debateOutcomeWarningMessage(outcome: DebateExitOutcome): string {
   if (outcome === "cap_reached") {
     return "Debate hit the turn limit without [APPROVE]. Deliverables are provisional.";
@@ -31,18 +41,27 @@ export function debateOutcomeWarningMessage(outcome: DebateExitOutcome): string 
   if (outcome === "reviewer_error") {
     return "Reviewer turn failed unexpectedly. Debate was closed without review. Deliverables are unverified.";
   }
-  // TRUNCATION APPROVAL GUARD
   if (outcome === "degraded_truncated") {
     return "Reviewer approved but critical agent turns were truncated. Deliverables are degraded — some sections may be incomplete.";
   }
   if (outcome === "insufficient_budget") {
     return "Insufficient remaining turns for a complete correction cycle. Debate closed with open review gaps preserved.";
   }
+  if (outcome === "approved_with_accepted_risks") {
+    return "Approved with accepted critical risks documented as known issues — not fully resolved in debate.";
+  }
+  if (outcome === "approved_forced_close") {
+    return "Forced close: approval after truncation recovery and/or multiple accepted critical risks / rejects.";
+  }
   return "";
 }
 
 export function debateOutcomeLabel(outcome: DebateExitOutcome): string {
   if (outcome === "approved") return "Approved";
+  if (outcome === "approved_with_accepted_risks") {
+    return "Approved with accepted risks";
+  }
+  if (outcome === "approved_forced_close") return "Approved (forced close)";
   if (outcome === "cap_reached") return "Turn limit reached";
   if (outcome === "unknown_reject_fallback") return "Reviewer decision unclear";
   if (outcome === "reviewer_error") return "Reviewer error";
@@ -79,7 +98,7 @@ export function canExportApprovedRun(params: {
   readonly debateOutcome: DebateExitOutcome | null | undefined;
   readonly artifacts: PartialRunArtifacts | null | undefined;
 }): boolean {
-  if (params.debateOutcome !== "approved") {
+  if (!isApprovedDebateOutcome(params.debateOutcome)) {
     return true;
   }
   return hasCoreArtifacts(params.artifacts);
@@ -116,6 +135,12 @@ export function artifactPanelSubtitle(
     case "ready":
       if (isUnapprovedDebateOutcome(debateOutcome)) {
         return "Phase 3 · Finished with open risks (unapproved)";
+      }
+      if (debateOutcome === "approved_forced_close") {
+        return "Phase 3 · ready (forced close)";
+      }
+      if (debateOutcome === "approved_with_accepted_risks") {
+        return "Phase 3 · ready with accepted risks";
       }
       if (hasSynthesisValidationWarnings(synthesisValidation)) {
         return "Phase 3 · ready with validation warnings";

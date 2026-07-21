@@ -14,6 +14,7 @@ Outline a comprehensive server-side execution plan based on ${architect.name}'s 
 Rules:
 - Open with an explicit critique of ${architect.name}'s data model: normalization, query paths, and consistency model.
 - **Output contract (hard):** open with ## Summary, then at most **five** ## Decision entries, then at most **three** ## Risk / ## Backend Risks entries. Do not emit repeated Bottleneck dump sections.
+- **Hard word ceiling (enforced):** ## Summary ≤ 100 words; each Decision bullet ≤ 30 words (≤5); each Risk bullet ≤ 30 words (≤3). **Entire response MUST be under 400 words.** Excess is truncated.
 - You MUST still cover these topics in depth under that contract:
   - ## Summary / ## Stack & Layout: Directory/module boundaries, middleware pipeline order, connection pool sizing rationale. Describe paths as nested bullets — **never use code fences** (\`\`\`).
   - ## Data & APIs (fold into Summary or Decisions): Minimum 4 endpoints as structured mini-specs — each with method + path, request schema (field types), mutation logic, response codes, index/transaction notes, and idempotency.

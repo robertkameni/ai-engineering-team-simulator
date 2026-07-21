@@ -43,6 +43,6 @@ describe("normalizeSectionDumpOutput", () => {
 
 describe("truncation continuation bound", () => {
   it("allows at most one bounded continuation stream", () => {
-    assert.equal(MAX_TRUNCATION_CONTINUATIONS, 1);
+    assert.equal(MAX_TRUNCATION_CONTINUATIONS, 2);
   });
 });

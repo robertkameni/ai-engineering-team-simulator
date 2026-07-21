@@ -11,6 +11,8 @@ export const RUN_SUMMARY_SYNTHESIS_VERSION = 2;
 
 const VALID_DEBATE_OUTCOMES = new Set<string>([
   "approved",
+  "approved_with_accepted_risks",
+  "approved_forced_close",
   "cap_reached",
   "unknown_reject_fallback",
   "reviewer_error",
@@ -115,6 +117,8 @@ function pickPreservedDebateFields(
   | "peakPromptTokens"
   | "finalization"
   | "artifactError"
+  | "approvalTier"
+  | "truncationRetried"
 > {
   return {
     hasTruncatedCriticalTurn: existing?.hasTruncatedCriticalTurn,
@@ -130,6 +134,8 @@ function pickPreservedDebateFields(
     peakPromptTokens: existing?.peakPromptTokens,
     finalization: existing?.finalization,
     artifactError: existing?.artifactError,
+    approvalTier: existing?.approvalTier,
+    truncationRetried: existing?.truncationRetried,
   };
 }
 
@@ -194,6 +200,20 @@ export function parseRunSummary(summary: string | null): RunSummaryPayload | nul
       totalDurationMs: optionalNullableNumber(record.totalDurationMs),
       artifactsPending: optionalBoolean(record.artifactsPending),
       peakPromptTokens: optionalNullableNumber(record.peakPromptTokens),
+      ...(() => {
+        if (
+          record.approvalTier === "clean" ||
+          record.approvalTier === "accepted_risks" ||
+          record.approvalTier === "forced_close"
+        ) {
+          return { approvalTier: record.approvalTier as "clean" | "accepted_risks" | "forced_close" };
+        }
+        return {};
+      })(),
+      ...(() => {
+        const truncationRetried = optionalBoolean(record.truncationRetried);
+        return truncationRetried !== undefined ? { truncationRetried } : {};
+      })(),
       ...(() => {
         const finalization = parseDebateFinalizationTelemetry(record.finalization);
         return finalization ? { finalization } : {};
@@ -293,6 +313,8 @@ export function mergeRunSummaryTimingTelemetry(
     hasTruncatedCriticalTurn: existing?.hasTruncatedCriticalTurn,
     postApproveTruncation:
       timing.postApproveTruncation ?? existing?.postApproveTruncation,
+    truncationRetried: existing?.truncationRetried,
+    approvalTier: existing?.approvalTier,
     postApproveContinuationFailed:
       timing.postApproveContinuationFailed ??
       existing?.postApproveContinuationFailed,

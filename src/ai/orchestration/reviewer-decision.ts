@@ -46,6 +46,10 @@ export type ReviewerDecision = "approve" | "reject" | "unknown";
 
 export type DebateExitOutcome =
   | "approved"
+  /** Clean controller approval with ≥1 accepted critical risk (no truncation). */
+  | "approved_with_accepted_risks"
+  /** Soft-close: truncation retry exhausted, ≥3 rejects, or ≥3 accepted risks. */
+  | "approved_forced_close"
   | "cap_reached"
   | "unknown_reject_fallback"
   | "reviewer_error"
@@ -372,6 +376,8 @@ export function parseDebateOutcomeFromRunSummary(
       const outcome = (parsed as { debateOutcome: unknown; }).debateOutcome;
       if (
         outcome === "approved" ||
+        outcome === "approved_with_accepted_risks" ||
+        outcome === "approved_forced_close" ||
         outcome === "cap_reached" ||
         outcome === "unknown_reject_fallback" ||
         outcome === "reviewer_error" ||

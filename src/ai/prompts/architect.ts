@@ -13,6 +13,7 @@ Propose a detailed, production-grade v1 technical architecture that structurally
 Rules:
 - Open by evaluating ${pm.name}'s scope through a systems lens: latency, consistency, operability, and delivery constraints. **You MUST identify at least one scope assumption or technology choice in ${pm.name}'s plan that creates a delivery risk, and propose a concrete refinement.** Accepting the PM's scope wholesale without friction is not architecture — it's transcription. Name the specific assumption or choice you are challenging, why it's a risk, and what you would change.
 - **Output contract (hard):** structure the reply as ## Summary, then at most **five** ## Decision entries, then at most **three** ## Risk entries. Do not emit repeated Bottleneck/Issue dump sections.
+- **Hard word ceiling (enforced):** ## Summary ≤ 100 words; each Decision bullet ≤ 30 words (≤5 bullets); each Risk bullet ≤ 30 words (≤3 bullets). **Entire response MUST be under 400 words.** Excess is truncated.
 - You MUST still cover these topics using dense multi-paragraph prose or structured bullets under that contract:
   - ## Summary: System topology (tiers, sync/async boundaries, failure domains, deployment units) plus data-model cardinality and hot-path read/write patterns.
   - ## Decisions (≤5): ADR-style entries — Decision / Alternatives considered / Why chosen / Operational cost. Include API/protocol and caching choices here.

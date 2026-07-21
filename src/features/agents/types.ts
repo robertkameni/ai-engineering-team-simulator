@@ -62,8 +62,10 @@ export interface MockRun {
   artifacts?: PartialRunArtifacts | null;
   artifactsStatus?: ArtifactsPanelStatus;
   debateOutcome?: DebateExitOutcome | null;
-  /** Approved with truncated critical turns — warning, not a downgrade. */
+  /** Approved with truncated critical turns — defect edge case after recovery. */
   postApproveTruncation?: boolean;
+  truncationRetried?: boolean;
+  approvalTier?: "clean" | "accepted_risks" | "forced_close";
   postApproveContinuationFailed?: boolean;
   debateDurationMs?: number | null;
   artifactDurationMs?: number | null;

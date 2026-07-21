@@ -49,7 +49,11 @@ export function isDebateCompleteForArtifactSynthesis(params: {
   readonly messages: readonly { agentRole: string; content: string; }[];
   readonly debateOutcome: string | null | undefined;
 }): boolean {
-  if (params.debateOutcome === "approved") {
+  if (
+    params.debateOutcome === "approved" ||
+    params.debateOutcome === "approved_with_accepted_risks" ||
+    params.debateOutcome === "approved_forced_close"
+  ) {
     return true;
   }
   return isDebateCompleteFromMessages(params.messages);

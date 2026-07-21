@@ -1,3 +1,4 @@
+import { resolveApprovedDebateOutcome } from "@/ai/orchestration/approval-tier";
 import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
 import { createSimulationRoster, getTeamMember } from "@/ai/agents/roster";
 import { classifyProjectTeamTemplate } from "@/ai/orchestration/classify-project";
@@ -88,6 +89,7 @@ export async function runSimulation(
       isArchitectRevision: false,
       hasTruncatedCriticalTurn: false,
       postApproveTruncation: false,
+      truncationRetried: false,
       postApproveContinuationFailed: false,
       truncationRecoveryAttemptedRoles: [],
       reviewIssues: [],
@@ -116,12 +118,26 @@ export async function runSimulation(
     };
 
     const debateStartedAt = Date.now();
-    const debateExitOutcome = await runDebateLoop(state, ctx);
+    const rawDebateExitOutcome = await runDebateLoop(state, ctx);
     const debateDurationMs = Date.now() - debateStartedAt;
 
     assertNotAborted(abortSignal);
 
     debateComplete = true;
+
+    const acceptedCriticalRisks =
+      state.finalizationProposal?.acceptedCriticalRisks ?? [];
+    const approvedMapping =
+      rawDebateExitOutcome === "approved"
+        ? resolveApprovedDebateOutcome({
+            acceptedCriticalRiskCount: acceptedCriticalRisks.length,
+            postApproveTruncation: state.postApproveTruncation,
+            rejectCount: state.reviewerRejectionCount,
+            truncationRetried: state.truncationRetried,
+          })
+        : null;
+    const debateExitOutcome =
+      approvedMapping?.debateOutcome ?? rawDebateExitOutcome;
 
     const usageTotals = usageAccumulator.getTotals();
     const opsFollowUpSummary = selectOpsFollowUpSummary(state.opsFollowUpCheckpoints);
@@ -137,6 +153,8 @@ export async function runSimulation(
         turnCount: state.turnCount,
         hasTruncatedCriticalTurn: state.hasTruncatedCriticalTurn || undefined,
         postApproveTruncation: state.postApproveTruncation || undefined,
+        truncationRetried: state.truncationRetried || undefined,
+        approvalTier: approvedMapping?.approvalTier,
         postApproveContinuationFailed:
           state.postApproveContinuationFailed || undefined,
         correctionLoopDetected: state.correctionLoopDetected || undefined,
@@ -151,8 +169,7 @@ export async function runSimulation(
           reason: state.finalizationProposal?.reason,
           rejectCount: state.reviewerRejectionCount,
           correctionsByRole: state.roleCorrectionCounts,
-          acceptedCriticalRisks:
-            state.finalizationProposal?.acceptedCriticalRisks ?? [],
+          acceptedCriticalRisks,
           outputDiagnostics: state.outputDiagnostics,
         }),
         ...opsFollowUpFieldsFromCheckpoint(opsFollowUpSummary.last),

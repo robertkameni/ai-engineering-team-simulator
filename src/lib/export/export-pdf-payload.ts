@@ -26,8 +26,13 @@ const runStatusSchema = z.enum(["idle", "running", "complete", "failed"]);
 
 const debateOutcomeSchema = z.enum([
   "approved",
+  "approved_with_accepted_risks",
+  "approved_forced_close",
   "cap_reached",
   "unknown_reject_fallback",
+  "reviewer_error",
+  "degraded_truncated",
+  "insufficient_budget",
 ]);
 
 const artifactSectionSchema = z.object({

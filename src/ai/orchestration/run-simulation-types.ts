@@ -53,6 +53,8 @@ export interface DebateState extends DebateConvergenceState {
   hasTruncatedCriticalTurn: boolean;
   /** Set when reviewer [APPROVE] lands despite truncated critical turns. */
   postApproveTruncation: boolean;
+  /** True when pre-approval truncation recovery still left a truncated turn. */
+  truncationRetried: boolean;
   /**
    * True when a post-approve truncation recovery turn was attempted and the
    * critical turn remained truncated (or budget blocked a second recovery).

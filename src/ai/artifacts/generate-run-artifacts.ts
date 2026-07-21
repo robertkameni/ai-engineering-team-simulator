@@ -2,6 +2,11 @@ import {
   buildOpenGapsDirective,
   extractReviewOpenGaps,
 } from "@/ai/artifacts/build-review-open-gaps";
+import {
+  buildAcceptedRisksDirective,
+  extractAcceptedCriticalRisksFromSummary,
+  partitionOpenGapsByAcceptedRisks,
+} from "@/ai/artifacts/accepted-risks-for-artifacts";
 import { buildCompressedDebateSummary } from "@/ai/artifacts/compress-debate-summary";
 import { buildConsensusDirectives } from "@/ai/artifacts/build-consensus-directives";
 import {
@@ -76,9 +81,18 @@ export async function generateRunArtifacts({
   const artifactPhaseStartedAt = Date.now();
   const templateId = roster.templateId;
   const debateOutcome = parseDebateOutcomeFromRunSummary(runSummary ?? null);
+  const acceptedCriticalRisks =
+    extractAcceptedCriticalRisksFromSummary(runSummary);
   const mergedTranscript = mergeCorrectionTurns(transcript);
   const openGaps = extractReviewOpenGaps(mergedTranscript, roster);
-  const openGapsDirective = buildOpenGapsDirective(openGaps);
+  const { actionableGaps, acceptedGaps } = partitionOpenGapsByAcceptedRisks(
+    openGaps,
+    acceptedCriticalRisks,
+  );
+  const openGapsDirective = buildOpenGapsDirective(actionableGaps);
+  const acceptedRisksDirective = buildAcceptedRisksDirective(
+    acceptedCriticalRisks,
+  );
   const consensusDirectives = buildConsensusDirectives(mergedTranscript);
   // One compressed summary reused across all generators (Group 6.1).
   // cap_reached / unapproved outcomes still synthesize (Group 6.3).
@@ -101,7 +115,7 @@ export async function generateRunArtifacts({
     debateOutcome !== null && isUnapprovedDebateExitOutcome(debateOutcome);
   const truthfulnessContext: ArtifactTruthfulnessContext = {
     isUnapproved,
-    hasOpenGaps: openGaps.length > 0,
+    hasOpenGaps: actionableGaps.length > 0,
     isTruncationDegraded: debateOutcome === "degraded_truncated",
   };
 
@@ -115,7 +129,7 @@ export async function generateRunArtifacts({
     const prompt = buildArtifactPrompt(
       transcriptPrompt,
       consensusDirectives,
-      openGapsDirective,
+      [openGapsDirective, acceptedRisksDirective].filter(Boolean).join("\n\n"),
       priorArtifactsPrompt,
     );
 
@@ -125,6 +139,9 @@ export async function generateRunArtifacts({
       promptPreview: prompt.slice(0, 500),
       debateOutcome,
       isUnapproved,
+      acceptedRiskCount: acceptedCriticalRisks.length,
+      actionableGapCount: actionableGaps.length,
+      acceptedGapCount: acceptedGaps.length,
     });
 
     let document: Awaited<ReturnType<typeof generateArtifactDocument>>;
@@ -217,9 +234,10 @@ export async function generateRunArtifacts({
 
   const stackRetryResult = await retryStackInconsistentArtifacts(retryContext);
 
+  // Only retry on NEW inconsistencies — never on parked accepted risks.
   const crossRetryResult = await retryCrossInconsistentArtifacts({
     ...retryContext,
-    openGaps,
+    openGaps: actionableGaps,
   });
 
   const artifactDurationMs = Date.now() - artifactPhaseStartedAt;
@@ -227,6 +245,8 @@ export async function generateRunArtifacts({
     artifactDurationMs,
     perArtifactDurationMs,
     debateOutcome,
+    acceptedRiskCount: acceptedCriticalRisks.length,
+    crossRetries: crossRetryResult.retryCount,
   });
 
   return {

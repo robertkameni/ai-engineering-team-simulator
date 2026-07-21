@@ -72,11 +72,12 @@ Reviewer feedback:
 ${excerpt}
 """
 
-This is a CORRECTION turn — targeted deltas only:
+This is a CORRECTION turn — ≤150 words, targeted deltas only:
+- Address ONLY the quoted issue ID(s). Do not restate your prior turn.
 - Start with a "## Changes" section listing only deltas vs your previous message.
 - Reference each assigned issue ID explicitly before the fix.
 - Prohibit full-plan restatement, section dumps, and unrelated redesign.
-- Keep cross-critique brief; prioritize resolving flagged issue IDs.`;
+- Provide only the corrected section(s).`;
 }
 
 function resolvePromptTemplateId(templateId: TeamTemplateId): "software" | "physical" {

@@ -67,6 +67,8 @@ export interface DebateConvergenceState {
   reviewIssueBaseline: ReviewIssueBaseline | null;
   hasTruncatedCriticalTurn: boolean;
   postApproveTruncation: boolean;
+  /** True when pre-approval truncation recovery still left a truncated turn. */
+  truncationRetried: boolean;
   postApproveContinuationFailed: boolean;
   truncationRecoveryAttemptedRoles: SimulationAgentRole[];
   hasHadOpsFollowUpForCurrentReject: boolean;
@@ -346,18 +348,31 @@ function decideApprovedPath(
     }
   }
 
+  // Always attempt truncation recovery BEFORE finalization — including on
+  // the software finalization-priority turn. Approving with truncated
+  // critical turns is a defect; recovery must run first.
+  const recoveryDirective = maybeScheduleApprovedRecovery(state);
+  if (recoveryDirective) {
+    return recoveryDirective;
+  }
+
   if (isSoftwareBoundedTemplate(templateId) && state.turnCount >= SOFTWARE_FINALIZATION_PRIORITY_TURN) {
     syncApprovedFinalizationFlags(state);
+    if (state.postApproveTruncation) {
+      console.error(
+        "TRUNCATION DEFECT: critical turn still truncated after recovery; finalizing with truncationRetried",
+        {
+          turnCount: state.turnCount,
+          attemptedRoles: state.truncationRecoveryAttemptedRoles,
+        },
+      );
+      state.truncationRetried = true;
+    }
     return applyFinalization(
       state,
       state.turnCount,
       "Software debate reached deterministic finalization priority.",
     );
-  }
-
-  const recoveryDirective = maybeScheduleApprovedRecovery(state);
-  if (recoveryDirective) {
-    return recoveryDirective;
   }
 
   return applyFinalization(state, state.turnCount, "Reviewer approved debate closure.");

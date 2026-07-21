@@ -7,6 +7,7 @@ import type { ArtifactType } from "@/features/artifacts/artifact-constants";
 import {
   debateOutcomeLabel,
   debateOutcomeWarningMessage,
+  isSoftApprovedDebateOutcome,
   isUnapprovedDebateOutcome,
 } from "@/features/artifacts/artifact-panel-phase";
 import {
@@ -54,6 +55,7 @@ interface MetadataWriter {
 interface DebateOutcomeMetadata {
   readonly label: string;
   readonly isUnapproved: boolean;
+  readonly isSoftApproved: boolean;
   readonly warningMessage: string;
   readonly hasPostApproveTruncation: boolean;
 }
@@ -176,6 +178,7 @@ function buildDebateOutcomeMetadata(run: MockRun): DebateOutcomeMetadata | null 
   return {
     label: debateOutcomeLabel(run.debateOutcome),
     isUnapproved: isUnapprovedDebateOutcome(run.debateOutcome),
+    isSoftApproved: isSoftApprovedDebateOutcome(run.debateOutcome),
     warningMessage: debateOutcomeWarningMessage(run.debateOutcome),
     hasPostApproveTruncation: run.postApproveTruncation === true,
   };
@@ -252,15 +255,21 @@ function createMarkdownMetadataWriter(lines: string[]): MetadataWriter {
     appendDuration: (value) => {
       lines.push("**Duration:** " + value, "");
     },
-    appendDebateOutcome: ({ label, isUnapproved, warningMessage, hasPostApproveTruncation }) => {
-      if (isUnapproved) {
+    appendDebateOutcome: ({
+      label,
+      isUnapproved,
+      isSoftApproved,
+      warningMessage,
+      hasPostApproveTruncation,
+    }) => {
+      if (isUnapproved || isSoftApproved) {
         lines.push("**Debate outcome:** " + label + " — " + warningMessage, "");
       } else {
         lines.push("**Debate outcome:** " + label, "");
       }
       if (hasPostApproveTruncation) {
         lines.push(
-          "**Warning:** postApproveTruncation — reviewer approved but some critical turns were truncated.",
+          "**Warning:** postApproveTruncation — recovery retry also truncated (edge defect).",
           "",
         );
       }
@@ -332,26 +341,32 @@ function createHtmlMetadataWriter(parts: string[]): MetadataWriter {
         "</p>",
       );
     },
-    appendDebateOutcome: ({ label, isUnapproved, warningMessage, hasPostApproveTruncation }) => {
+    appendDebateOutcome: ({
+      label,
+      isUnapproved,
+      isSoftApproved,
+      warningMessage,
+      hasPostApproveTruncation,
+    }) => {
       const escapedLabel = escapeHtml(label);
-      if (isUnapproved) {
+      if (isUnapproved || isSoftApproved) {
         parts.push(
           '<div class="export-warning"><strong>Debate outcome:</strong> ' +
-          escapedLabel +
-          " — " +
-          escapeHtml(warningMessage) +
-          "</div>",
+            escapedLabel +
+            " — " +
+            escapeHtml(warningMessage) +
+            "</div>",
         );
       } else {
         parts.push(
           '<p class="meta-block"><strong>Debate outcome:</strong> ' +
-          escapedLabel +
-          "</p>",
+            escapedLabel +
+            "</p>",
         );
       }
       if (hasPostApproveTruncation) {
         parts.push(
-          '<div class="export-warning"><strong>Warning:</strong> postApproveTruncation — reviewer approved but some critical turns were truncated.</div>',
+          '<div class="export-warning"><strong>Warning:</strong> postApproveTruncation — recovery retry also truncated (edge defect).</div>',
         );
       }
     },

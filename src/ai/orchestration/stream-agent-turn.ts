@@ -377,36 +377,35 @@ async function retryAfterTruncationExhausted(
   }
 
   assertNotAborted(abortSignal);
-  console.warn(`${role}: still truncated after continuations, requesting boosted completion`);
+  console.warn(`${role}: still truncated after continuations, requesting full brevity rewrite`);
 
-  const boostedConfig = {
+  const rewriteConfig = {
     ...config,
     model: "deepseek-v4-flash" as const,
-    maxOutputTokens: Math.max(config.maxOutputTokens * 1.5, 2400),
+    maxOutputTokens: Math.min(config.maxOutputTokens, 1400),
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   };
 
-  const completionText = await collectAgentStream({
+  const rewriteText = await collectAgentStream({
     runId,
     role,
     productIdea,
     transcript,
     roster,
     templateId,
-    config: boostedConfig,
+    config: rewriteConfig,
     debateContext,
     usageAccumulator,
     abortSignal,
     send,
-    continuationOf: normalized,
-    supplementalUserPrompt: buildTruncationContinuationPrompt(normalized, role),
+    supplementalUserPrompt: `FULL REWRITE — previous output truncated. Produce a COMPLETE replacement under 350 words covering the same required sections. Do not continue mid-sentence. Close cleanly.`,
   });
 
-  if (!completionText.trim()) {
+  if (!rewriteText.trim()) {
     return normalized;
   }
 
-  return mergeContinuationText(normalized, completionText);
+  return normalizeAgentPersistedText(role, rewriteText.trim());
 }
 
 async function retryRoleDeliverableIfNeeded(
