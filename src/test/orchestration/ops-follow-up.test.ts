@@ -90,6 +90,7 @@ function buildBaseState(
     isArchitectRevision: false,
     hasTruncatedCriticalTurn: false,
     postApproveTruncation: false,
+    truncationRetried: false,
     postApproveContinuationFailed: false,
     truncationRecoveryAttemptedRoles: [],
     reviewIssues: [],

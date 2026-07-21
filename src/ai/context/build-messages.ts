@@ -46,6 +46,8 @@ export interface DebateTurnContext {
   reReviewIssues?: readonly CorrectionIssueAssignment[];
   hasTeamDisagreement?: boolean;
   architectRevisionCritiques?: string[];
+  /** Pre-approval truncation recovery: rewrite entire turn under a hard word ceiling. */
+  truncationRewrite?: boolean;
 }
 
 function formatProductIdeaBlock(productIdea: string): string {
@@ -226,15 +228,20 @@ export function buildAgentMessages(
     });
   }
 
+  let turnPrompt = getAgentTurnPrompt(
+    role,
+    productIdea,
+    roster,
+    roster.templateId,
+    debateContext,
+  );
+  if (debateContext.truncationRewrite) {
+    turnPrompt = `TRUNCATION REWRITE (mandatory): Your previous turn truncated. Rewrite the ENTIRE deliverable under 350 words. Keep ## Summary / Decisions / Risks only. Do not continue from mid-sentence — produce a complete concise replacement.\n\n${turnPrompt}`;
+  }
+
   messages.push({
     role: "user",
-    content: getAgentTurnPrompt(
-      role,
-      productIdea,
-      roster,
-      roster.templateId,
-      debateContext,
-    ),
+    content: turnPrompt,
   });
 
   return applyPromptContextBudget(messages).messages;

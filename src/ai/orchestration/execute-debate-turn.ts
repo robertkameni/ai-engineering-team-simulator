@@ -94,6 +94,10 @@ export async function runDebateTurn(
 
   enrichDebateContext(role, state, ctx, debateContext);
 
+  if (state.truncationRecoveryAttemptedRoles.includes(role)) {
+    debateContext.truncationRewrite = true;
+  }
+
   const turnResult = await executeDebateTurn(
     role,
     member.name,

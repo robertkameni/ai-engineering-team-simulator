@@ -61,6 +61,7 @@ function buildState(overrides: Partial<DebateState> = {}): DebateState {
     isArchitectRevision: false,
     hasTruncatedCriticalTurn: false,
     postApproveTruncation: false,
+    truncationRetried: false,
     postApproveContinuationFailed: false,
     truncationRecoveryAttemptedRoles: [],
     reviewIssues: [],
@@ -306,6 +307,7 @@ describe("truncation recovery before finalize approve", () => {
       assert.equal(directive.outcome, "approved");
     }
     assert.equal(state.postApproveTruncation, true);
+    assert.equal(state.truncationRetried, true);
   });
 });
 
@@ -411,6 +413,7 @@ describe("postApproveTruncation summary telemetry", () => {
       debateOutcome: "approved",
       turnCount: 9,
       postApproveTruncation: false,
+    truncationRetried: false,
       debateDurationMs: 100_000,
       artifactDurationMs: 40_000,
       totalDurationMs: computeTotalDurationMs({

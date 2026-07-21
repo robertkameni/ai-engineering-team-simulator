@@ -67,6 +67,7 @@ function buildState(overrides: Partial<DebateState> = {}): DebateState {
     isArchitectRevision: false,
     hasTruncatedCriticalTurn: false,
     postApproveTruncation: false,
+    truncationRetried: false,
     postApproveContinuationFailed: false,
     truncationRecoveryAttemptedRoles: [],
     reviewIssues: [],

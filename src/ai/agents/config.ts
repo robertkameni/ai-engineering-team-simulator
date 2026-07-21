@@ -35,45 +35,45 @@ const ACTIVE_AGENTS: Record<SimulationAgentRole, AgentModelConfig> = {
   architect: {
     role: "architect",
     model: "deepseek-v4-pro",
-    maxOutputTokens: 2400,
+    maxOutputTokens: 2000,
     temperature: 0.4,
     deepseek: DEEPSEEK_REASONING_OPTIONS,
   },
   backend: {
     role: "backend",
     model: "deepseek-v4-flash",
-    maxOutputTokens: 2000,
+    maxOutputTokens: 1600,
     temperature: 0.35,
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   },
   frontend: {
     role: "frontend",
     model: "deepseek-v4-flash",
-    maxOutputTokens: 3000,
+    maxOutputTokens: 2200,
     temperature: 0.4,
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   },
   devops: {
     role: "devops",
     model: "deepseek-v4-flash",
-    maxOutputTokens: 1700,
+    maxOutputTokens: 1500,
     temperature: 0.4,
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   },
   reviewer: {
     role: "reviewer",
     model: "deepseek-v4-flash",
-    maxOutputTokens: 2000,
+    maxOutputTokens: 1600,
     temperature: 0.35,
     deepseek: DEEPSEEK_CHAT_OPTIONS,
   },
 };
 
 /** Cap for truncation continuation streams (same turn). */
-export const TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS = 1800;
+export const TRUNCATION_CONTINUATION_MAX_OUTPUT_TOKENS = 1200;
 
 /** Max continuation streams per agent turn when output looks truncated. */
-export const MAX_TRUNCATION_CONTINUATIONS = 1;
+export const MAX_TRUNCATION_CONTINUATIONS = 2;
 
 export function getAgentConfig(role: SimulationAgentRole): AgentModelConfig {
   return ACTIVE_AGENTS[role];

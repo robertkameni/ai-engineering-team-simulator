@@ -372,7 +372,9 @@ export function buildTruncationContinuationPrompt(
   role: SimulationAgentRole = "frontend",
 ): string {
   const excerpt = tail.trim().slice(-600);
-  return `Your previous team message was cut off by the output limit. Continue from the exact next token — do not repeat sentences or headings already written, do not re-paste prior paragraphs, do not add meta-commentary about limits or whether continuation is needed. Close any open backticks, parentheses, or JSON. ${finalSectionGuidance(role)} Last characters of your prior message:
+  const priorTokensEstimate = Math.max(40, Math.ceil(tail.trim().length / 4));
+  const targetTokens = Math.max(120, Math.min(900, Math.floor(priorTokensEstimate * 0.55)));
+  return `BREVITY RETRY — Your previous team message truncated (~${priorTokensEstimate} tokens of content). Produce the SAME substance more concisely under ~${targetTokens} tokens. Continue from the exact next token — do not repeat sentences or headings already written, do not re-paste prior paragraphs, do not add meta-commentary about limits. Close any open backticks, parentheses, or JSON. ${finalSectionGuidance(role)} Last characters of your prior message:
 
 """${excerpt}"""`;
 }

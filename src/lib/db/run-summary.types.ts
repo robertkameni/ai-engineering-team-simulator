@@ -53,6 +53,10 @@ export interface RunSummaryPayload {
    * accepted critical risks, output diagnostics).
    */
   readonly finalization?: DebateFinalizationTelemetry;
+  /** Quality tier for approved outcomes (clean / accepted_risks / forced_close). */
+  readonly approvalTier?: "clean" | "accepted_risks" | "forced_close";
+  /** True when a pre-approval truncation retry still truncated (edge case). */
+  readonly truncationRetried?: boolean;
   /** Populated when core artifact synthesis fails after debate. */
   readonly artifactError?: ArtifactErrorTelemetry | null;
   readonly opsFollowUpEvaluated?: boolean;

@@ -414,6 +414,8 @@ function buildSummaryTelemetryFields(
 ) {
   return {
     postApproveTruncation: summaryPayload?.postApproveTruncation === true,
+    truncationRetried: summaryPayload?.truncationRetried === true,
+    approvalTier: summaryPayload?.approvalTier,
     postApproveContinuationFailed:
       summaryPayload?.postApproveContinuationFailed === true,
     debateDurationMs: summaryPayload?.debateDurationMs ?? null,
