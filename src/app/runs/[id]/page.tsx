@@ -1,12 +1,10 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import { cache } from "react";
 import { notFound } from "next/navigation";
 
 import { SavedRunWorkspace } from "@/features/workspace/saved-run-workspace";
 import { SidebarRunsSkeleton } from "@/features/workspace/workspace-page-skeleton";
 import {
-  getRunForWorkspaceIfOwned,
   listRecentRunsForSidebar,
   type RunWorkspaceView,
 } from "@/lib/db/runs";
@@ -14,14 +12,11 @@ import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
 import { getSessionUser } from "@/lib/auth/session";
 import { rosterToPreview } from "@/features/simulation/team-roster-preview";
 
+import { getCachedRunPageView } from "./get-cached-run-page-view";
+
 interface RunPageProps {
   params: Promise<{ id: string }>;
 }
-
-const getCachedRunPageView = cache(async (id: string) => {
-  const scope = await getRunOwnershipContext();
-  return getRunForWorkspaceIfOwned(id, scope);
-});
 
 export async function generateMetadata({
   params,
@@ -67,6 +62,7 @@ async function SavedRunPageBody({
 
 export default async function RunPage({ params }: RunPageProps) {
   const { id } = await params;
+  // Layout already gates 404 outside loading.tsx; keep a defense-in-depth check.
   const run = await getCachedRunPageView(id);
   if (!run) {
     notFound();
