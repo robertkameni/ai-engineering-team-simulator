@@ -8,12 +8,11 @@ import { SidebarRunsSkeleton } from "@/features/workspace/workspace-page-skeleto
 import {
   getRunForWorkspaceIfOwned,
   listRecentRunsForSidebar,
+  type RunWorkspaceView,
 } from "@/lib/db/runs";
-import { getTeamRoster } from "@/lib/db/team-roster";
 import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
 import { getSessionUser } from "@/lib/auth/session";
 import { rosterToPreview } from "@/features/simulation/team-roster-preview";
-import type { MockRun } from "@/features/agents/types";
 
 interface RunPageProps {
   params: Promise<{ id: string }>;
@@ -38,12 +37,11 @@ async function SavedRunPageBody({
   run,
 }: {
   id: string;
-  run: MockRun;
+  run: RunWorkspaceView;
 }) {
-  const ownership = await getRunOwnershipContext();
-  const [recentRuns, teamRosterRecord, session] = await Promise.all([
-    listRecentRunsForSidebar(ownership, 12),
-    getTeamRoster(id),
+  // Ownership/session are React.cache-deduped with getCachedRunPageView.
+  const [recentRuns, session] = await Promise.all([
+    listRecentRunsForSidebar(await getRunOwnershipContext(), 12),
     getSessionUser(),
   ]);
 
@@ -59,7 +57,7 @@ async function SavedRunPageBody({
       canRegenerateArtifacts={canRegenerateArtifacts}
       initialRecentRuns={recentRuns}
       teamRoster={
-        teamRosterRecord != null ? rosterToPreview(teamRosterRecord) : null
+        run.teamRoster != null ? rosterToPreview(run.teamRoster) : null
       }
       isAuthenticated={session.userId != null}
       userEmail={session.email}
@@ -69,7 +67,6 @@ async function SavedRunPageBody({
 
 export default async function RunPage({ params }: RunPageProps) {
   const { id } = await params;
-  // Ownership/404 before Suspense so a missing run never spins the skeleton forever (F5).
   const run = await getCachedRunPageView(id);
   if (!run) {
     notFound();
@@ -90,6 +87,9 @@ export default async function RunPage({ params }: RunPageProps) {
           sidebar={<SidebarRunsSkeleton />}
           regenerateRunId={canRegenerateArtifacts ? run.id : undefined}
           canRegenerateArtifacts={canRegenerateArtifacts}
+          teamRoster={
+            run.teamRoster != null ? rosterToPreview(run.teamRoster) : null
+          }
         />
       }
     >

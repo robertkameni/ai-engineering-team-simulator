@@ -12,6 +12,10 @@ import {
   sidebarRunRowClassName,
 } from "@/features/workspace/sidebar-run-link-content";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
+import {
+  formatDeleteRateLimitError,
+  readRetryAfterFromResponse,
+} from "@/lib/rate-limit-message";
 
 export type { SidebarRunItemData };
 
@@ -43,6 +47,12 @@ export function SidebarRunItem({
     setDeleteError(null);
     try {
       const response = await fetch(`/api/runs/${run.id}`, { method: "DELETE" });
+
+      if (response.status === 429) {
+        const retryAfter = await readRetryAfterFromResponse(response);
+        setDeleteError(formatDeleteRateLimitError(retryAfter ?? 60));
+        return;
+      }
 
       if (!response.ok && response.status !== 404) {
         setDeleteError("Failed to delete run. Please try again.");

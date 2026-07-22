@@ -6,7 +6,12 @@ import { isSimulationAgent, type SimulationAgentRole } from "@/ai/agents/config"
 import { parseDebateOutcomeFromRunSummary } from "@/ai/orchestration/reviewer-decision";
 import { opsFollowUpFieldsFromCheckpoint } from "@/lib/db/ops-follow-up-summary";
 import { parseRunSummary } from "@/lib/db/run-summary";
-import type { AgentRole, SimulationMessage } from "@/features/agents/types";
+import type {
+  AgentRole,
+  MockRun,
+  RunStatus as AppRunStatus,
+  SimulationMessage,
+} from "@/features/agents/types";
 import { getPersonaBase } from "@/features/agents/personas";
 import { formatMessageTime, formatRelativeTime } from "@/lib/format-time";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
@@ -18,7 +23,6 @@ import {
 } from "@/lib/db/artifact-status";
 import { reconcileStaleRunIfNeeded, reconcileStaleRunsBatch } from "@/lib/db/run-reconcile";
 import { toAppRunStatus, toPrismaRunStatus } from "@/lib/db/run-status";
-import type { RunStatus as AppRunStatus } from "@/features/agents/types";
 import { getOrCreateDefaultProject } from "@/lib/db/projects";
 import { mapDbArtifactsToRunArtifacts } from "@/lib/db/artifacts";
 import {
@@ -29,6 +33,11 @@ import {
 import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
 
 export type { RunOwnershipScope };
+
+/** Workspace run view including roster resolved once in mapRunToWorkspace (F9). */
+export type RunWorkspaceView = MockRun & {
+  teamRoster: TeamRoster | null;
+};
 
 export interface CreateRunOptions {
   projectId?: string;
@@ -433,11 +442,13 @@ function buildSummaryTelemetryFields(
   };
 }
 
-async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
+async function mapRunToWorkspace(
+  run: RunWithMessagesAndArtifacts,
+): Promise<RunWorkspaceView> {
   const rosterFromArtifact = run.artifacts.find(
     (artifact) => artifact.type === "team-roster",
   );
-  const roster =
+  const teamRoster =
     parseTeamRoster(rosterFromArtifact?.data) ??
     (await getTeamRoster(run.id));
 
@@ -453,16 +464,20 @@ async function mapRunToWorkspace(run: RunWithMessagesAndArtifacts) {
     updatedAt: run.updatedAt.toISOString(),
     userId: run.userId,
     usage: buildUsageWithSummaryTelemetry(mapUsageFromRun(run), summaryPayload),
-    messages: mapDbMessagesToSimulation(run.messages, roster),
+    messages: mapDbMessagesToSimulation(run.messages, teamRoster),
     artifacts: mapDbArtifactsToRunArtifacts(run.artifacts),
     artifactsStatus: deriveArtifactsPanelStatus(runStatus, artifactStatus),
     debateOutcome: parseDebateOutcomeFromRunSummary(run.summary),
     ...buildSummaryTelemetryFields(summaryPayload),
     ...buildOpsFollowUpFromSummary(summaryPayload),
+    /** Resolved once in mapRunToWorkspace — avoid a second getTeamRoster. */
+    teamRoster,
   };
 }
 
-async function getRunForWorkspace(runId: string) {
+async function getRunForWorkspace(
+  runId: string,
+): Promise<RunWorkspaceView | null> {
   let run = await getRunWithMessages(runId);
   if (!run) return null;
 
@@ -475,7 +490,7 @@ async function getRunForWorkspace(runId: string) {
 export async function getRunForWorkspaceIfOwned(
   runId: string,
   scope: RunOwnershipScope,
-) {
+): Promise<RunWorkspaceView | null> {
   let run = await getRunWithMessages(runId);
   if (!run) return null;
 

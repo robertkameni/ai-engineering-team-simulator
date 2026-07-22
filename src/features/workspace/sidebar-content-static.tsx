@@ -1,9 +1,7 @@
 import Link from "next/link";
-import { X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { SidebarBrandLink } from "@/features/workspace/sidebar-brand-link";
-import { deleteRunAction } from "@/features/workspace/delete-run-action";
+import { SidebarDeleteRunForm } from "@/features/workspace/sidebar-delete-run-form";
 import { SidebarSimulationAction } from "@/features/workspace/sidebar-simulation-action";
 import {
   SidebarRunLinkContent,
@@ -61,19 +59,11 @@ export function SidebarContentStatic({
                 >
                   <SidebarRunLinkContent run={run} />
                 </Link>
-                <form action={deleteRunAction}>
-                  <input type="hidden" name="runId" value={run.id} />
-                  <input type="hidden" name="activePath" value={pathname} />
-                  <Button
-                    type="submit"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Delete run: ${run.title}`}
-                    className="my-1 mr-1 size-7 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 max-lg:opacity-70"
-                  >
-                    <X className="size-3.5" />
-                  </Button>
-                </form>
+                <SidebarDeleteRunForm
+                  runId={run.id}
+                  runTitle={run.title}
+                  activePath={pathname}
+                />
               </div>
             );
           })
