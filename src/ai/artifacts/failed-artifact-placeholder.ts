@@ -1,5 +1,5 @@
 import type { ArtifactDocument, ArtifactType } from "@/features/artifacts/schemas";
-import { CORE_ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
+import { CORE_ARTIFACT_TYPES } from "@/lib/artifact-constants";
 
 /**
  * Placeholder document when synthesis fails after retry. Keeps export at 5/5

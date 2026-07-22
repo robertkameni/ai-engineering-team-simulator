@@ -6,7 +6,7 @@ export {
   LAZY_ARTIFACT_TYPES,
   isArtifactType,
   type ArtifactType,
-} from "@/features/artifacts/artifact-constants";
+} from "@/lib/artifact-constants";
 
 const artifactSectionSchema = z.object({
   title: z.string().describe("Section heading"),

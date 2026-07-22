@@ -25,7 +25,7 @@ export interface SavedRunPdfExportHooks {
   getRunForWorkspaceIfOwned: (
     runId: string,
     scope: { userId: string; guestSessionId: null },
-  ) => Promise<MockRun | null>;
+  ) => Promise<(MockRun & { teamRoster?: unknown }) | null>;
   getTeamRoster: (
     runId: string,
   ) => Promise<{ templateId?: TeamTemplateId } | null>;

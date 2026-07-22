@@ -9,7 +9,7 @@ import {
   getRegenerateBlockingError,
   isDebateCompleteForArtifactSynthesis,
 } from "@/ai/artifacts/regenerate-run-eligibility";
-import { CORE_ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
+import { CORE_ARTIFACT_TYPES } from "@/lib/artifact-constants";
 
 describe("isDebateCompleteForArtifactSynthesis", () => {
   it("allows synthesis when summary is approved even if last reviewer rejected", () => {

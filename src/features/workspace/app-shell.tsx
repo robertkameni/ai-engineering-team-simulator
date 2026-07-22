@@ -1,9 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 
-import { ArtifactPanel } from "@/features/artifacts/artifact-panel";
+import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skeleton";
 import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
 import type { DebateProgress } from "@/features/artifacts/types";
 import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
@@ -16,6 +17,22 @@ import { WorkspaceMobileSheetPortals } from "@/features/workspace/workspace-mobi
 import { WorkspaceRunProvider } from "@/features/workspace/workspace-run-context";
 import { SiteFooter } from "@/components/site-footer";
 import { useMinWidth } from "@/hooks/use-media-query";
+
+/** Arch-review F6: defer live ArtifactPanel chunk until showArtifactPanel. */
+const ArtifactPanel = dynamic(
+  () =>
+    import("@/features/artifacts/artifact-panel").then(
+      (module) => module.ArtifactPanel,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <aside className="@container/artifact-panel glass-panel hidden h-full w-[min(100%,420px)] shrink-0 flex-col overflow-hidden border-l border-glass-border min-[960px]:flex">
+        <ArtifactPanelSkeleton />
+      </aside>
+    ),
+  },
+);
 
 interface AppShellProps {
   children: React.ReactNode;

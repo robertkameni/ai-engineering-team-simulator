@@ -10,7 +10,15 @@ const POLL_RUN_PROGRESS_INTERVAL_MS = 2_000;
 /** Railway SSE cap is 15 minutes; allow polling slightly longer. */
 const POLL_RUN_PROGRESS_MAX_MS = 16 * 60 * 1000;
 
-type RunProgressResponse = {
+/** Slim progress payload from GET /api/runs/[id]/progress (arch-review F2). */
+export type RunProgressSnapshot = {
+  status: RunStatus;
+  messageCount: number;
+  lastMessageText: string;
+  artifactsComplete: boolean;
+};
+
+type RunFullSnapshot = {
   id: string;
   status: RunStatus;
   messages: SimulationMessage[];
@@ -33,20 +41,42 @@ type ArtifactsFetchResult =
     }
   | { ok: false; retryable: boolean };
 
+export function isRunProgressTerminal(status: RunStatus): boolean {
+  return status === "complete" || status === "failed";
+}
+
 function isRetryableArtifactsHttpStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
-async function fetchRunProgress(
+async function fetchSlimRunProgress(
   runId: string,
   signal?: AbortSignal,
-): Promise<RunProgressResponse | null> {
+): Promise<RunProgressSnapshot | null> {
+  try {
+    const response = await fetch(`/api/runs/${runId}/progress`, { signal });
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as RunProgressSnapshot;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return null;
+    }
+    return null;
+  }
+}
+
+async function fetchFullRunSnapshot(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<RunFullSnapshot | null> {
   try {
     const response = await fetch(`/api/runs/${runId}`, { signal });
     if (!response.ok) {
       return null;
     }
-    return (await response.json()) as RunProgressResponse;
+    return (await response.json()) as RunFullSnapshot;
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return null;
@@ -268,6 +298,26 @@ export type RunProgressRecoverySetters = ArtifactPollSetters & {
   setTeamRoster: (roster: TeamRosterPreview | null) => void;
 };
 
+function applyFullRunSnapshot(
+  setters: RunProgressRecoverySetters,
+  snapshot: RunFullSnapshot,
+): void {
+  setters.setRunId(snapshot.id);
+  setters.setMessages(snapshot.messages);
+  if (snapshot.teamRoster) {
+    setters.setTeamRoster(snapshot.teamRoster);
+  }
+  setters.setArtifacts(snapshot.artifacts);
+  setters.setArtifactsStatus(snapshot.artifactsStatus);
+  setters.setDebateOutcome(snapshot.debateOutcome);
+  setters.setStackValidationFailed(snapshot.stackValidationFailed === true);
+  setters.setCrossValidationFailed(snapshot.crossValidationFailed === true);
+}
+
+/**
+ * After SSE drop: poll slim /progress, then one full GET /api/runs/[id]
+ * when status is terminal (complete | failed). Arch-review F2.
+ */
 export async function recoverRunAfterStreamDrop(
   id: string,
   setters: RunProgressRecoverySetters,
@@ -286,27 +336,29 @@ export async function recoverRunAfterStreamDrop(
       return;
     }
 
-    const progress = await fetchRunProgress(id, signal);
+    const progress = await fetchSlimRunProgress(id, signal);
     if (!isActive()) {
       return;
     }
 
-    if (progress) {
-      setters.setRunId(progress.id);
-      setters.setMessages(progress.messages);
-      if (progress.teamRoster) {
-        setters.setTeamRoster(progress.teamRoster);
+    if (progress && isRunProgressTerminal(progress.status)) {
+      const snapshot = await fetchFullRunSnapshot(id, signal);
+      if (!isActive()) {
+        return;
       }
-      setters.setArtifacts(progress.artifacts);
-      setters.setArtifactsStatus(progress.artifactsStatus);
-      setters.setDebateOutcome(progress.debateOutcome);
-      setters.setStackValidationFailed(progress.stackValidationFailed === true);
-      setters.setCrossValidationFailed(progress.crossValidationFailed === true);
 
-      if (progress.status === "complete") {
+      if (!snapshot) {
+        setters.setStatus("failed");
+        setters.setError("Simulation failed");
+        return;
+      }
+
+      applyFullRunSnapshot(setters, snapshot);
+
+      if (snapshot.status === "complete") {
         setters.setStatus("complete");
         setters.setError(
-          progress.artifactsStatus === "unavailable"
+          snapshot.artifactsStatus === "unavailable"
             ? "Artifact synthesis failed"
             : null,
         );
@@ -314,11 +366,9 @@ export async function recoverRunAfterStreamDrop(
         return;
       }
 
-      if (progress.status === "failed") {
-        setters.setStatus("failed");
-        setters.setError("Simulation failed");
-        return;
-      }
+      setters.setStatus("failed");
+      setters.setError("Simulation failed");
+      return;
     }
 
     try {

@@ -1,5 +1,4 @@
 import { deleteRunIfOwned, getRunForWorkspaceIfOwned } from "@/lib/db/runs";
-import { getTeamRoster } from "@/lib/db/team-roster";
 import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { rosterToPreview } from "@/features/simulation/team-roster-preview";
@@ -19,8 +18,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
     return Response.json({ error: "Run not found" }, { status: 404 });
   }
 
-  const teamRosterRecord = await getTeamRoster(id);
-
   return Response.json({
     id: run.id,
     status: run.status,
@@ -29,7 +26,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     artifactsStatus: run.artifactsStatus,
     debateOutcome: run.debateOutcome,
     teamRoster:
-      teamRosterRecord != null ? rosterToPreview(teamRosterRecord) : null,
+      run.teamRoster != null ? rosterToPreview(run.teamRoster) : null,
     stackValidationFailed: run.stackValidationFailed === true,
     crossValidationFailed: run.crossValidationFailed === true,
     opsFollowUpEvaluated: run.opsFollowUpEvaluated === true,

@@ -159,7 +159,7 @@ export function useSimulationStream() {
         const decoder = new TextDecoder();
         let buffer = "";
 
-        const handleStreamEvent = createSimulationStreamEventHandler({
+        const streamEventHandler = createSimulationStreamEventHandler({
           signal,
           isActive,
           currentRunIdRef,
@@ -196,7 +196,7 @@ export function useSimulationStream() {
 
             const event = parseSimulationEvent(line);
             if (!event) continue;
-            await handleStreamEvent(event);
+            await streamEventHandler.handle(event);
           }
 
           return true;
@@ -230,6 +230,9 @@ export function useSimulationStream() {
             }
           }
         } finally {
+          // Arch-review F1: flush coalesced deltas before tear-down so last tokens render.
+          streamEventHandler.flushPendingTextDeltas();
+          streamEventHandler.dispose();
           reader.releaseLock();
         }
 

@@ -27,7 +27,7 @@ export function ArtifactSections({
 
         return (
           <section
-            key={title}
+            key={`${index}-${title}`}
             className="glass-card rounded-xl px-3 py-3 message-enter"
             style={{ animationDelay: `${index * 60}ms` }}
           >
@@ -35,9 +35,9 @@ export function ArtifactSections({
               {title}
             </h3>
             <ul className="list-disc space-y-1.5 pl-4 marker:text-muted-foreground/60">
-              {items.map((item) => (
+              {items.map((item, itemIndex) => (
                 <li
-                  key={`${title}-${item}`}
+                  key={`${index}-${itemIndex}`}
                   className="text-body leading-snug text-foreground/90"
                 >
                   {item}

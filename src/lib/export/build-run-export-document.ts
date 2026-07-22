@@ -2,8 +2,8 @@ import { isSimulationAgent } from "@/ai/agents/config";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { AgentRole } from "@/features/agents/types";
 import { formatExportDate } from "@/lib/format-time";
-import { ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
-import type { ArtifactType } from "@/features/artifacts/artifact-constants";
+import { ARTIFACT_TYPES } from "@/lib/artifact-constants";
+import type { ArtifactType } from "@/lib/artifact-constants";
 import {
   debateOutcomeLabel,
   debateOutcomeWarningMessage,

@@ -33,7 +33,7 @@ import {
   isUnapprovedDebateExitOutcome,
   parseDebateOutcomeFromRunSummary,
 } from "@/ai/orchestration/reviewer-decision";
-import { CORE_ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
+import { CORE_ARTIFACT_TYPES } from "@/lib/artifact-constants";
 import type {
   ArtifactDocument,
   ArtifactType,
