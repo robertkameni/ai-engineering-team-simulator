@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useDeferredValue, useEffect, useRef } from "react";
 import { Users } from "lucide-react";
 
 import { AgentMessage } from "@/features/simulation/agent-message";
@@ -15,6 +15,8 @@ interface MessageThreadProps {
 
 export function MessageThread({ messages, empty, loading }: MessageThreadProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Arch-review F1: defer list paint under token flood; scroll uses urgent lengths.
+  const deferredMessages = useDeferredValue(messages);
   const lastMessageKey = messages.at(-1)?.id;
   const lastContentLength = messages.at(-1)?.content.length ?? 0;
 
@@ -56,7 +58,7 @@ export function MessageThread({ messages, empty, loading }: MessageThreadProps) 
       aria-busy={messages.some((message) => message.isStreaming)}
     >
       <div className="flex flex-col gap-4 px-3 py-3 @md/message-thread:gap-8 @md/message-thread:px-4 @md/message-thread:py-4">
-        {messages.map((message) => (
+        {deferredMessages.map((message) => (
           <AgentMessage key={message.id} message={message} />
         ))}
         <div ref={bottomRef} className="h-px shrink-0" aria-hidden />

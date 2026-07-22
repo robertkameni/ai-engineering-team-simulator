@@ -11,6 +11,7 @@ import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
 import { formatMessageTime } from "@/lib/format-time";
 
+import { createTextDeltaCoalescer } from "./text-delta-coalescer";
 import {
   fetchArtifactsOnce,
   pollArtifactsUntilSettled,
@@ -36,6 +37,13 @@ export type SimulationStreamEventContext = ArtifactPollSetters & {
   artifactsSettledViaStreamRef: { current: boolean };
 };
 
+export type SimulationStreamEventHandler = {
+  handle: (event: SimulationStreamEvent) => Promise<void>;
+  /** Flush coalesced text-delta before abort/unmount so last tokens render (F1). */
+  flushPendingTextDeltas: () => void;
+  dispose: () => void;
+};
+
 function finalizeDoneStatus(
   context: SimulationStreamEventContext,
   finalPanel: string | null,
@@ -53,7 +61,7 @@ function finalizeDoneStatus(
 
 export function createSimulationStreamEventHandler(
   context: SimulationStreamEventContext,
-): (event: SimulationStreamEvent) => Promise<void> {
+): SimulationStreamEventHandler {
   const artifactSetters: ArtifactPollSetters = {
     setArtifacts: context.setArtifacts,
     setArtifactsStatus: context.setArtifactsStatus,
@@ -62,7 +70,22 @@ export function createSimulationStreamEventHandler(
     setCrossValidationFailed: context.setCrossValidationFailed,
   };
 
-  return async (event: SimulationStreamEvent) => {
+  const textDeltaCoalescer = createTextDeltaCoalescer({
+    appendDelta: (messageId, delta) => {
+      if (!context.isActive()) {
+        return;
+      }
+      context.setMessages((prev) =>
+        prev.map((message) =>
+          message.id === messageId
+            ? { ...message, content: message.content + delta }
+            : message,
+        ),
+      );
+    },
+  });
+
+  const handle = async (event: SimulationStreamEvent) => {
     if (event.type === "run_started") {
       context.currentRunIdRef.current = event.runId;
       context.setRunId(event.runId);
@@ -80,6 +103,7 @@ export function createSimulationStreamEventHandler(
     }
 
     if (event.type === "agent_start") {
+      textDeltaCoalescer.flush();
       context.setActiveAgent(event.role);
       const id = crypto.randomUUID();
       context.activeMessageIdRef.current = id;
@@ -100,6 +124,7 @@ export function createSimulationStreamEventHandler(
     }
 
     if (event.type === "tool_start") {
+      textDeltaCoalescer.flush();
       const activeId = context.activeMessageIdRef.current;
       if (!activeId) return;
 
@@ -120,6 +145,7 @@ export function createSimulationStreamEventHandler(
     }
 
     if (event.type === "tool_end") {
+      textDeltaCoalescer.flush();
       const activeId = context.activeMessageIdRef.current;
       if (!activeId) return;
 
@@ -139,17 +165,12 @@ export function createSimulationStreamEventHandler(
       const activeId = context.activeMessageIdRef.current;
       if (!activeId) return;
 
-      context.setMessages((prev) =>
-        prev.map((message) =>
-          message.id === activeId
-            ? { ...message, content: message.content + event.delta }
-            : message,
-        ),
-      );
+      textDeltaCoalescer.enqueue(activeId, event.delta);
       return;
     }
 
     if (event.type === "agent_end") {
+      textDeltaCoalescer.flush();
       const activeId = context.activeMessageIdRef.current;
 
       if (activeId) {
@@ -191,6 +212,7 @@ export function createSimulationStreamEventHandler(
     }
 
     if (event.type === "error") {
+      textDeltaCoalescer.flush();
       context.streamSettledRef.current = true;
       context.setError(event.message);
       context.setStatus("failed");
@@ -221,6 +243,7 @@ export function createSimulationStreamEventHandler(
     }
 
     if (event.type === "done") {
+      textDeltaCoalescer.flush();
       context.streamSettledRef.current = true;
 
       if (!context.isActive()) return;
@@ -249,5 +272,11 @@ export function createSimulationStreamEventHandler(
       finalizeDoneStatus(context, finalPanel);
       context.router.replace(`/runs/${event.runId}`);
     }
+  };
+
+  return {
+    handle,
+    flushPendingTextDeltas: () => textDeltaCoalescer.flush(),
+    dispose: () => textDeltaCoalescer.dispose(),
   };
 }

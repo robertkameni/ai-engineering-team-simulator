@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { AppShellFrame } from "@/features/workspace/app-shell-frame";
 import { ArtifactPanelStatic } from "@/features/artifacts/artifact-panel-static";
 import { MessageThreadStatic } from "@/features/simulation/message-thread-static";
@@ -14,6 +16,8 @@ interface SavedRunWorkspaceProps {
   run: MockRun;
   pathname: string;
   initialRecentRuns: SidebarRunItemData[];
+  /** Optional slot for Suspense-streamed sidebar (arch-review F5). */
+  sidebar?: ReactNode;
   teamRoster?: TeamRosterPreview | null;
   regenerateRunId?: string;
   canRegenerateArtifacts?: boolean;
@@ -25,6 +29,7 @@ export function SavedRunWorkspace({
   run,
   pathname,
   initialRecentRuns,
+  sidebar,
   teamRoster = null,
   regenerateRunId,
   canRegenerateArtifacts = false,
@@ -53,11 +58,13 @@ export function SavedRunWorkspace({
     >
       <AppShellFrame
         sidebar={
-          <SidebarStatic
-            pathname={pathname}
-            runs={initialRecentRuns}
-            rerunPrompt={run.userPrompt}
-          />
+          sidebar ?? (
+            <SidebarStatic
+              pathname={pathname}
+              runs={initialRecentRuns}
+              rerunPrompt={run.userPrompt}
+            />
+          )
         }
         artifacts={
           showArtifactPanel ? (
