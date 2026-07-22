@@ -17,9 +17,10 @@ Open items after F1–F12 shipped. Do **not** treat these as merge blockers for 
   - `React.cache` dedupes `getSessionUser` / `getRunOwnershipContext` within a request.
   - Sidebar list still awaits ownership first (API requires scope). Explore a scoped list query that can start earlier or batch differently without changing ownership semantics.
 
-- [ ] **(d) F3 — CSP nonces**
-  - Current CSP allows `'unsafe-inline'` / `'unsafe-eval'` for Next App Router bootstrap.
-  - Follow-up: nonce (or hash) based `script-src` via `src/proxy.ts` + `next.config` and drop unsafe tokens when compatible with Next 16.2.x.
+- [x] **(d) F3 — CSP nonces** (Sprint 4 Tier 1 — `feature/sprint-4-csp-nonces`)
+  - Per-request nonce CSP in `src/proxy.ts` via `buildContentSecurityPolicy`.
+  - Production `script-src`: `'self' 'nonce-…' 'strict-dynamic'` (no `'unsafe-inline'` / `'unsafe-eval'`).
+  - Dev keeps `'unsafe-eval'` only. Static CSP removed from `next.config.ts`; root layout uses `connection()`.
 
 ## Staging note (`0b0c80d`)
 
