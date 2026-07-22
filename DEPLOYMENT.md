@@ -20,6 +20,7 @@ In Railway project → **Variables**, configure at least:
 | `DATABASE_URL` | ✓ | Pooled Postgres URL from Neon. |
 | `DEEPSEEK_API_KEY` | ✓ | Simulations and artifact generation. |
 | `AUTH_SECRET` | ✓ | **Required in production** — JWT session signing (`src/lib/auth/auth-session.ts`). |
+| `NEXT_PUBLIC_APP_URL` | ✓ | Canonical origin (no trailing slash). Used for Origin allowlist on mutating `/api` routes and artifact synthesize worker dispatch. Example: `https://ai-engineering-team-simulator.up.railway.app`. |
 | `UPSTASH_REDIS_REST_URL` | ✓ | Rate limiting (simulate, delete, export, regenerate, auth). |
 | `UPSTASH_REDIS_REST_TOKEN` | ✓ | Pair with URL above. |
 

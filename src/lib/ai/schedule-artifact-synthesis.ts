@@ -5,7 +5,7 @@ import {
   listMissingCoreArtifactTypes,
 } from "@/ai/artifacts/failed-artifact-placeholder";
 import { regenerateRunArtifacts } from "@/ai/artifacts/regenerate-run-artifacts";
-import { CORE_ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
+import { CORE_ARTIFACT_TYPES } from "@/lib/artifact-constants";
 import { isArtifactType, type ArtifactType } from "@/features/artifacts/schemas";
 import {
   createRunUsageAccumulator,
@@ -309,7 +309,10 @@ export function dispatchCoreArtifactSynthesisWorker(
 
   void fetch(`${origin}/api/runs/${runId}/synthesize`, {
     method: "POST",
-    headers: cookie ? { cookie } : undefined,
+    headers: {
+      Origin: origin,
+      ...(cookie ? { cookie } : {}),
+    },
   })
     .then(async (response) => {
       if (!response.ok) {

@@ -21,7 +21,7 @@ import {
   isSimulationBudgetExceeded,
 } from "@/ai/orchestration/simulation-budget";
 import { parseDebateOutcomeFromRunSummary } from "@/ai/orchestration/reviewer-decision";
-import { CORE_ARTIFACT_TYPES } from "@/features/artifacts/artifact-constants";
+import { CORE_ARTIFACT_TYPES } from "@/lib/artifact-constants";
 import {
   ARTIFACT_TYPES,
 } from "@/features/artifacts/schemas";

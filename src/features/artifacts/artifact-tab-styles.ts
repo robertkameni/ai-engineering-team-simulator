@@ -1,4 +1,4 @@
-import type { ArtifactType } from "@/features/artifacts/artifact-constants";
+import type { ArtifactType } from "@/lib/artifact-constants";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import { cn } from "@/lib/utils";
 
