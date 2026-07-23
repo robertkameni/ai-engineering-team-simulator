@@ -2,7 +2,7 @@
  * Shared rate-limit user-facing copy (arch-review F8).
  */
 
-export function formatRateLimitRetryMessage(
+function formatRateLimitRetryMessage(
   retryAfterSec: number,
   actionLabel: string,
 ): string {

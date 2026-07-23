@@ -59,6 +59,22 @@ function finalizeDoneStatus(
   }
 }
 
+function markActiveMessageIdle(
+  context: SimulationStreamEventContext,
+): void {
+  const activeId = context.activeMessageIdRef.current;
+  if (activeId) {
+    context.setMessages((prev) =>
+      prev.map((message) =>
+        message.id === activeId
+          ? { ...message, isStreaming: false, activeTools: [] }
+          : message,
+      ),
+    );
+  }
+  context.activeMessageIdRef.current = null;
+}
+
 export function createSimulationStreamEventHandler(
   context: SimulationStreamEventContext,
 ): SimulationStreamEventHandler {
@@ -171,18 +187,7 @@ export function createSimulationStreamEventHandler(
 
     if (event.type === "agent_end") {
       textDeltaCoalescer.flush();
-      const activeId = context.activeMessageIdRef.current;
-
-      if (activeId) {
-        context.setMessages((prev) =>
-          prev.map((message) =>
-            message.id === activeId
-              ? { ...message, isStreaming: false, activeTools: [] }
-              : message,
-          ),
-        );
-      }
-      context.activeMessageIdRef.current = null;
+      markActiveMessageIdle(context);
       context.setActiveAgent(null);
       return;
     }
@@ -217,18 +222,7 @@ export function createSimulationStreamEventHandler(
       context.setError(event.message);
       context.setStatus("failed");
       context.setActiveAgent(null);
-
-      const activeId = context.activeMessageIdRef.current;
-      if (activeId) {
-        context.setMessages((prev) =>
-          prev.map((message) =>
-            message.id === activeId
-              ? { ...message, isStreaming: false, activeTools: [] }
-              : message,
-          ),
-        );
-        context.activeMessageIdRef.current = null;
-      }
+      markActiveMessageIdle(context);
 
       if (context.currentRunIdRef.current) {
         await pollArtifactsUntilSettled(

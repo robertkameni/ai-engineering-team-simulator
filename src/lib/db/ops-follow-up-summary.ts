@@ -36,7 +36,7 @@ const CORRECTION_ROLES = new Set<OpsFollowUpLastCorrectionRole>([
   "devops",
 ]);
 
-export function parseOpsFollowUpLastCorrectionRole(
+function parseOpsFollowUpLastCorrectionRole(
   value: unknown,
 ): OpsFollowUpLastCorrectionRole | null {
   if (typeof value !== "string") {
@@ -97,7 +97,7 @@ function parseCheckpointObject(record: Record<string, unknown>): OpsFollowUpChec
   };
 }
 
-export function parseOpsFollowUpArchitectCheckpoint(
+function parseOpsFollowUpArchitectCheckpoint(
   value: unknown,
 ): OpsFollowUpCheckpoint | null {
   if (value === null || value === undefined) {
@@ -136,57 +136,20 @@ export function parseOpsFollowUpFields(
       ? record.opsFollowUpEvaluated
       : legacyTriggered === true;
 
-  return {
+  const checkpoint = parseCheckpointObject({
+    ...record,
     opsFollowUpEvaluated: evaluated,
-    opsFollowUpTriggered:
-      typeof record.opsFollowUpTriggered === "boolean"
-        ? record.opsFollowUpTriggered
-        : false,
-    opsFollowUpSkipReason:
-      typeof record.opsFollowUpSkipReason === "string"
-        ? record.opsFollowUpSkipReason
-        : record.opsFollowUpSkipReason === null
-          ? null
-          : null,
-    opsFollowUpEligible:
-      typeof record.opsFollowUpEligible === "boolean"
-        ? record.opsFollowUpEligible
-        : false,
-    opsFollowUpUnresolvedDevopsIssueCount:
-      typeof record.opsFollowUpUnresolvedDevopsIssueCount === "number"
-        ? record.opsFollowUpUnresolvedDevopsIssueCount
-        : 0,
-    opsFollowUpOpenIssueCount:
-      typeof record.opsFollowUpOpenIssueCount === "number"
-        ? record.opsFollowUpOpenIssueCount
-        : typeof record.opsFollowUpUnresolvedDevopsIssueCount === "number"
-          ? record.opsFollowUpUnresolvedDevopsIssueCount
-          : 0,
-    opsFollowUpAddressedIssueCount:
-      typeof record.opsFollowUpAddressedIssueCount === "number"
-        ? record.opsFollowUpAddressedIssueCount
-        : 0,
-    opsFollowUpAcceptedRiskIssueCount:
-      typeof record.opsFollowUpAcceptedRiskIssueCount === "number"
-        ? record.opsFollowUpAcceptedRiskIssueCount
-        : 0,
-    opsFollowUpAcceptedRiskReasons: parseAcceptedRiskReasons(
-      record.opsFollowUpAcceptedRiskReasons,
-    ),
-    opsFollowUpLastCorrectionRole: parseOpsFollowUpLastCorrectionRole(
-      record.opsFollowUpLastCorrectionRole,
-    ),
-    opsFollowUpEvaluationTurn:
-      typeof record.opsFollowUpEvaluationTurn === "number"
-        ? record.opsFollowUpEvaluationTurn
-        : null,
+  });
+
+  return {
+    ...checkpoint,
     opsFollowUpArchitectCheckpoint: parseOpsFollowUpArchitectCheckpoint(
       record.opsFollowUpArchitectCheckpoint,
     ),
   };
 }
 
-export function buildDefaultOpsFollowUpFields(): OpsFollowUpCheckpoint {
+function buildDefaultOpsFollowUpFields(): OpsFollowUpCheckpoint {
   return {
     opsFollowUpEvaluated: false,
     opsFollowUpTriggered: false,
@@ -228,19 +191,62 @@ function appendCheckpointLines(
     `**${prefix}triggered:** ` + (fields.opsFollowUpTriggered ? "yes" : "no"),
     `**${prefix}skip reason:** ` + skipReason,
     `**${prefix}unresolved DevOps issues:** ` +
-      String(fields.opsFollowUpUnresolvedDevopsIssueCount),
+    String(fields.opsFollowUpUnresolvedDevopsIssueCount),
     `**${prefix}open DevOps issues:** ` + String(fields.opsFollowUpOpenIssueCount),
     `**${prefix}addressed DevOps issues:** ` +
-      String(fields.opsFollowUpAddressedIssueCount),
+    String(fields.opsFollowUpAddressedIssueCount),
     `**${prefix}accepted-risk DevOps issues:** ` +
-      String(fields.opsFollowUpAcceptedRiskIssueCount),
+    String(fields.opsFollowUpAcceptedRiskIssueCount),
     `**${prefix}last correction role:** ` + correctionRole,
     `**${prefix}evaluation turn:** ` + evaluationTurn,
   );
   if (fields.opsFollowUpAcceptedRiskReasons.length > 0) {
     lines.push(
       `**${prefix}accepted-risk reasons:** ` +
-        fields.opsFollowUpAcceptedRiskReasons.join(" | "),
+      fields.opsFollowUpAcceptedRiskReasons.join(" | "),
+    );
+  }
+}
+
+function resolveOpsIssueResolutionLabel(fields: OpsFollowUpCheckpoint): string {
+  if (fields.opsFollowUpOpenIssueCount === 0) {
+    return "resolved";
+  }
+  return fields.opsFollowUpTriggered ? "in_progress" : "unresolved";
+}
+
+function appendOpsIssueMetricLines(
+  lines: string[],
+  fields: OpsFollowUpCheckpoint,
+): void {
+  lines.push(
+    `**opsIssuesUnresolved:** ${fields.opsFollowUpUnresolvedDevopsIssueCount}`,
+    `**opsIssuesOpen:** ${fields.opsFollowUpOpenIssueCount}`,
+    `**opsIssuesAddressed:** ${fields.opsFollowUpAddressedIssueCount}`,
+    `**opsIssuesAcceptedRisk:** ${fields.opsFollowUpAcceptedRiskIssueCount}`,
+    `**opsIssueResolution:** ${resolveOpsIssueResolutionLabel(fields)}`,
+  );
+  if (fields.opsFollowUpAcceptedRiskReasons.length > 0) {
+    lines.push(
+      `**opsAcceptedRiskReasons:** ${fields.opsFollowUpAcceptedRiskReasons.join(" | ")}`,
+    );
+  }
+}
+
+function appendOpsIssueMetricHtml(
+  parts: string[],
+  fields: OpsFollowUpCheckpoint,
+): void {
+  parts.push(
+    `<p class="meta-block"><strong>opsIssuesUnresolved:</strong> ${fields.opsFollowUpUnresolvedDevopsIssueCount}</p>`,
+    `<p class="meta-block"><strong>opsIssuesOpen:</strong> ${fields.opsFollowUpOpenIssueCount}</p>`,
+    `<p class="meta-block"><strong>opsIssuesAddressed:</strong> ${fields.opsFollowUpAddressedIssueCount}</p>`,
+    `<p class="meta-block"><strong>opsIssuesAcceptedRisk:</strong> ${fields.opsFollowUpAcceptedRiskIssueCount}</p>`,
+    `<p class="meta-block"><strong>opsIssueResolution:</strong> ${resolveOpsIssueResolutionLabel(fields)}</p>`,
+  );
+  if (fields.opsFollowUpAcceptedRiskReasons.length > 0) {
+    parts.push(
+      `<p class="meta-block"><strong>opsAcceptedRiskReasons:</strong> ${fields.opsFollowUpAcceptedRiskReasons.join(" | ")}</p>`,
     );
   }
 }
@@ -257,24 +263,7 @@ export function appendOpsFollowUpMetadataLines(
 
   lines.push("**Ops follow-up evaluated:** yes");
   appendCheckpointLines(lines, fields, "Ops follow-up ");
-  lines.push(
-    `**opsIssuesUnresolved:** ${fields.opsFollowUpUnresolvedDevopsIssueCount}`,
-    `**opsIssuesOpen:** ${fields.opsFollowUpOpenIssueCount}`,
-    `**opsIssuesAddressed:** ${fields.opsFollowUpAddressedIssueCount}`,
-    `**opsIssuesAcceptedRisk:** ${fields.opsFollowUpAcceptedRiskIssueCount}`,
-    `**opsIssueResolution:** ${
-      fields.opsFollowUpOpenIssueCount === 0
-        ? "resolved"
-        : fields.opsFollowUpTriggered
-          ? "in_progress"
-          : "unresolved"
-    }`,
-  );
-  if (fields.opsFollowUpAcceptedRiskReasons.length > 0) {
-    lines.push(
-      `**opsAcceptedRiskReasons:** ${fields.opsFollowUpAcceptedRiskReasons.join(" | ")}`,
-    );
-  }
+  appendOpsIssueMetricLines(lines, fields);
   lines.push("");
 
   if (architectCheckpoint) {
@@ -298,38 +287,38 @@ function appendCheckpointHtml(
 
   parts.push(
     `<p class="meta-block"><strong>${prefix}eligible:</strong> ` +
-      (fields.opsFollowUpEligible ? "yes" : "no") +
-      "</p>",
+    (fields.opsFollowUpEligible ? "yes" : "no") +
+    "</p>",
     `<p class="meta-block"><strong>${prefix}triggered:</strong> ` +
-      (fields.opsFollowUpTriggered ? "yes" : "no") +
-      "</p>",
+    (fields.opsFollowUpTriggered ? "yes" : "no") +
+    "</p>",
     `<p class="meta-block"><strong>${prefix}skip reason:</strong> ` +
-      skipReason +
-      "</p>",
+    skipReason +
+    "</p>",
     `<p class="meta-block"><strong>${prefix}unresolved DevOps issues:</strong> ` +
-      String(fields.opsFollowUpUnresolvedDevopsIssueCount) +
-      "</p>",
+    String(fields.opsFollowUpUnresolvedDevopsIssueCount) +
+    "</p>",
     `<p class="meta-block"><strong>${prefix}open DevOps issues:</strong> ` +
-      String(fields.opsFollowUpOpenIssueCount) +
-      "</p>",
+    String(fields.opsFollowUpOpenIssueCount) +
+    "</p>",
     `<p class="meta-block"><strong>${prefix}addressed DevOps issues:</strong> ` +
-      String(fields.opsFollowUpAddressedIssueCount) +
-      "</p>",
+    String(fields.opsFollowUpAddressedIssueCount) +
+    "</p>",
     `<p class="meta-block"><strong>${prefix}accepted-risk DevOps issues:</strong> ` +
-      String(fields.opsFollowUpAcceptedRiskIssueCount) +
-      "</p>",
+    String(fields.opsFollowUpAcceptedRiskIssueCount) +
+    "</p>",
     `<p class="meta-block"><strong>${prefix}last correction role:</strong> ` +
-      correctionRole +
-      "</p>",
+    correctionRole +
+    "</p>",
     `<p class="meta-block"><strong>${prefix}evaluation turn:</strong> ` +
-      evaluationTurn +
-      "</p>",
+    evaluationTurn +
+    "</p>",
   );
   if (fields.opsFollowUpAcceptedRiskReasons.length > 0) {
     parts.push(
       `<p class="meta-block"><strong>${prefix}accepted-risk reasons:</strong> ` +
-        fields.opsFollowUpAcceptedRiskReasons.join(" | ") +
-        "</p>",
+      fields.opsFollowUpAcceptedRiskReasons.join(" | ") +
+      "</p>",
     );
   }
 }
@@ -350,24 +339,7 @@ export function appendOpsFollowUpMetadataHtml(
     '<p class="meta-block"><strong>Ops follow-up evaluated:</strong> yes</p>',
   );
   appendCheckpointHtml(parts, fields, "Ops follow-up ");
-  parts.push(
-    `<p class="meta-block"><strong>opsIssuesUnresolved:</strong> ${fields.opsFollowUpUnresolvedDevopsIssueCount}</p>`,
-    `<p class="meta-block"><strong>opsIssuesOpen:</strong> ${fields.opsFollowUpOpenIssueCount}</p>`,
-    `<p class="meta-block"><strong>opsIssuesAddressed:</strong> ${fields.opsFollowUpAddressedIssueCount}</p>`,
-    `<p class="meta-block"><strong>opsIssuesAcceptedRisk:</strong> ${fields.opsFollowUpAcceptedRiskIssueCount}</p>`,
-    `<p class="meta-block"><strong>opsIssueResolution:</strong> ${
-      fields.opsFollowUpOpenIssueCount === 0
-        ? "resolved"
-        : fields.opsFollowUpTriggered
-          ? "in_progress"
-          : "unresolved"
-    }</p>`,
-  );
-  if (fields.opsFollowUpAcceptedRiskReasons.length > 0) {
-    parts.push(
-      `<p class="meta-block"><strong>opsAcceptedRiskReasons:</strong> ${fields.opsFollowUpAcceptedRiskReasons.join(" | ")}</p>`,
-    );
-  }
+  appendOpsIssueMetricHtml(parts, fields);
 
   if (architectCheckpoint) {
     parts.push(

@@ -5,7 +5,7 @@ export const POLL_ARTIFACT_INITIAL_MS = 2_500;
 export const POLL_ARTIFACT_MAX_INTERVAL_MS = 10_000;
 
 /** Growth factor applied after each wait. */
-export const POLL_ARTIFACT_BACKOFF_FACTOR = 1.5;
+const POLL_ARTIFACT_BACKOFF_FACTOR = 1.5;
 
 /** Match artifacts route synthesis budget (approx). */
 export const POLL_ARTIFACT_MAX_MS = 320_000;

@@ -25,39 +25,6 @@ export function shouldScheduleMissingRoleFirstTurn(
   return !roleHasSpoken(transcript, rejectRole);
 }
 
-const NEAR_CAP_REMAINING_TURNS = 3;
-
-/**
- * Near the turn cap, prefer inviting silent pipeline roles over burning
- * remaining turns on correction cycles.
- */
-export function selectSilentRoleNearCap(params: {
-  readonly transcript: readonly TranscriptEntry[];
-  readonly turnCount: number;
-  readonly maxTurns: number;
-  readonly preferDevOps?: boolean;
-}): SimulationAgentRole | null {
-  const remaining = params.maxTurns - params.turnCount;
-  if (remaining < 1) {
-    return null;
-  }
-
-  const missing = listMissingPipelineRoles(params.transcript);
-  if (missing.length === 0) {
-    return null;
-  }
-
-  if (params.preferDevOps && missing.includes("devops")) {
-    return "devops";
-  }
-
-  if (remaining <= NEAR_CAP_REMAINING_TURNS) {
-    return missing[0] ?? null;
-  }
-
-  return null;
-}
-
 /**
  * Invite DevOps when operational issues are open or DevOps never spoke
  * and the pipeline has otherwise progressed past Frontend.
@@ -83,13 +50,10 @@ export function canApproveWithFullParticipation(
 }
 
 /** Remaining turns at/under this count count as "near cap" for prefer-approve. */
-export const NEAR_CAP_APPROVE_REMAINING_TURNS = 2;
+const NEAR_CAP_APPROVE_REMAINING_TURNS = 2;
 
 /** Open review issues at/under this count are treated as minor near cap. */
-export const NEAR_CAP_APPROVE_MAX_OPEN_ISSUES = 2;
-
-/** Correction feedback excerpt cap when near the turn budget. */
-export const NEAR_CAP_FEEDBACK_EXCERPT_MAX_CHARS = 500;
+const NEAR_CAP_APPROVE_MAX_OPEN_ISSUES = 2;
 
 /**
  * Near the turn cap, prefer [APPROVE] over burning remaining turns on

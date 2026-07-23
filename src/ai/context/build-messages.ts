@@ -192,11 +192,7 @@ export function buildAgentMessages(
     });
   }
 
-  const windowedTranscript = windowTranscriptForTurn(
-    transcript,
-    roster,
-    debateContext,
-  );
+  const windowedTranscript = windowTranscriptForTurn(transcript, roster);
 
   if (windowedTranscript.omittedSummary) {
     messages.push({
@@ -216,10 +212,10 @@ export function buildAgentMessages(
   if (role === "reviewer" && transcript.length > 0) {
     const checklist = debateContext.isReReview
       ? buildScopedReReviewChecklist({
-          targetRole: debateContext.reReviewTargetRole ?? null,
-          issues: debateContext.reReviewIssues ?? [],
-          roster,
-        })
+        targetRole: debateContext.reReviewTargetRole ?? null,
+        issues: debateContext.reReviewIssues ?? [],
+        roster,
+      })
       : buildReviewerPreflightChecklist(transcript, roster);
 
     messages.push({

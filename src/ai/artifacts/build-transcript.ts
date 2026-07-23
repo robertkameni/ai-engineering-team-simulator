@@ -31,7 +31,7 @@ export function prepareArtifactTranscript(
   return buildCanonicalTranscriptForArtifacts(mergeCorrectionTurns(transcript));
 }
 
-export function buildTranscriptForArtifacts(
+function buildTranscriptForArtifacts(
   productIdea: string,
   transcript: TranscriptEntry[],
   roster: TeamRoster,

@@ -1,3 +1,5 @@
+import { parseEnvNumber } from "@/lib/parse-env-number";
+
 export type RateLimitAction =
   | "simulate"
   | "delete"
@@ -69,10 +71,13 @@ export function getAuthRateLimitThreshold(action: AuthRateLimitAction): number {
 }
 
 function parseLimit(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (raw == null || raw.trim() === "") return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+  return Math.floor(
+    parseEnvNumber(
+      name,
+      fallback,
+      (value) => Number.isFinite(value) && value > 0,
+    ),
+  );
 }
 
 export function getRateLimitThreshold(

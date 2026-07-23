@@ -1,5 +1,5 @@
 /** Soft character budget for assembled debate prompts (~50k tokens ≈ 200k chars). */
-export const PROMPT_CONTEXT_BUDGET_CHARS = 80_000;
+const PROMPT_CONTEXT_BUDGET_CHARS = 80_000;
 
 /** Peak prompt token soft ceiling for run telemetry / guards. */
 export const PROMPT_CONTEXT_BUDGET_TOKENS = 50_000;

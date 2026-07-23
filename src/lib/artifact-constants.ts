@@ -17,9 +17,6 @@ export const CORE_ARTIFACT_TYPES = [
   "review",
 ] as const satisfies readonly ArtifactType[];
 
-/** Optional artifacts generated outside the default post-debate worker. */
-export const LAZY_ARTIFACT_TYPES = [] as const satisfies readonly ArtifactType[];
-
 export function isArtifactType(value: string): value is ArtifactType {
   return (ARTIFACT_TYPES as readonly string[]).includes(value);
 }

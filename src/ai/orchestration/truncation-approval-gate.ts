@@ -1,7 +1,7 @@
 import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 
-export const CRITICAL_TRUNCATION_ROLES: ReadonlySet<SimulationAgentRole> = new Set([
+const CRITICAL_TRUNCATION_ROLES: ReadonlySet<SimulationAgentRole> = new Set([
   "architect",
   "backend",
   "frontend",
@@ -41,4 +41,48 @@ export function syncHasTruncatedCriticalTurn(
   transcript: readonly TranscriptEntry[],
 ): void {
   state.hasTruncatedCriticalTurn = hasCurrentCriticalTruncation(transcript);
+}
+
+type PostApproveTruncationState = {
+  postApproveTruncation: boolean;
+  hasTruncatedCriticalTurn: boolean;
+  postApproveContinuationFailed: boolean;
+  truncationRecoveryAttemptedRoles: readonly SimulationAgentRole[];
+};
+
+/**
+ * Clears post-approve truncation flags when no critical truncation remains.
+ * Returns true when cleared (caller should stop truncation recovery).
+ */
+export function clearPostApproveTruncationIfRecovered(
+  state: PostApproveTruncationState,
+  transcript: readonly TranscriptEntry[],
+): boolean {
+  syncHasTruncatedCriticalTurn(state, transcript);
+  if (hasCurrentCriticalTruncation(transcript)) {
+    return false;
+  }
+
+  state.postApproveTruncation = false;
+  state.hasTruncatedCriticalTurn = false;
+  if (state.truncationRecoveryAttemptedRoles.length > 0) {
+    state.postApproveContinuationFailed = false;
+  }
+  return true;
+}
+
+/** Sync post-approve truncation flags from the current transcript. */
+export function applyPostApproveTruncationFlags(
+  state: PostApproveTruncationState,
+  transcript: readonly TranscriptEntry[],
+): void {
+  if (clearPostApproveTruncationIfRecovered(state, transcript)) {
+    return;
+  }
+
+  state.postApproveTruncation = true;
+  state.hasTruncatedCriticalTurn = true;
+  if (state.truncationRecoveryAttemptedRoles.length > 0) {
+    state.postApproveContinuationFailed = true;
+  }
 }

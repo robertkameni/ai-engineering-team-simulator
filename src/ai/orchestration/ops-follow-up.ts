@@ -4,7 +4,6 @@ import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import { canCorrectRole } from "@/ai/orchestration/debate-correction-caps";
 import {
-  inferIssueOwnerFromConcern,
   isDevOpsOwnedConcern,
   matchesOperationalCategory,
 } from "@/ai/orchestration/issue-ownership";

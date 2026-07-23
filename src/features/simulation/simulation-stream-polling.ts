@@ -85,9 +85,9 @@ async function fetchFullRunSnapshot(
   }
 }
 
-function waitForRunProgressPoll(
+function waitForAbortableTimeout(
+  intervalMs: number,
   signal?: AbortSignal,
-  intervalMs = POLL_RUN_PROGRESS_INTERVAL_MS,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = globalThis.setTimeout(resolve, intervalMs);
@@ -108,6 +108,13 @@ function waitForRunProgressPoll(
       { once: true },
     );
   });
+}
+
+function waitForRunProgressPoll(
+  signal?: AbortSignal,
+  intervalMs = POLL_RUN_PROGRESS_INTERVAL_MS,
+): Promise<void> {
+  return waitForAbortableTimeout(intervalMs, signal);
 }
 
 async function fetchArtifactsState(
@@ -153,24 +160,7 @@ function waitForArtifactPoll(
   intervalMs: number,
   signal?: AbortSignal,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = globalThis.setTimeout(resolve, intervalMs);
-    if (signal) {
-      if (signal.aborted) {
-        globalThis.clearTimeout(timer);
-        reject(new DOMException("Aborted", "AbortError"));
-        return;
-      }
-      signal.addEventListener(
-        "abort",
-        () => {
-          globalThis.clearTimeout(timer);
-          reject(new DOMException("Aborted", "AbortError"));
-        },
-        { once: true },
-      );
-    }
-  });
+  return waitForAbortableTimeout(intervalMs, signal);
 }
 
 export type ArtifactPollSetters = {

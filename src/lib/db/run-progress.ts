@@ -1,15 +1,14 @@
 import "server-only";
 
-import type { Prisma } from "@/generated/prisma/client";
-
 import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
 import type { RunStatus as AppRunStatus } from "@/features/agents/types";
 import { toAppArtifactStatus } from "@/lib/db/artifact-status";
+import { buildRunOwnershipWhere } from "@/lib/db/run-ownership-where";
 import { toAppRunStatus } from "@/lib/db/run-status";
 import { prisma } from "@/lib/prisma";
 
 /** Truncate last-message preview so progress polls stay small. */
-export const RUN_PROGRESS_LAST_MESSAGE_MAX_CHARS = 240;
+const RUN_PROGRESS_LAST_MESSAGE_MAX_CHARS = 240;
 
 export type RunProgressSnapshot = {
   readonly status: AppRunStatus;
@@ -17,33 +16,6 @@ export type RunProgressSnapshot = {
   readonly lastMessageText: string;
   readonly artifactsComplete: boolean;
 };
-
-function buildRunOwnershipWhere(
-  scope: RunOwnershipScope,
-): Prisma.RunWhereInput | null {
-  const conditions: Prisma.RunWhereInput[] = [];
-
-  if (scope.userId != null) {
-    conditions.push({ userId: scope.userId });
-  }
-
-  if (scope.guestSessionId != null) {
-    conditions.push({
-      guestSessionId: scope.guestSessionId,
-      userId: null,
-    });
-  }
-
-  if (conditions.length === 0) {
-    return null;
-  }
-
-  if (conditions.length === 1) {
-    return conditions[0];
-  }
-
-  return { OR: conditions };
-}
 
 function truncateProgressText(content: string): string {
   if (content.length <= RUN_PROGRESS_LAST_MESSAGE_MAX_CHARS) {

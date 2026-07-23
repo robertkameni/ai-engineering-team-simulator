@@ -7,9 +7,8 @@ import {
 } from "@/ai/orchestration/role-participation";
 import { updateReviewerRejectIssues } from "@/ai/orchestration/review-reject-issue-scope";
 import {
+  clearPostApproveTruncationIfRecovered,
   getLatestTruncatedCriticalRoles,
-  hasCurrentCriticalTruncation,
-  syncHasTruncatedCriticalTurn,
 } from "@/ai/orchestration/truncation-approval-gate";
 import type {
   DebateState,
@@ -66,14 +65,7 @@ export function maybeScheduleTruncationRecovery(
   state: DebateState,
   ctx: TurnContext,
 ): TurnDirective | null {
-  syncHasTruncatedCriticalTurn(state, state.transcript);
-
-  if (!hasCurrentCriticalTruncation(state.transcript)) {
-    state.postApproveTruncation = false;
-    state.hasTruncatedCriticalTurn = false;
-    if (state.truncationRecoveryAttemptedRoles.length > 0) {
-      state.postApproveContinuationFailed = false;
-    }
+  if (clearPostApproveTruncationIfRecovered(state, state.transcript)) {
     return null;
   }
 

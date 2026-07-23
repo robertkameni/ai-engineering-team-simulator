@@ -8,6 +8,7 @@ import {
 } from "@/lib/export/export-pdf-payload";
 import { EXPORT_PDF_MAX_BODY_BYTES } from "@/lib/export/export-pdf-limits";
 import { handleSavedRunPdfExport } from "@/lib/export/handle-saved-run-pdf-export";
+import { buildPdfAttachmentResponse } from "@/lib/export/pdf-attachment-response";
 import { compileRunPdfFromMarkdown } from "@/lib/export/run-pdf";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
@@ -93,13 +94,5 @@ export async function POST(request: Request) {
     return Response.json({ error: "PDF generation failed" }, { status: 500 });
   }
 
-  return new Response(new Uint8Array(pdf), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Length": String(pdf.byteLength),
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "no-store, no-cache, must-revalidate",
-      Pragma: "no-cache",
-    },
-  });
+  return buildPdfAttachmentResponse(pdf, filename);
 }

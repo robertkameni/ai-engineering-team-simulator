@@ -2,6 +2,7 @@ import type { LanguageModelUsage } from "ai";
 
 import type { DeepSeekModelId } from "@/ai/providers";
 import type { UsageDelta } from "@/lib/ai/run-usage";
+import { parseEnvNumber } from "@/lib/parse-env-number";
 
 /**
  * USD per 1M tokens — defaults from DeepSeek v4 pricing.
@@ -28,10 +29,11 @@ const DEFAULT_PRICING: Record<DeepSeekModelId, ModelPricing> = {
 };
 
 function parseEnvRate(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (raw == null || raw.trim() === "") return fallback;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  return parseEnvNumber(
+    name,
+    fallback,
+    (value) => Number.isFinite(value) && value >= 0,
+  );
 }
 
 function pricingForModel(modelId: DeepSeekModelId): ModelPricing {
@@ -112,9 +114,9 @@ function estimateCostUsd(
   const rates = pricingForModel(modelId);
   const inputCost =
     (normalized.standardPromptTokens / 1_000_000) *
-      rates.inputUsdPerMillion +
+    rates.inputUsdPerMillion +
     (normalized.cachedPromptTokens / 1_000_000) *
-      rates.cachedInputUsdPerMillion;
+    rates.cachedInputUsdPerMillion;
   const outputCost =
     (normalized.completionTokens / 1_000_000) * rates.outputUsdPerMillion;
 

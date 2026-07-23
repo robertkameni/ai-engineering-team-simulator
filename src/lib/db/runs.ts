@@ -22,6 +22,7 @@ import {
   toAppArtifactStatus,
 } from "@/lib/db/artifact-status";
 import { reconcileStaleRunIfNeeded, reconcileStaleRunsBatch } from "@/lib/db/run-reconcile";
+import { buildRunOwnershipWhere } from "@/lib/db/run-ownership-where";
 import { toAppRunStatus, toPrismaRunStatus } from "@/lib/db/run-status";
 import { getOrCreateDefaultProject } from "@/lib/db/projects";
 import { mapDbArtifactsToRunArtifacts } from "@/lib/db/artifacts";
@@ -181,33 +182,6 @@ export async function getRunWithMessages(runId: string) {
       artifacts: true,
     },
   });
-}
-
-function buildRunOwnershipWhere(
-  scope: RunOwnershipScope,
-): Prisma.RunWhereInput | null {
-  const conditions: Prisma.RunWhereInput[] = [];
-
-  if (scope.userId != null) {
-    conditions.push({ userId: scope.userId });
-  }
-
-  if (scope.guestSessionId != null) {
-    conditions.push({
-      guestSessionId: scope.guestSessionId,
-      userId: null,
-    });
-  }
-
-  if (conditions.length === 0) {
-    return null;
-  }
-
-  if (conditions.length === 1) {
-    return conditions[0];
-  }
-
-  return { OR: conditions };
 }
 
 export function canAccessRun(

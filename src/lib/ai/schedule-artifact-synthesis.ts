@@ -30,7 +30,7 @@ import {
 import { resolveRequestOrigin } from "@/lib/http/resolve-request-origin";
 
 /** Soft ceiling under route maxDuration for in-request synthesis await. */
-export const ARTIFACT_SYNTHESIS_AWAIT_TIMEOUT_MS = 280_000;
+const ARTIFACT_SYNTHESIS_AWAIT_TIMEOUT_MS = 280_000;
 
 export type ArtifactSynthesisAwaitResult = {
   readonly completed: boolean;

@@ -22,7 +22,7 @@ function countMarkdownSectionHeadings(text: string): number {
   return (text.match(/^##\s+/gm) ?? []).length;
 }
 
-export function isPmDeliverableInsufficient(text: string): boolean {
+function isPmDeliverableInsufficient(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed || countMarkdownSectionHeadings(trimmed) < PM_MIN_HEADINGS) {
     return true;
@@ -53,7 +53,7 @@ export function isBackendDeliverableInsufficient(text: string): boolean {
   return !hasCompleteSentenceEnding(trimmed);
 }
 
-export function isDevOpsDeliverableInsufficient(text: string): boolean {
+function isDevOpsDeliverableInsufficient(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed || trimmed.length < 200) {
     return true;
@@ -90,19 +90,19 @@ export function isRoleDeliverableInsufficient(
   return false;
 }
 
-export function buildPmInsufficientContinuationPrompt(): string {
+function buildPmInsufficientContinuationPrompt(): string {
   return `CRITICAL — Your PM brief is incomplete. Include all mandatory ## sections (scope, users, core features, user stories, out of scope, success metrics) and end with a complete sentence. Do not repeat completed sections.`;
 }
 
-export function buildBackendInsufficientContinuationPrompt(): string {
+function buildBackendInsufficientContinuationPrompt(): string {
   return `CRITICAL — Your backend plan is incomplete. Finish ## Stack & Layout and ## Data & APIs with at least four **Endpoint N:** blocks (create, complete task, upload document, list active onboardings), then complete ## Backend Risks with named bottlenecks and mitigations. End with a complete sentence.`;
 }
 
-export function buildArchitectInsufficientContinuationPrompt(): string {
+function buildArchitectInsufficientContinuationPrompt(): string {
   return `CRITICAL — Your architecture deliverable is incomplete. Finish all mandatory ## sections (Summary, Decisions ≤5, Risks ≤3) and end the final paragraph with a complete sentence. Do not repeat completed sections.`;
 }
 
-export function buildDevOpsInsufficientContinuationPrompt(): string {
+function buildDevOpsInsufficientContinuationPrompt(): string {
   return `CRITICAL — Your DevOps plan is incomplete. Complete ## Monitoring & Rollback, ## Automated Backup (with schedule, storage, restore steps), and ## Risks. End with a complete sentence.`;
 }
 
