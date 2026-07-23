@@ -7,7 +7,7 @@ import {
 } from "../../lib/export/saved-run-pdf-export-logic.js";
 import { buildRunStyledMarkdown } from "../../lib/export/build-run-export-document.js";
 import { buildRunPdfFilename } from "../../lib/export/export-filename.js";
-import { rateLimitResponse } from "../shared/rate-limit-response.js";
+import { rateLimitResponse } from "@/lib/rate-limit-response";
 
 function baseHooks(
   overrides: Partial<SavedRunPdfExportHooks>,

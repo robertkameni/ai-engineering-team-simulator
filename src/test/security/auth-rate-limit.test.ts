@@ -8,7 +8,7 @@ import {
 import {
   getAuthRateLimitThreshold,
 } from "../../lib/rate-limit-config.js";
-import { rateLimitResponse } from "../shared/rate-limit-response.js";
+import { rateLimitResponse } from "@/lib/rate-limit-response";
 
 describe("auth rate limit configuration", () => {
   it("uses default 10 for auth_login threshold when env is unset", () => {

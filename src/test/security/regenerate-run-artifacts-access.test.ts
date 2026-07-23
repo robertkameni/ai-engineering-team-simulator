@@ -5,7 +5,7 @@ import {
   executeRegenerateArtifactsPost,
   type RegenerateArtifactsPostHooks,
 } from "../../lib/api/regenerate-artifacts-post-logic.js";
-import { rateLimitResponse } from "../shared/rate-limit-response.js";
+import { rateLimitResponse } from "@/lib/rate-limit-response";
 
 function baseHooks(
   overrides: Partial<RegenerateArtifactsPostHooks>,

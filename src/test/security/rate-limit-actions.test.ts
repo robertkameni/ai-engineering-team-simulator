@@ -6,7 +6,7 @@ import {
   type RegenerateArtifactsPostHooks,
 } from "../../lib/api/regenerate-artifacts-post-logic.js";
 import { getRateLimitThreshold } from "../../lib/rate-limit-config.js";
-import { rateLimitResponse } from "../shared/rate-limit-response.js";
+import { rateLimitResponse } from "@/lib/rate-limit-response";
 
 describe("getRateLimitThreshold", () => {
   it("sets export_pdf to default 5 when env is unset", () => {

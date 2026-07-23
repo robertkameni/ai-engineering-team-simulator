@@ -15,7 +15,7 @@ and/or structural confirmation):
 | 7 | export MD ↔ PDF routes | **fixed** | Route files are re-exports only; logic in `handle-saved-run-markdown-export.ts` (uses `resolveAuthenticatedExportRoute`) vs `handle-saved-run-pdf-export.ts` (uses `requireAuthenticatedExportSession` + await params) — deliberately different auth shapes. |
 | 8 | progress ↔ runs/[id] routes | **fixed** | Progress is `export { GET } from handle-run-progress-get` (`loadOwnedRunResource`); runs/[id] uses `resolveOwnedRunRoute` + direct loader — different call shapes. |
 | 9 | `countCoreArtifacts` / `hasCoreArtifacts` | **already-fixed** | Module-local `function` (not exported). IDE cache if still shown. |
-| 10 | `regenerate-artifacts-action-logic.types.ts` | **fixed** | Deleted again if resurrected; action imports hooks directly. |
+| 10 | `regenerate-artifacts-action-logic.types.ts` | **fixed** | File deleted permanently; action/post logic use `RegenerateArtifactsAccessHooks` from hooks module (extends only). |
 | 11 | schemas CORE/LAZY | **already-fixed** | Only `ARTIFACT_TYPES` re-exported from schemas. |
 | 12 | `POLL_ARTIFACT_BACKOFF_FACTOR` | **already-fixed** | Module-local. |
 | 13 | `simulation-stream-events` error/done | **fixed** | `handleStreamErrorEvent` / `handleStreamDoneEvent` + shared `flushAndMarkStreamSettled`. |
@@ -29,7 +29,7 @@ and/or structural confirmation):
 | 21 | `run-pdf-client` | **already-fixed** | `readPdfBlobFromResponse`. |
 | 22 | saved-run PDF ↔ live PDF | **fixed** | `buildCompiledPdfAttachmentResponse`. |
 | 23 | rate-limit-config pair | **already-fixed** | See #3. |
-| 24 | test rate-limit-response | **already-fixed** | Re-export only. |
+| 24 | test rate-limit-response | **fixed** | Shim deleted; tests import from `@/lib/rate-limit-response`. |
 | 25 | `use-simulation-stream` exhaustive-deps | **fixed** | Removed intermediate `artifactSetters` object; inlined stable `useState` setters into `recoverAfterDrop` deps (avoids `react-hooks/refs` render write). |
 
 ## Deferred
