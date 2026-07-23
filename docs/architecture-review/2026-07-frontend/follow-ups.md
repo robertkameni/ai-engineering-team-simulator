@@ -13,9 +13,11 @@ Open items after F1–F12 shipped. Do **not** treat these as merge blockers for 
   - Route `loading.tsx` + layout 404 gate + post-ownership Suspense are in place.
   - Still missing: stream sidebar and team roster as separate Suspense children without waiting on the full `SavedRunPageBody` fetch batch.
 
-- [ ] **(c) F9 — ownership + list fetch parallelization**
-  - `React.cache` dedupes `getSessionUser` / `getRunOwnershipContext` within a request.
-  - Sidebar list still awaits ownership first (API requires scope). Explore a scoped list query that can start earlier or batch differently without changing ownership semantics.
+- [x] **(c) F9 — ownership + list fetch** (Sprint 4 Tier 2 investigation — **closed**)
+  - **Finding:** `listRecentRuns` filters at the **DB layer** via `buildRunOwnershipWhere(scope)` → Prisma `findMany({ where, take })`. Not “fetch all then filter client-side.”
+  - Empty scope returns `[]` (no unscoped query). Post-query `.filter` is only stale `RUNNING` reconcile on the already-scoped set.
+  - Call sites: `GET /api/runs`, workspace/run RSC pages → `listRecentRunsForSidebar(ownership, 12)`.
+  - Original parallelization idea remains optional perf only; **not** an authorization issue — no further work unless reopened for latency.
 
 - [x] **(d) F3 — CSP nonces** (Sprint 4 Tier 1 — `feature/sprint-4-csp-nonces`)
   - Per-request nonce CSP in `src/proxy.ts` via `buildContentSecurityPolicy`.
