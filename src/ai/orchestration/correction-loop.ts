@@ -6,9 +6,6 @@ import type { TranscriptEntry } from "@/ai/context/transcript";
 /** Unproductive reject→correct cycles before preferring approve. */
 export const UNPRODUCTIVE_CORRECTION_LOOP_THRESHOLD = 3;
 
-/** Max corrections allowed for any single role (stricter than soft mid-debate). */
-export const HARD_MAX_CORRECTIONS_PER_ROLE = 3;
-
 export interface CorrectionLoopState {
   /** Consecutive reject cycles that only re-opened still_open issues. */
   consecutiveUnproductiveCycles: number;
@@ -108,11 +105,4 @@ export function shouldPreferCorrectionLoopApprove(params: {
     return false;
   }
   return true;
-}
-
-export function hasReachedHardCorrectionLimit(
-  counts: Readonly<Partial<Record<SimulationAgentRole, number>>>,
-  role: SimulationAgentRole,
-): boolean {
-  return (counts[role] ?? 0) >= HARD_MAX_CORRECTIONS_PER_ROLE;
 }

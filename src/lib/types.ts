@@ -1,11 +1,9 @@
 import type { ArtifactType } from "@/lib/artifact-constants";
 import type { RunUsageTotals } from "@/lib/ai/run-usage";
 import type { DebateExitOutcome } from "@/ai/orchestration/reviewer-decision";
-import type {
-  OpsFollowUpCheckpoint,
-  OpsFollowUpLastCorrectionRole,
-} from "@/lib/db/ops-follow-up-summary";
+import type { OpsFollowUpCheckpoint } from "@/lib/db/ops-follow-up-summary";
 import type { DebateFinalizationTelemetry } from "@/lib/db/debate-finalization-telemetry";
+import type { ArtifactErrorTelemetry } from "@/lib/db/run-summary.types";
 
 /**
  * Shared domain types for UI + lib (arch-review F4).
@@ -57,11 +55,11 @@ export interface SimulationMessage {
     text: string;
   };
   isStreaming?: boolean;
-  activeTools?: { name: string; args: unknown }[];
+  activeTools?: { name: string; args: unknown; }[];
   createdAt: string;
 }
 
-export interface MockRun {
+export interface MockRun extends Partial<OpsFollowUpCheckpoint> {
   id: string;
   title: string;
   userPrompt: string;
@@ -86,28 +84,11 @@ export interface MockRun {
   peakPromptTokens?: number | null;
   stackValidationFailed?: boolean;
   crossValidationFailed?: boolean;
-  opsFollowUpEvaluated?: boolean;
-  opsFollowUpTriggered?: boolean;
-  opsFollowUpSkipReason?: string | null;
-  opsFollowUpEligible?: boolean;
-  opsFollowUpUnresolvedDevopsIssueCount?: number;
-  opsFollowUpOpenIssueCount?: number;
-  opsFollowUpAddressedIssueCount?: number;
-  opsFollowUpAcceptedRiskIssueCount?: number;
-  opsFollowUpAcceptedRiskReasons?: readonly string[];
-  opsFollowUpLastCorrectionRole?: OpsFollowUpLastCorrectionRole | null;
-  opsFollowUpEvaluationTurn?: number | null;
   opsFollowUpArchitectCheckpoint?: OpsFollowUpCheckpoint | null;
   /** Deterministic debate finalization telemetry. */
   finalization?: DebateFinalizationTelemetry | null;
   /** Populated when core artifact synthesis fails after debate. */
-  artifactError?: {
-    readonly message: string;
-    readonly failedArtifact: string | null;
-    readonly timestamp: string;
-    readonly retryFailed: boolean;
-    readonly errorCode?: string;
-  } | null;
+  artifactError?: ArtifactErrorTelemetry | null;
 }
 
 export type { DebateExitOutcome };

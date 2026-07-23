@@ -7,9 +7,8 @@ import {
   listMissingPipelineRoles,
 } from "@/ai/orchestration/role-participation";
 import {
-  getLatestTruncatedCriticalRoles,
-  hasCurrentCriticalTruncation,
-  syncHasTruncatedCriticalTurn,
+  applyPostApproveTruncationFlags,
+  planPostApproveTruncationRecovery,
 } from "@/ai/orchestration/truncation-approval-gate";
 import type {
   ReviewIssue,
@@ -93,12 +92,12 @@ const DELIVERY_ROLES = [
   "devops",
 ] as const satisfies readonly SimulationAgentRole[];
 
-export const SOFTWARE_MAX_TURNS = 10;
-export const PHYSICAL_MAX_TURNS = 16;
-export const SOFTWARE_MAX_REVIEWER_REJECTIONS = 5;
-export const SOFTWARE_MAX_CORRECTIONS_PER_ROLE = 3;
-export const SOFTWARE_FINALIZATION_PRIORITY_TURN = 8;
-export const SOFTWARE_MAX_TARGETED_TURNS = 2;
+const SOFTWARE_MAX_TURNS = 10;
+const PHYSICAL_MAX_TURNS = 16;
+const SOFTWARE_MAX_REVIEWER_REJECTIONS = 5;
+const SOFTWARE_MAX_CORRECTIONS_PER_ROLE = 3;
+const SOFTWARE_FINALIZATION_PRIORITY_TURN = 8;
+const SOFTWARE_MAX_TARGETED_TURNS = 2;
 
 function countReviewerTurns(transcript: readonly TranscriptEntry[]): number {
   return transcript.filter((entry) => entry.role === "reviewer").length;
@@ -278,59 +277,22 @@ function applyFinalization(
 function maybeScheduleApprovedRecovery(
   state: DebateConvergenceState,
 ): DebateConvergenceDirective | null {
-  syncHasTruncatedCriticalTurn(state, state.transcript);
-  const truncatedRoles = getLatestTruncatedCriticalRoles(state.transcript);
-  if (truncatedRoles.length === 0) {
-    state.postApproveTruncation = false;
-    state.hasTruncatedCriticalTurn = false;
-    if (state.truncationRecoveryAttemptedRoles.length > 0) {
-      state.postApproveContinuationFailed = false;
-    }
+  const plan = planPostApproveTruncationRecovery(state, state.transcript);
+  if (plan.kind !== "schedule") {
     return null;
   }
-
-  const recoverableRole = truncatedRoles.find(
-    (role) => !state.truncationRecoveryAttemptedRoles.includes(role),
-  );
-  if (!recoverableRole) {
-    state.postApproveTruncation = true;
-    state.hasTruncatedCriticalTurn = true;
-    if (state.truncationRecoveryAttemptedRoles.length > 0) {
-      state.postApproveContinuationFailed = true;
-    }
-    return null;
-  }
-
-  state.truncationRecoveryAttemptedRoles = [
-    ...state.truncationRecoveryAttemptedRoles,
-    recoverableRole,
-  ];
 
   return {
     kind: "schedule_turn",
     phase: "correction_wave",
-    role: recoverableRole,
+    role: plan.role,
   };
 }
 
 function syncApprovedFinalizationFlags(
   state: DebateConvergenceState,
 ): void {
-  syncHasTruncatedCriticalTurn(state, state.transcript);
-  if (!hasCurrentCriticalTruncation(state.transcript)) {
-    state.postApproveTruncation = false;
-    state.hasTruncatedCriticalTurn = false;
-    if (state.truncationRecoveryAttemptedRoles.length > 0) {
-      state.postApproveContinuationFailed = false;
-    }
-    return;
-  }
-
-  state.postApproveTruncation = true;
-  state.hasTruncatedCriticalTurn = true;
-  if (state.truncationRecoveryAttemptedRoles.length > 0) {
-    state.postApproveContinuationFailed = true;
-  }
+  applyPostApproveTruncationFlags(state, state.transcript);
 }
 
 function decideApprovedPath(
@@ -378,9 +340,9 @@ function decideApprovedPath(
   return applyFinalization(state, state.turnCount, "Reviewer approved debate closure.");
 }
 
-function decideSoftwarePath(
+function decideInitialDeliveryOrReview(
   state: DebateConvergenceState,
-): DebateConvergenceDirective {
+): DebateConvergenceDirective | null {
   const deliveryRole = nextInitialDeliveryRole(state.transcript);
   if (deliveryRole) {
     state.phase = "initial_delivery";
@@ -393,6 +355,18 @@ function decideSoftwarePath(
     return { kind: "schedule_turn", phase: "initial_review", role: "reviewer" };
   }
 
+  return null;
+}
+
+function decideSoftwarePath(
+  state: DebateConvergenceState,
+): DebateConvergenceDirective {
+  const initial = decideInitialDeliveryOrReview(state);
+  if (initial) {
+    return initial;
+  }
+
+  const reviewerTurns = countReviewerTurns(state.transcript);
   const proposal = state.reviewerProposal;
   if (proposal?.decision === "approve") {
     return decideApprovedPath(state, "software");
@@ -440,18 +414,12 @@ function decidePhysicalPath(
   state: DebateConvergenceState,
   templateId: TeamTemplateId,
 ): DebateConvergenceDirective {
-  const deliveryRole = nextInitialDeliveryRole(state.transcript);
-  if (deliveryRole) {
-    state.phase = "initial_delivery";
-    return { kind: "schedule_turn", phase: "initial_delivery", role: deliveryRole };
+  const initial = decideInitialDeliveryOrReview(state);
+  if (initial) {
+    return initial;
   }
 
   const reviewerTurns = countReviewerTurns(state.transcript);
-  if (reviewerTurns === 0) {
-    state.phase = "initial_review";
-    return { kind: "schedule_turn", phase: "initial_review", role: "reviewer" };
-  }
-
   const proposal = state.reviewerProposal;
   if (proposal?.decision === "approve") {
     return decideApprovedPath(state, templateId);

@@ -1,21 +1,20 @@
 import { deleteRunIfOwned, getRunForWorkspaceIfOwned } from "@/lib/db/runs";
-import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
+import {
+  resolveOwnedRunRoute,
+  runNotFoundResponse,
+  type OwnedRunRouteParams,
+} from "@/lib/api/owned-run-route";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 import { rosterToPreview } from "@/features/simulation/team-roster-preview";
 
 export const runtime = "nodejs";
 
-interface RouteParams {
-  params: Promise<{ id: string; }>;
-}
-
-export async function GET(_request: Request, { params }: RouteParams) {
-  const { id } = await params;
-  const scope = await getRunOwnershipContext();
+export async function GET(_request: Request, { params }: OwnedRunRouteParams) {
+  const { id, scope } = await resolveOwnedRunRoute(params);
   const run = await getRunForWorkspaceIfOwned(id, scope);
 
   if (!run) {
-    return Response.json({ error: "Run not found" }, { status: 404 });
+    return runNotFoundResponse();
   }
 
   return Response.json({
@@ -47,22 +46,17 @@ export async function GET(_request: Request, { params }: RouteParams) {
   });
 }
 
-export async function DELETE(request: Request, { params }: RouteParams) {
-  const ownership = await getRunOwnershipContext();
+export async function DELETE(request: Request, { params }: OwnedRunRouteParams) {
+  const { id, scope: ownership } = await resolveOwnedRunRoute(params);
   const rateLimit = await assertRateLimit(request, "delete", ownership.userId);
   if (!rateLimit.ok) {
     return rateLimitResponse(rateLimit);
   }
 
-  const { id } = await params;
   const result = await deleteRunIfOwned(id, ownership);
 
-  if (result === "not_found") {
-    return Response.json({ error: "Run not found" }, { status: 404 });
-  }
-
-  if (result === "forbidden") {
-    return Response.json({ error: "Run not found" }, { status: 404 });
+  if (result === "not_found" || result === "forbidden") {
+    return runNotFoundResponse();
   }
 
   return new Response(null, { status: 204 });

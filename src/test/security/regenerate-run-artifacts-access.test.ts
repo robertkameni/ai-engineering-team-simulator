@@ -1,11 +1,24 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import type { RegenerateRunArtifactsResult } from "@/ai/artifacts/regenerate-run-artifacts.types";
 import {
   executeRegenerateArtifactsPost,
   type RegenerateArtifactsPostHooks,
 } from "../../lib/api/regenerate-artifacts-post-logic.js";
-import { rateLimitResponse } from "../shared/rate-limit-response.js";
+import { rateLimitResponse } from "@/lib/rate-limit-response";
+
+const SUCCESS_RESULT = {
+  ok: true,
+  artifactDurationMs: null,
+  artifacts: {
+    requirements: [],
+    architecture: [],
+    blueprint: [],
+    implementation: [],
+    review: [],
+  },
+} satisfies Extract<RegenerateRunArtifactsResult, { ok: true }>;
 
 function baseHooks(
   overrides: Partial<RegenerateArtifactsPostHooks>,
@@ -16,47 +29,37 @@ function baseHooks(
       run: { id: "run-a", userId: "user-a", guestSessionId: null },
     }),
     assertRateLimit: async () => ({ ok: true }),
-    regenerateRunArtifactsWithUsage: async () => ({
-      ok: true,
-      artifactDurationMs: null,
-      artifacts: {
-        requirements: [],
-        architecture: [],
-        blueprint: [],
-        implementation: [],
-        review: [],
-      },
-    }),
+    regenerateRunArtifactsWithUsage: async () => SUCCESS_RESULT,
     rateLimitResponse,
     ...overrides,
   };
 }
 
-describe("regenerateRunArtifacts tenant enclosure", () => {
+async function postRegenerate(
+  scope: { userId: string | null; guestSessionId: string | null },
+  hooks: Partial<RegenerateArtifactsPostHooks>,
+) {
+  return executeRegenerateArtifactsPost(
+    new Request("http://localhost/api/runs/run-a/artifacts"),
+    "run-a",
+    scope,
+    baseHooks(hooks),
+  );
+}
+
+describe("regenerateRunArtifacts tenant enclosure — access denied", () => {
   it("returns 404 and skips regeneration when route access is forbidden", async () => {
     let regenerateCalled = false;
 
-    const response = await executeRegenerateArtifactsPost(
-      new Request("http://localhost/api/runs/run-a/artifacts"),
-      "run-a",
+    const response = await postRegenerate(
       { userId: "user-b", guestSessionId: null },
-      baseHooks({
+      {
         requireRunAccess: async () => ({ ok: false, reason: "forbidden" }),
         regenerateRunArtifactsWithUsage: async () => {
           regenerateCalled = true;
-          return {
-            ok: true,
-            artifactDurationMs: null,
-            artifacts: {
-              requirements: [],
-              architecture: [],
-              blueprint: [],
-              implementation: [],
-              review: [],
-            },
-          };
+          return SUCCESS_RESULT;
         },
-      }),
+      },
     );
 
     assert.equal(response.status, 404);
@@ -68,16 +71,14 @@ describe("regenerateRunArtifacts tenant enclosure", () => {
   it("returns 404 when core regeneration reports forbidden", async () => {
     let generateCalled = false;
 
-    const response = await executeRegenerateArtifactsPost(
-      new Request("http://localhost/api/runs/run-a/artifacts"),
-      "run-a",
+    const response = await postRegenerate(
       { userId: "user-a", guestSessionId: null },
-      baseHooks({
+      {
         regenerateRunArtifactsWithUsage: async () => {
           generateCalled = true;
           return { ok: false, error: "forbidden" };
         },
-      }),
+      },
     );
 
     assert.equal(response.status, 404);
@@ -85,31 +86,21 @@ describe("regenerateRunArtifacts tenant enclosure", () => {
     assert.equal(body.error, "Run not found");
     assert.equal(generateCalled, true);
   });
+});
 
+describe("regenerateRunArtifacts tenant enclosure — scope", () => {
   it("forwards scope into regenerateRunArtifactsWithUsage", async () => {
     let capturedScope: { userId: string | null; guestSessionId: string | null } | null =
       null;
 
-    await executeRegenerateArtifactsPost(
-      new Request("http://localhost/api/runs/run-a/artifacts"),
-      "run-a",
+    await postRegenerate(
       { userId: "user-a", guestSessionId: "guest-1" },
-      baseHooks({
+      {
         regenerateRunArtifactsWithUsage: async (_runId, scope) => {
           capturedScope = scope;
-          return {
-            ok: true,
-            artifactDurationMs: null,
-            artifacts: {
-              requirements: [],
-              architecture: [],
-              blueprint: [],
-              implementation: [],
-              review: [],
-            },
-          };
+          return SUCCESS_RESULT;
         },
-      }),
+      },
     );
 
     assert.deepEqual(capturedScope, {

@@ -58,7 +58,7 @@ export function resolveLastCorrectionRole(
   return "unknown";
 }
 
-export function isOpsFollowUpEligible(
+function isOpsFollowUpEligible(
   evaluation: OpsFollowUpEvaluation,
   lastCorrectionRole: OpsFollowUpLastCorrectionRole,
 ): boolean {

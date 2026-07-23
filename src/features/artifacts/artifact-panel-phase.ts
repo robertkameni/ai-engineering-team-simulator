@@ -77,14 +77,14 @@ export function countRunArtifacts(
   return ARTIFACT_TYPES.filter((type) => artifacts[type] != null).length;
 }
 
-export function countCoreArtifacts(
+function countCoreArtifacts(
   artifacts: PartialRunArtifacts | null | undefined,
 ): number {
   if (!artifacts) return 0;
   return CORE_ARTIFACT_TYPES.filter((type) => artifacts[type] != null).length;
 }
 
-export function hasCoreArtifacts(
+function hasCoreArtifacts(
   artifacts: PartialRunArtifacts | null | undefined,
 ): boolean {
   return countCoreArtifacts(artifacts) === CORE_ARTIFACT_TYPES.length;

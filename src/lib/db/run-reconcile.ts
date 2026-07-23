@@ -19,6 +19,33 @@ import { prisma } from "@/lib/prisma";
 /** Simulate route maxDuration (600s) + buffer for stale detection. */
 const RUN_STALE_MS = 12 * 60 * 1000;
 
+async function finalizeStaleRunFromLastMessage(params: {
+  readonly runId: string;
+  readonly messageCount: number;
+  readonly artifactStatus: PrismaArtifactStatus;
+  readonly lastMessage: { agentRole: string; content: string; };
+}): Promise<void> {
+  const debateComplete = resolveStaleDebateCompletion(
+    params.messageCount,
+    params.lastMessage,
+  );
+  const artifactStatus = toAppArtifactStatus(params.artifactStatus);
+
+  if (debateComplete) {
+    await setRunStatus(params.runId, "complete");
+    if (
+      artifactStatus === "generating" ||
+      artifactStatus === "pending" ||
+      artifactStatus === "none"
+    ) {
+      await updateArtifactStatus(params.runId, "failed");
+    }
+    return;
+  }
+
+  await setRunStatus(params.runId, "failed");
+}
+
 export async function reconcileRunFailure(
   runId: string,
   options: { debateComplete: boolean; artifactPhaseStarted: boolean; },
@@ -65,21 +92,12 @@ export async function reconcileStaleRunIfNeeded(run: {
     return true;
   }
 
-  const debateComplete = resolveStaleDebateCompletion(run.messageCount, lastMessage);
-  const artifactStatus = toAppArtifactStatus(run.artifactStatus);
-
-  if (debateComplete) {
-    await setRunStatus(run.id, "complete");
-    if (
-      artifactStatus === "generating" ||
-      artifactStatus === "pending" ||
-      artifactStatus === "none"
-    ) {
-      await updateArtifactStatus(run.id, "failed");
-    }
-  } else {
-    await setRunStatus(run.id, "failed");
-  }
+  await finalizeStaleRunFromLastMessage({
+    runId: run.id,
+    messageCount: run.messageCount,
+    artifactStatus: run.artifactStatus,
+    lastMessage,
+  });
 
   return true;
 }
@@ -140,21 +158,12 @@ export async function reconcileStaleRunsBatch(
       continue;
     }
 
-    const debateComplete = resolveStaleDebateCompletion(run.messageCount, lastMessage);
-    const artifactStatus = toAppArtifactStatus(run.artifactStatus);
-
-    if (debateComplete) {
-      await setRunStatus(run.id, "complete");
-      if (
-        artifactStatus === "generating" ||
-        artifactStatus === "pending" ||
-        artifactStatus === "none"
-      ) {
-        await updateArtifactStatus(run.id, "failed");
-      }
-    } else {
-      await setRunStatus(run.id, "failed");
-    }
+    await finalizeStaleRunFromLastMessage({
+      runId: run.id,
+      messageCount: run.messageCount,
+      artifactStatus: run.artifactStatus,
+      lastMessage,
+    });
   }
 
   return staleIds;

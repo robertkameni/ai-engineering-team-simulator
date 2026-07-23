@@ -11,11 +11,12 @@ import type { RateLimitResult } from "@/lib/rate-limit-config";
 import { canExportApprovedRun } from "@/features/artifacts/artifact-panel-phase";
 import type { MockRun } from "@/features/agents/types";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
+import { buildCompiledPdfAttachmentResponse } from "@/lib/export/pdf-attachment-response";
 
 export interface SavedRunPdfExportHooks {
   requireRunAccess: (
     runId: string,
-    scope: { userId: string; guestSessionId: null },
+    scope: { userId: string; guestSessionId: null; },
   ) => Promise<RequireRunAccessResult>;
   assertRateLimit: (
     request: Request,
@@ -24,18 +25,18 @@ export interface SavedRunPdfExportHooks {
   ) => Promise<RateLimitResult>;
   getRunForWorkspaceIfOwned: (
     runId: string,
-    scope: { userId: string; guestSessionId: null },
-  ) => Promise<(MockRun & { teamRoster?: unknown }) | null>;
+    scope: { userId: string; guestSessionId: null; },
+  ) => Promise<(MockRun & { teamRoster?: unknown; }) | null>;
   getTeamRoster: (
     runId: string,
-  ) => Promise<{ templateId?: TeamTemplateId } | null>;
+  ) => Promise<{ templateId?: TeamTemplateId; } | null>;
   buildRunStyledMarkdown: typeof buildRunStyledMarkdown;
   compileRunPdfFromMarkdown: (
     markdown: string,
-    options: { title: string; author?: string },
+    options: { title: string; author?: string; },
   ) => Promise<Buffer>;
   buildRunPdfFilename: typeof buildRunPdfFilename;
-  rateLimitResponse: (result: Extract<RateLimitResult, { ok: false }>) => Response;
+  rateLimitResponse: (result: Extract<RateLimitResult, { ok: false; }>) => Response;
 }
 
 export async function executeSavedRunPdfExport(
@@ -44,7 +45,7 @@ export async function executeSavedRunPdfExport(
   userId: string,
   hooks: SavedRunPdfExportHooks,
 ): Promise<Response> {
-  const scope: { userId: string; guestSessionId: null } = {
+  const scope: { userId: string; guestSessionId: null; } = {
     userId,
     guestSessionId: null,
   };
@@ -89,26 +90,10 @@ export async function executeSavedRunPdfExport(
   const exportId = Date.now();
   const filename = hooks.buildRunPdfFilename(run.title, exportId);
 
-  let pdf: Buffer;
-  try {
-    pdf = await hooks.compileRunPdfFromMarkdown(markdown, {
-      title: run.title,
-      author: "AI Engineering Team Simulator",
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "PDF generation failed";
-    console.error("[export/pdf]", message, error);
-    return Response.json({ error: "PDF generation failed" }, { status: 500 });
-  }
-
-  return new Response(new Uint8Array(pdf), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Length": String(pdf.byteLength),
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "no-store, no-cache, must-revalidate",
-      Pragma: "no-cache",
-    },
+  return buildCompiledPdfAttachmentResponse({
+    markdown,
+    title: run.title,
+    filename,
+    compileRunPdfFromMarkdown: hooks.compileRunPdfFromMarkdown,
   });
 }

@@ -2,13 +2,14 @@ import type { RegenerateRunArtifactsResult } from "@/ai/artifacts/regenerate-run
 import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
 import type { RateLimitResult } from "@/lib/rate-limit-config";
 
-export interface RegenerateArtifactsActionHooks {
+/** Shared hooks for regenerate Server Action and POST /api/runs/[id]/artifacts. */
+export interface RegenerateArtifactsAccessHooks {
   requireRunAccess: (
     runId: string,
     scope: RunOwnershipScope,
   ) => Promise<
-    | { ok: true; run: { id: string; userId: string | null; guestSessionId: string | null } }
-    | { ok: false; reason: "not_found" | "forbidden" }
+    | { ok: true; run: { id: string; userId: string | null; guestSessionId: string | null; }; }
+    | { ok: false; reason: "not_found" | "forbidden"; }
   >;
   assertRateLimit: (
     request: Request,

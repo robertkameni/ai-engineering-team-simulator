@@ -1,7 +1,7 @@
 import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 
-export const CRITICAL_TRUNCATION_ROLES: ReadonlySet<SimulationAgentRole> = new Set([
+const CRITICAL_TRUNCATION_ROLES: ReadonlySet<SimulationAgentRole> = new Set([
   "architect",
   "backend",
   "frontend",
@@ -41,4 +41,85 @@ export function syncHasTruncatedCriticalTurn(
   transcript: readonly TranscriptEntry[],
 ): void {
   state.hasTruncatedCriticalTurn = hasCurrentCriticalTruncation(transcript);
+}
+
+type PostApproveTruncationState = {
+  postApproveTruncation: boolean;
+  hasTruncatedCriticalTurn: boolean;
+  postApproveContinuationFailed: boolean;
+  truncationRecoveryAttemptedRoles: SimulationAgentRole[];
+};
+
+export type TruncationRecoveryPlan =
+  | { readonly kind: "recovered"; }
+  | { readonly kind: "schedule"; readonly role: SimulationAgentRole; }
+  | { readonly kind: "ship_with_warning"; };
+
+/**
+ * Clears post-approve truncation flags when no critical truncation remains.
+ * Returns true when cleared (caller should stop truncation recovery).
+ */
+function clearPostApproveTruncationIfRecovered(
+  state: PostApproveTruncationState,
+  transcript: readonly TranscriptEntry[],
+): boolean {
+  syncHasTruncatedCriticalTurn(state, transcript);
+  if (hasCurrentCriticalTruncation(transcript)) {
+    return false;
+  }
+
+  state.postApproveTruncation = false;
+  state.hasTruncatedCriticalTurn = false;
+  if (state.truncationRecoveryAttemptedRoles.length > 0) {
+    state.postApproveContinuationFailed = false;
+  }
+  return true;
+}
+
+/** Sync post-approve truncation flags from the current transcript. */
+export function applyPostApproveTruncationFlags(
+  state: PostApproveTruncationState,
+  transcript: readonly TranscriptEntry[],
+): void {
+  if (clearPostApproveTruncationIfRecovered(state, transcript)) {
+    return;
+  }
+
+  state.postApproveTruncation = true;
+  state.hasTruncatedCriticalTurn = true;
+  if (state.truncationRecoveryAttemptedRoles.length > 0) {
+    state.postApproveContinuationFailed = true;
+  }
+}
+
+/**
+ * Shared post-approve truncation recovery planner used by debate convergence
+ * and the resolve-reviewer truncation gate.
+ */
+export function planPostApproveTruncationRecovery(
+  state: PostApproveTruncationState,
+  transcript: readonly TranscriptEntry[],
+  remainingBudget?: number,
+): TruncationRecoveryPlan {
+  if (clearPostApproveTruncationIfRecovered(state, transcript)) {
+    return { kind: "recovered" };
+  }
+
+  const truncatedRoles = getLatestTruncatedCriticalRoles(transcript);
+  const recoverableRole = truncatedRoles.find(
+    (role) => !state.truncationRecoveryAttemptedRoles.includes(role),
+  );
+  const hasBudget =
+    remainingBudget === undefined ? true : remainingBudget >= 1;
+
+  if (recoverableRole && hasBudget) {
+    state.truncationRecoveryAttemptedRoles = [
+      ...state.truncationRecoveryAttemptedRoles,
+      recoverableRole,
+    ];
+    return { kind: "schedule", role: recoverableRole };
+  }
+
+  applyPostApproveTruncationFlags(state, transcript);
+  return { kind: "ship_with_warning" };
 }

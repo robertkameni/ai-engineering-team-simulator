@@ -2,8 +2,6 @@ import { z } from "zod";
 
 export {
   ARTIFACT_TYPES,
-  CORE_ARTIFACT_TYPES,
-  LAZY_ARTIFACT_TYPES,
   isArtifactType,
   type ArtifactType,
 } from "@/lib/artifact-constants";

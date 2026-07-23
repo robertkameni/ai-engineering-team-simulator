@@ -1,30 +1,15 @@
 import type { RegenerateRunArtifactsResult } from "@/ai/artifacts/regenerate-run-artifacts.types";
+import type { RegenerateArtifactsAccessHooks } from "@/lib/api/regenerate-artifacts-hooks";
 import { runAccessDeniedResponse } from "@/lib/auth/run-access-denied-response";
 import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
 import type { RateLimitResult } from "@/lib/rate-limit-config";
 
-export interface RegenerateArtifactsPostHooks {
-  requireRunAccess: (
-    runId: string,
-    scope: RunOwnershipScope,
-  ) => Promise<
-    | { ok: true; run: { id: string; userId: string | null; guestSessionId: string | null } }
-    | { ok: false; reason: "not_found" | "forbidden" }
-  >;
-  assertRateLimit: (
-    request: Request,
-    action: "regenerate",
-    userId?: string | null,
-  ) => Promise<RateLimitResult>;
-  regenerateRunArtifactsWithUsage: (
-    runId: string,
-    scope: RunOwnershipScope,
-  ) => Promise<RegenerateRunArtifactsResult>;
-  rateLimitResponse: (result: Extract<RateLimitResult, { ok: false }>) => Response;
+export interface RegenerateArtifactsPostHooks extends RegenerateArtifactsAccessHooks {
+  rateLimitResponse: (result: Extract<RateLimitResult, { ok: false; }>) => Response;
 }
 
 function mapRegenerateErrorResponse(
-  result: Extract<RegenerateRunArtifactsResult, { ok: false }>,
+  result: Extract<RegenerateRunArtifactsResult, { ok: false; }>,
 ): Response {
   if (result.error === "not_found" || result.error === "forbidden") {
     return Response.json({ error: "Run not found" }, { status: 404 });

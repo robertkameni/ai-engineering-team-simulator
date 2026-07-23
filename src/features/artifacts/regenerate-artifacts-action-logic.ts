@@ -2,7 +2,7 @@ import type { RegenerateRunArtifactsError } from "@/ai/artifacts/regenerate-run-
 import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
 import type { RegenerateArtifactsActionState } from "@/features/artifacts/regenerate-artifacts-state";
 
-import type { RegenerateArtifactsActionHooks } from "@/features/artifacts/regenerate-artifacts-action-logic.types";
+import type { RegenerateArtifactsAccessHooks } from "@/lib/api/regenerate-artifacts-hooks";
 
 function mapRegenerateActionError(
   error: RegenerateRunArtifactsError,
@@ -38,7 +38,7 @@ export async function executeRegenerateArtifactsAction(
   runId: string,
   scope: RunOwnershipScope,
   request: Request,
-  hooks: RegenerateArtifactsActionHooks,
+  hooks: RegenerateArtifactsAccessHooks,
 ): Promise<RegenerateArtifactsActionState> {
   const access = await hooks.requireRunAccess(runId, scope);
   if (!access.ok) {

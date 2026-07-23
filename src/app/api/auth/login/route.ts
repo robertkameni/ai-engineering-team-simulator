@@ -1,4 +1,3 @@
-import { setAuthSessionCookie } from "@/lib/auth/auth-session";
 import { authCredentialsSchema } from "@/lib/auth/auth-schemas";
 import { assertAuthRateLimit } from "@/lib/auth/auth-rate-limit";
 import {

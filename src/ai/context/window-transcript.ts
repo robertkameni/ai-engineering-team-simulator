@@ -1,12 +1,9 @@
 import type { TeamRoster } from "@/ai/agents/roster";
-import type { DebateTurnContext } from "@/ai/context/build-messages";
 import type { TranscriptEntry } from "@/ai/context/transcript";
 import {
   summarizePriorTurns,
   SUMMARIZED_PRIOR_TURNS_MAX_CHARS,
 } from "@/ai/context/summarize-prior-turns";
-
-export const TRANSCRIPT_WINDOW_RECENT_COUNT = 6;
 
 export interface WindowedTranscript {
   omittedSummary: string | null;
@@ -34,7 +31,6 @@ function windowHeavyContextTranscript(
 export function windowTranscriptForTurn(
   transcript: TranscriptEntry[],
   roster: TeamRoster,
-  _debateContext: DebateTurnContext,
 ): WindowedTranscript {
   return windowHeavyContextTranscript(transcript, roster);
 }

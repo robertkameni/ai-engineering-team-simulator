@@ -429,13 +429,7 @@ describe("windowTranscriptForTurn", () => {
       content: `Message ${index + 1} `.repeat(20),
     }));
 
-    const windowed = windowTranscriptForTurn(transcript, roster, {
-      correction: {
-        reviewerName: roster.reviewer.name,
-        feedback: "Fix scope",
-        targetRole: "pm",
-      },
-    });
+    const windowed = windowTranscriptForTurn(transcript, roster);
 
     assert.ok(windowed.omittedSummary?.includes("Earlier debate summary"));
     assert.equal(windowed.entries.length, 1);
@@ -450,7 +444,7 @@ describe("windowTranscriptForTurn", () => {
       content: `Message ${index + 1} with enough detail to matter.`,
     }));
 
-    const windowed = windowTranscriptForTurn(transcript, roster, {});
+    const windowed = windowTranscriptForTurn(transcript, roster);
 
     assert.ok(windowed.omittedSummary?.includes("Earlier debate summary"));
     assert.equal(windowed.entries.length, 1);

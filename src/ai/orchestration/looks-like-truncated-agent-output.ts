@@ -97,7 +97,7 @@ function requiresSoftwareFrontendRisks(
   return role === "frontend" && options?.templateId !== "physical";
 }
 
-function hasIncompleteFrontendStructureSignals(
+function hasIncompleteLastLineStructureSignals(
   text: string,
   lastLine: string,
 ): boolean {
@@ -110,13 +110,23 @@ function hasIncompleteFrontendStructureSignals(
   if (INCOMPLETE_COMPONENT_HEADING.test(lastLine)) {
     return true;
   }
+  if (isIncompleteContinuedSection(text)) {
+    return true;
+  }
+  return false;
+}
+
+function hasIncompleteFrontendStructureSignals(
+  text: string,
+  lastLine: string,
+): boolean {
+  if (hasIncompleteLastLineStructureSignals(text, lastLine)) {
+    return true;
+  }
   if (isIncompleteSpecLine(lastLine)) {
     return true;
   }
   if (isShortWordFragment(lastLine)) {
-    return true;
-  }
-  if (isIncompleteContinuedSection(text)) {
     return true;
   }
   if (!hasCompleteSentenceEnding(text)) {
@@ -159,19 +169,7 @@ export function looksLikeTruncatedAgentOutput(
 
   const lastLine = lastNonEmptyLine(trimmed);
 
-  if (INCOMPLETE_LIST_BULLET.test(lastLine)) {
-    return true;
-  }
-
-  if (lastLine.startsWith("- Props:") && lastLine.length < 40) {
-    return true;
-  }
-
-  if (INCOMPLETE_COMPONENT_HEADING.test(lastLine)) {
-    return true;
-  }
-
-  if (isIncompleteContinuedSection(trimmed)) {
+  if (hasIncompleteLastLineStructureSignals(trimmed, lastLine)) {
     return true;
   }
 

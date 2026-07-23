@@ -6,11 +6,7 @@ import {
   shouldScheduleMissingRoleFirstTurn,
 } from "@/ai/orchestration/role-participation";
 import { updateReviewerRejectIssues } from "@/ai/orchestration/review-reject-issue-scope";
-import {
-  getLatestTruncatedCriticalRoles,
-  hasCurrentCriticalTruncation,
-  syncHasTruncatedCriticalTurn,
-} from "@/ai/orchestration/truncation-approval-gate";
+import { planPostApproveTruncationRecovery } from "@/ai/orchestration/truncation-approval-gate";
 import type {
   DebateState,
   TurnContext,
@@ -66,53 +62,36 @@ export function maybeScheduleTruncationRecovery(
   state: DebateState,
   ctx: TurnContext,
 ): TurnDirective | null {
-  syncHasTruncatedCriticalTurn(state, state.transcript);
-
-  if (!hasCurrentCriticalTruncation(state.transcript)) {
-    state.postApproveTruncation = false;
-    state.hasTruncatedCriticalTurn = false;
-    if (state.truncationRecoveryAttemptedRoles.length > 0) {
-      state.postApproveContinuationFailed = false;
-    }
-    return null;
-  }
-
-  const truncatedRoles = getLatestTruncatedCriticalRoles(state.transcript);
-  const maxTurns = getMaxSimulationTurns(ctx.templateId);
-  const remainingBudget = maxTurns - state.turnCount;
-  const recoverableRole = truncatedRoles.find(
-    (role) => !state.truncationRecoveryAttemptedRoles.includes(role),
+  const remainingBudget =
+    getMaxSimulationTurns(ctx.templateId) - state.turnCount;
+  const plan = planPostApproveTruncationRecovery(
+    state,
+    state.transcript,
+    remainingBudget,
   );
 
-  if (recoverableRole && remainingBudget >= 1) {
+  if (plan.kind === "schedule") {
     console.info(
       "TRUNCATION RECOVERY: retrying truncated critical turn before finalize approve",
       {
         runId: ctx.runId,
-        recoverableRole,
-        truncatedRoles,
+        recoverableRole: plan.role,
         turnCount: state.turnCount,
         remainingBudget,
       },
     );
-    state.truncationRecoveryAttemptedRoles = [
-      ...state.truncationRecoveryAttemptedRoles,
-      recoverableRole,
-    ];
     state.returnToReviewer = true;
     state.isGateReroute = true;
-    return { kind: "reroute", targetRole: recoverableRole };
+    return { kind: "reroute", targetRole: plan.role };
   }
 
-  console.warn(
-    "TRUNCATION APPROVAL GUARD: reviewer approved with truncated critical turns — keeping approved, setting postApproveTruncation",
-    { runId: ctx.runId, turnCount: state.turnCount, truncatedRoles },
-  );
-  state.postApproveTruncation = true;
-  state.hasTruncatedCriticalTurn = true;
-  if (state.truncationRecoveryAttemptedRoles.length > 0) {
-    state.postApproveContinuationFailed = true;
+  if (plan.kind === "ship_with_warning") {
+    console.warn(
+      "TRUNCATION APPROVAL GUARD: reviewer approved with truncated critical turns — keeping approved, setting postApproveTruncation",
+      { runId: ctx.runId, turnCount: state.turnCount },
+    );
   }
+
   return null;
 }
 

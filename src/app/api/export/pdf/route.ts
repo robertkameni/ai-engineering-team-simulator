@@ -1,4 +1,3 @@
-import { getSessionUser } from "@/lib/auth/session";
 import { requireRunAccess } from "@/lib/auth/run-ownership";
 import { buildRunStyledMarkdown } from "@/lib/export/build-run-export-document";
 import { buildRunPdfFilename } from "@/lib/export/export-filename";
@@ -8,6 +7,8 @@ import {
 } from "@/lib/export/export-pdf-payload";
 import { EXPORT_PDF_MAX_BODY_BYTES } from "@/lib/export/export-pdf-limits";
 import { handleSavedRunPdfExport } from "@/lib/export/handle-saved-run-pdf-export";
+import { buildCompiledPdfAttachmentResponse } from "@/lib/export/pdf-attachment-response";
+import { requireAuthenticatedExportSession } from "@/lib/export/require-authenticated-export-session";
 import { compileRunPdfFromMarkdown } from "@/lib/export/run-pdf";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
@@ -21,13 +22,11 @@ const PLACEHOLDER_RUN_IDS = new Set(["live", "new"]);
  * rebuild from DB (ignore client body). Body path is for in-flight placeholders only.
  */
 export async function POST(request: Request) {
-  const { userId } = await getSessionUser();
-  if (!userId) {
-    return Response.json(
-      { error: "Authentication required to export" },
-      { status: 401 },
-    );
+  const session = await requireAuthenticatedExportSession();
+  if (!session.ok) {
+    return session.response;
   }
+  const { userId } = session;
 
   let rawBody: string;
   try {
@@ -80,26 +79,10 @@ export async function POST(request: Request) {
   const exportId = Date.now();
   const filename = buildRunPdfFilename(ctx.run.title, exportId);
 
-  let pdf: Buffer;
-  try {
-    pdf = await compileRunPdfFromMarkdown(markdown, {
-      title: ctx.run.title,
-      author: "AI Engineering Team Simulator",
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "PDF generation failed";
-    console.error("[export/pdf]", message, error);
-    return Response.json({ error: "PDF generation failed" }, { status: 500 });
-  }
-
-  return new Response(new Uint8Array(pdf), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Length": String(pdf.byteLength),
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "no-store, no-cache, must-revalidate",
-      Pragma: "no-cache",
-    },
+  return buildCompiledPdfAttachmentResponse({
+    markdown,
+    title: ctx.run.title,
+    filename,
+    compileRunPdfFromMarkdown,
   });
 }

@@ -18,7 +18,7 @@ export interface ArtifactErrorTelemetry {
   readonly errorCode?: string;
 }
 
-export interface RunSummaryPayload {
+export interface RunSummaryPayloadBase {
   readonly debateOutcome: RunSummaryDebateOutcome | null;
   readonly turnCount: number | null;
   readonly synthesisVersion?: number;
@@ -59,19 +59,11 @@ export interface RunSummaryPayload {
   readonly truncationRetried?: boolean;
   /** Populated when core artifact synthesis fails after debate. */
   readonly artifactError?: ArtifactErrorTelemetry | null;
-  readonly opsFollowUpEvaluated?: boolean;
-  readonly opsFollowUpTriggered?: boolean;
-  readonly opsFollowUpSkipReason?: string | null;
-  readonly opsFollowUpEligible?: boolean;
-  readonly opsFollowUpUnresolvedDevopsIssueCount?: number;
-  readonly opsFollowUpOpenIssueCount?: number;
-  readonly opsFollowUpAddressedIssueCount?: number;
-  readonly opsFollowUpAcceptedRiskIssueCount?: number;
-  readonly opsFollowUpAcceptedRiskReasons?: readonly string[];
-  readonly opsFollowUpLastCorrectionRole?: OpsFollowUpLastCorrectionRole | null;
-  readonly opsFollowUpEvaluationTurn?: number | null;
   readonly opsFollowUpArchitectCheckpoint?: OpsFollowUpCheckpoint | null;
 }
+
+export type RunSummaryPayload = RunSummaryPayloadBase &
+  Partial<OpsFollowUpCheckpoint>;
 
 export interface RunSummarySynthesisTelemetry {
   readonly synthesisVersion: number;

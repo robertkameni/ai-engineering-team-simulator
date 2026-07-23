@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { SavedRunWorkspace } from "@/features/workspace/saved-run-workspace";
+import { RunPagePerfObserver } from "@/features/workspace/run-page-perf-observer";
 import { SidebarRunsSkeleton } from "@/features/workspace/workspace-page-skeleton";
 import {
   listRecentRunsForSidebar,
@@ -45,18 +46,21 @@ async function SavedRunPageBody({
     (run.status === "complete" || run.status === "failed");
 
   return (
-    <SavedRunWorkspace
-      run={run}
-      pathname={`/runs/${id}`}
-      regenerateRunId={canRegenerateArtifacts ? run.id : undefined}
-      canRegenerateArtifacts={canRegenerateArtifacts}
-      initialRecentRuns={recentRuns}
-      teamRoster={
-        run.teamRoster != null ? rosterToPreview(run.teamRoster) : null
-      }
-      isAuthenticated={session.userId != null}
-      userEmail={session.email}
-    />
+    <>
+      <RunPagePerfObserver />
+      <SavedRunWorkspace
+        run={run}
+        pathname={`/runs/${id}`}
+        regenerateRunId={canRegenerateArtifacts ? run.id : undefined}
+        canRegenerateArtifacts={canRegenerateArtifacts}
+        initialRecentRuns={recentRuns}
+        teamRoster={
+          run.teamRoster != null ? rosterToPreview(run.teamRoster) : null
+        }
+        isAuthenticated={session.userId != null}
+        userEmail={session.email}
+      />
+    </>
   );
 }
 

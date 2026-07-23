@@ -49,45 +49,44 @@ function isRetryableArtifactsHttpStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
-async function fetchSlimRunProgress(
-  runId: string,
+async function fetchJsonOrNull<T>(
+  url: string,
   signal?: AbortSignal,
-): Promise<RunProgressSnapshot | null> {
+): Promise<T | null> {
   try {
-    const response = await fetch(`/api/runs/${runId}/progress`, { signal });
+    const response = await fetch(url, { signal });
     if (!response.ok) {
       return null;
     }
-    return (await response.json()) as RunProgressSnapshot;
+    return (await response.json()) as T;
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return null;
     }
     return null;
   }
+}
+
+async function fetchSlimRunProgress(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<RunProgressSnapshot | null> {
+  return fetchJsonOrNull<RunProgressSnapshot>(
+    `/api/runs/${runId}/progress`,
+    signal,
+  );
 }
 
 async function fetchFullRunSnapshot(
   runId: string,
   signal?: AbortSignal,
 ): Promise<RunFullSnapshot | null> {
-  try {
-    const response = await fetch(`/api/runs/${runId}`, { signal });
-    if (!response.ok) {
-      return null;
-    }
-    return (await response.json()) as RunFullSnapshot;
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      return null;
-    }
-    return null;
-  }
+  return fetchJsonOrNull<RunFullSnapshot>(`/api/runs/${runId}`, signal);
 }
 
-function waitForRunProgressPoll(
+function waitForAbortableTimeout(
+  intervalMs: number,
   signal?: AbortSignal,
-  intervalMs = POLL_RUN_PROGRESS_INTERVAL_MS,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = globalThis.setTimeout(resolve, intervalMs);
@@ -149,30 +148,6 @@ async function fetchArtifactsState(
   };
 }
 
-function waitForArtifactPoll(
-  intervalMs: number,
-  signal?: AbortSignal,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = globalThis.setTimeout(resolve, intervalMs);
-    if (signal) {
-      if (signal.aborted) {
-        globalThis.clearTimeout(timer);
-        reject(new DOMException("Aborted", "AbortError"));
-        return;
-      }
-      signal.addEventListener(
-        "abort",
-        () => {
-          globalThis.clearTimeout(timer);
-          reject(new DOMException("Aborted", "AbortError"));
-        },
-        { once: true },
-      );
-    }
-  });
-}
-
 export type ArtifactPollSetters = {
   setArtifacts: (artifacts: PartialRunArtifacts | null) => void;
   setArtifactsStatus: (status: ArtifactsPanelStatus) => void;
@@ -216,7 +191,7 @@ export async function pollArtifactsUntilSettled(
     if (!result.ok) {
       if (result.retryable) {
         try {
-          await waitForArtifactPoll(
+          await waitForAbortableTimeout(
             computeArtifactPollIntervalMs(waitIndex),
             signal,
           );
@@ -241,7 +216,7 @@ export async function pollArtifactsUntilSettled(
     }
 
     try {
-      await waitForArtifactPoll(
+      await waitForAbortableTimeout(
         computeArtifactPollIntervalMs(waitIndex),
         signal,
       );
@@ -372,7 +347,7 @@ export async function recoverRunAfterStreamDrop(
     }
 
     try {
-      await waitForRunProgressPoll(signal);
+      await waitForAbortableTimeout(POLL_RUN_PROGRESS_INTERVAL_MS, signal);
     } catch {
       return;
     }

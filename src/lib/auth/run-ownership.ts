@@ -4,7 +4,7 @@ import { cache } from "react";
 
 import { getGuestSessionId } from "@/lib/auth/guest-session";
 import { getSessionUser } from "@/lib/auth/session";
-import { canAccessRun } from "@/lib/db/runs";
+import { canAccessRun } from "@/lib/db/run-ownership-where";
 import { prisma } from "@/lib/prisma";
 
 export interface RunOwnershipScope {
