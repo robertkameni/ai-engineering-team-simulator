@@ -28,22 +28,30 @@ function baseHooks(
   };
 }
 
-describe("executeSavedRunPdfExport authorization", () => {
+async function exportPdf(
+  runId: string,
+  userId: string,
+  hooks: Partial<SavedRunPdfExportHooks>,
+) {
+  return executeSavedRunPdfExport(
+    new Request(`http://localhost/api/runs/${runId}/export/pdf`),
+    runId,
+    userId,
+    baseHooks(hooks),
+  );
+}
+
+describe("executeSavedRunPdfExport — access check", () => {
   it("returns 404 and skips PDF compilation when access is forbidden", async () => {
     let compileCalled = false;
 
-    const response = await executeSavedRunPdfExport(
-      new Request("http://localhost/api/runs/run-a/export/pdf"),
-      "run-a",
-      "user-b",
-      baseHooks({
-        requireRunAccess: async () => ({ ok: false, reason: "forbidden" }),
-        compileRunPdfFromMarkdown: async () => {
-          compileCalled = true;
-          return Buffer.from("pdf");
-        },
-      }),
-    );
+    const response = await exportPdf("run-a", "user-b", {
+      requireRunAccess: async () => ({ ok: false, reason: "forbidden" }),
+      compileRunPdfFromMarkdown: async () => {
+        compileCalled = true;
+        return Buffer.from("pdf");
+      },
+    });
 
     assert.equal(response.status, 404);
     const body = (await response.json()) as { error: string };
@@ -54,40 +62,32 @@ describe("executeSavedRunPdfExport authorization", () => {
   it("returns 404 and skips PDF compilation when run is not found in access check", async () => {
     let compileCalled = false;
 
-    const response = await executeSavedRunPdfExport(
-      new Request("http://localhost/api/runs/missing/export/pdf"),
-      "missing",
-      "user-b",
-      baseHooks({
-        requireRunAccess: async () => ({ ok: false, reason: "not_found" }),
-        compileRunPdfFromMarkdown: async () => {
-          compileCalled = true;
-          return Buffer.from("pdf");
-        },
-      }),
-    );
+    const response = await exportPdf("missing", "user-b", {
+      requireRunAccess: async () => ({ ok: false, reason: "not_found" }),
+      compileRunPdfFromMarkdown: async () => {
+        compileCalled = true;
+        return Buffer.from("pdf");
+      },
+    });
 
     assert.equal(response.status, 404);
     const body = (await response.json()) as { error: string };
     assert.equal(body.error, "Run not found");
     assert.equal(compileCalled, false);
   });
+});
 
+describe("executeSavedRunPdfExport — owned fetch", () => {
   it("returns 404 and skips PDF compilation when scoped fetch returns null", async () => {
     let compileCalled = false;
 
-    const response = await executeSavedRunPdfExport(
-      new Request("http://localhost/api/runs/run-a/export/pdf"),
-      "run-a",
-      "user-a",
-      baseHooks({
-        getRunForWorkspaceIfOwned: async () => null,
-        compileRunPdfFromMarkdown: async () => {
-          compileCalled = true;
-          return Buffer.from("pdf");
-        },
-      }),
-    );
+    const response = await exportPdf("run-a", "user-a", {
+      getRunForWorkspaceIfOwned: async () => null,
+      compileRunPdfFromMarkdown: async () => {
+        compileCalled = true;
+        return Buffer.from("pdf");
+      },
+    });
 
     assert.equal(response.status, 404);
     assert.equal(compileCalled, false);
