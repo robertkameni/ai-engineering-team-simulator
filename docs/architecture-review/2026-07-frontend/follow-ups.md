@@ -9,9 +9,13 @@ Open items after F1–F12 shipped. Do **not** treat these as merge blockers for 
   - Simulation `prompt-composer` still imports workspace run context (invert: pass props from workspace).
   - Artifacts `regenerate-artifacts-button` still imports workspace header button styles (move shared styles to `src/lib` or `src/components`).
 
-- [ ] **(b) F5 — finer-grained Suspense for roster**
-  - Route `loading.tsx` + layout 404 gate + post-ownership Suspense are in place.
-  - Still missing: stream sidebar and team roster as separate Suspense children without waiting on the full `SavedRunPageBody` fetch batch.
+- [ ] **(b) F5 — finer-grained Suspense for roster (deferred — reactivation criteria below)**
+  - **Status:** Deferred. Route `loading.tsx` + 404 gate + post-ownership Suspense are in place and verified (404/404/200 trio). The remaining finer-grained split (roster as its own Suspense child) is incremental polish, not a regression.
+  - **Reactivate (b) if ANY of these is true:**
+    - Production p95 on `/runs/[id]` LCP exceeds **1500ms** over a 7-day window (via `RunPagePerfObserver` console `[perf]` logs / future aggregation)
+    - **3+** user-reported perceived slowness complaints on opening a saved run within 30 days
+    - Roster evolves into its own scannable feature (expandable per-agent view, multi-roster per page) that warrants independent streaming
+  - Do **not** reactivate based on “it’s a known follow-up.” Reactivate based on signal.
 
 - [x] **(c) F9 — ownership + list fetch** (Sprint 4 Tier 2 investigation — **closed**)
   - **Finding:** `listRecentRuns` filters at the **DB layer** via `buildRunOwnershipWhere(scope)` → Prisma `findMany({ where, take })`. Not “fetch all then filter client-side.”
