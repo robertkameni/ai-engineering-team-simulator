@@ -1,25 +1,24 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import type { RegenerateRunArtifactsResult } from "@/ai/artifacts/regenerate-run-artifacts.types";
 import {
   executeRegenerateArtifactsPost,
   type RegenerateArtifactsPostHooks,
 } from "../../lib/api/regenerate-artifacts-post-logic.js";
 import { rateLimitResponse } from "@/lib/rate-limit-response";
 
-const EMPTY_ARTIFACTS = {
-  requirements: [],
-  architecture: [],
-  blueprint: [],
-  implementation: [],
-  review: [],
-} as const;
-
 const SUCCESS_RESULT = {
-  ok: true as const,
+  ok: true,
   artifactDurationMs: null,
-  artifacts: EMPTY_ARTIFACTS,
-};
+  artifacts: {
+    requirements: [],
+    architecture: [],
+    blueprint: [],
+    implementation: [],
+    review: [],
+  },
+} satisfies Extract<RegenerateRunArtifactsResult, { ok: true }>;
 
 function baseHooks(
   overrides: Partial<RegenerateArtifactsPostHooks>,
