@@ -31,3 +31,23 @@ export function buildRunOwnershipWhere(
 
   return { OR: conditions };
 }
+
+/** In-memory ownership check matching `buildRunOwnershipWhere` semantics. */
+export function canAccessRun(
+  run: { userId: string | null; guestSessionId: string | null },
+  scope: RunOwnershipScope,
+): boolean {
+  if (scope.userId != null && run.userId === scope.userId) {
+    return true;
+  }
+
+  if (
+    scope.guestSessionId != null &&
+    run.userId === null &&
+    run.guestSessionId === scope.guestSessionId
+  ) {
+    return true;
+  }
+
+  return false;
+}

@@ -8,8 +8,7 @@ import {
 } from "@/ai/orchestration/role-participation";
 import {
   applyPostApproveTruncationFlags,
-  getLatestTruncatedCriticalRoles,
-  syncHasTruncatedCriticalTurn,
+  planPostApproveTruncationRecovery,
 } from "@/ai/orchestration/truncation-approval-gate";
 import type {
   ReviewIssue,
@@ -278,38 +277,15 @@ function applyFinalization(
 function maybeScheduleApprovedRecovery(
   state: DebateConvergenceState,
 ): DebateConvergenceDirective | null {
-  syncHasTruncatedCriticalTurn(state, state.transcript);
-  const truncatedRoles = getLatestTruncatedCriticalRoles(state.transcript);
-  if (truncatedRoles.length === 0) {
-    state.postApproveTruncation = false;
-    state.hasTruncatedCriticalTurn = false;
-    if (state.truncationRecoveryAttemptedRoles.length > 0) {
-      state.postApproveContinuationFailed = false;
-    }
+  const plan = planPostApproveTruncationRecovery(state, state.transcript);
+  if (plan.kind !== "schedule") {
     return null;
   }
-
-  const recoverableRole = truncatedRoles.find(
-    (role) => !state.truncationRecoveryAttemptedRoles.includes(role),
-  );
-  if (!recoverableRole) {
-    state.postApproveTruncation = true;
-    state.hasTruncatedCriticalTurn = true;
-    if (state.truncationRecoveryAttemptedRoles.length > 0) {
-      state.postApproveContinuationFailed = true;
-    }
-    return null;
-  }
-
-  state.truncationRecoveryAttemptedRoles = [
-    ...state.truncationRecoveryAttemptedRoles,
-    recoverableRole,
-  ];
 
   return {
     kind: "schedule_turn",
     phase: "correction_wave",
-    role: recoverableRole,
+    role: plan.role,
   };
 }
 

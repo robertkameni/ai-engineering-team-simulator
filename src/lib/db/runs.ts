@@ -4,7 +4,7 @@ import type { Message } from "@/generated/prisma/client";
 import type { TeamRoster } from "@/ai/agents/roster";
 import { isSimulationAgent, type SimulationAgentRole } from "@/ai/agents/config";
 import { parseDebateOutcomeFromRunSummary } from "@/ai/orchestration/reviewer-decision";
-import { opsFollowUpFieldsFromCheckpoint } from "@/lib/db/ops-follow-up-summary";
+import { opsFollowUpFieldsFromSummaryPayload } from "@/lib/db/ops-follow-up-summary";
 import { parseRunSummary } from "@/lib/db/run-summary";
 import type {
   AgentRole,
@@ -22,7 +22,10 @@ import {
   toAppArtifactStatus,
 } from "@/lib/db/artifact-status";
 import { reconcileStaleRunIfNeeded, reconcileStaleRunsBatch } from "@/lib/db/run-reconcile";
-import { buildRunOwnershipWhere } from "@/lib/db/run-ownership-where";
+import {
+  buildRunOwnershipWhere,
+  canAccessRun,
+} from "@/lib/db/run-ownership-where";
 import { toAppRunStatus, toPrismaRunStatus } from "@/lib/db/run-status";
 import { getOrCreateDefaultProject } from "@/lib/db/projects";
 import { mapDbArtifactsToRunArtifacts } from "@/lib/db/artifacts";
@@ -34,6 +37,7 @@ import {
 import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
 
 export type { RunOwnershipScope };
+export { canAccessRun };
 
 /** Workspace run view including roster resolved once in mapRunToWorkspace (F9). */
 export type RunWorkspaceView = MockRun & {
@@ -184,25 +188,6 @@ export async function getRunWithMessages(runId: string) {
   });
 }
 
-export function canAccessRun(
-  run: { userId: string | null; guestSessionId: string | null; },
-  scope: RunOwnershipScope,
-): boolean {
-  if (scope.userId != null && run.userId === scope.userId) {
-    return true;
-  }
-
-  if (
-    scope.guestSessionId != null &&
-    run.userId === null &&
-    run.guestSessionId === scope.guestSessionId
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
 async function listRecentRuns(
   scope: RunOwnershipScope,
   limit = 10,
@@ -347,36 +332,6 @@ async function refreshRunAfterReconcile(
   return getRunWithMessages(runId);
 }
 
-function buildOpsFollowUpFromSummary(
-  summaryPayload: ReturnType<typeof parseRunSummary>,
-) {
-  if (!summaryPayload?.opsFollowUpEvaluated) {
-    return opsFollowUpFieldsFromCheckpoint(null);
-  }
-
-  return opsFollowUpFieldsFromCheckpoint({
-    opsFollowUpEvaluated: summaryPayload.opsFollowUpEvaluated,
-    opsFollowUpTriggered: summaryPayload.opsFollowUpTriggered ?? false,
-    opsFollowUpSkipReason: summaryPayload.opsFollowUpSkipReason ?? null,
-    opsFollowUpEligible: summaryPayload.opsFollowUpEligible ?? false,
-    opsFollowUpUnresolvedDevopsIssueCount:
-      summaryPayload.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
-    opsFollowUpOpenIssueCount:
-      summaryPayload.opsFollowUpOpenIssueCount ??
-      summaryPayload.opsFollowUpUnresolvedDevopsIssueCount ??
-      0,
-    opsFollowUpAddressedIssueCount: summaryPayload.opsFollowUpAddressedIssueCount ?? 0,
-    opsFollowUpAcceptedRiskIssueCount:
-      summaryPayload.opsFollowUpAcceptedRiskIssueCount ?? 0,
-    opsFollowUpAcceptedRiskReasons:
-      summaryPayload.opsFollowUpAcceptedRiskReasons ?? [],
-    opsFollowUpLastCorrectionRole:
-      summaryPayload.opsFollowUpLastCorrectionRole ?? null,
-    opsFollowUpEvaluationTurn:
-      summaryPayload.opsFollowUpEvaluationTurn ?? null,
-  });
-}
-
 function buildUsageWithSummaryTelemetry(
   usage: ReturnType<typeof mapUsageFromRun>,
   summaryPayload: ReturnType<typeof parseRunSummary>,
@@ -443,22 +398,10 @@ async function mapRunToWorkspace(
     artifactsStatus: deriveArtifactsPanelStatus(runStatus, artifactStatus),
     debateOutcome: parseDebateOutcomeFromRunSummary(run.summary),
     ...buildSummaryTelemetryFields(summaryPayload),
-    ...buildOpsFollowUpFromSummary(summaryPayload),
+    ...opsFollowUpFieldsFromSummaryPayload(summaryPayload),
     /** Resolved once in mapRunToWorkspace — avoid a second getTeamRoster. */
     teamRoster,
   };
-}
-
-async function getRunForWorkspace(
-  runId: string,
-): Promise<RunWorkspaceView | null> {
-  let run = await getRunWithMessages(runId);
-  if (!run) return null;
-
-  run = await refreshRunAfterReconcile(runId, run);
-  if (!run) return null;
-
-  return mapRunToWorkspace(run);
 }
 
 export async function getRunForWorkspaceIfOwned(

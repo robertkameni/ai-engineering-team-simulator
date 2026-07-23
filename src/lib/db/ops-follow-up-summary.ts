@@ -174,6 +174,56 @@ export function opsFollowUpFieldsFromCheckpoint(
   return checkpoint;
 }
 
+/**
+ * Normalize ops follow-up fields from a parsed run summary for API / workspace
+ * responses. Unevaluated summaries collapse to defaults.
+ */
+export function opsFollowUpFieldsFromSummaryPayload(
+  summaryPayload: RunSummaryPayload | null | undefined,
+): OpsFollowUpCheckpoint {
+  if (!summaryPayload?.opsFollowUpEvaluated) {
+    return opsFollowUpFieldsFromCheckpoint(null);
+  }
+
+  return opsFollowUpFieldsFromCheckpoint({
+    opsFollowUpEvaluated: summaryPayload.opsFollowUpEvaluated,
+    opsFollowUpTriggered: summaryPayload.opsFollowUpTriggered ?? false,
+    opsFollowUpSkipReason: summaryPayload.opsFollowUpSkipReason ?? null,
+    opsFollowUpEligible: summaryPayload.opsFollowUpEligible ?? false,
+    opsFollowUpUnresolvedDevopsIssueCount:
+      summaryPayload.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
+    opsFollowUpOpenIssueCount:
+      summaryPayload.opsFollowUpOpenIssueCount ??
+      summaryPayload.opsFollowUpUnresolvedDevopsIssueCount ??
+      0,
+    opsFollowUpAddressedIssueCount:
+      summaryPayload.opsFollowUpAddressedIssueCount ?? 0,
+    opsFollowUpAcceptedRiskIssueCount:
+      summaryPayload.opsFollowUpAcceptedRiskIssueCount ?? 0,
+    opsFollowUpAcceptedRiskReasons:
+      summaryPayload.opsFollowUpAcceptedRiskReasons ?? [],
+    opsFollowUpLastCorrectionRole:
+      summaryPayload.opsFollowUpLastCorrectionRole ?? null,
+    opsFollowUpEvaluationTurn:
+      summaryPayload.opsFollowUpEvaluationTurn ?? null,
+  });
+}
+
+/**
+ * Ops follow-up fields plus architect checkpoint for run-scoped JSON APIs.
+ */
+export function opsFollowUpApiFieldsFromSummaryPayload(
+  summaryPayload: RunSummaryPayload | null | undefined,
+): OpsFollowUpCheckpoint & {
+  readonly opsFollowUpArchitectCheckpoint: OpsFollowUpCheckpoint | null;
+} {
+  return {
+    ...opsFollowUpFieldsFromSummaryPayload(summaryPayload),
+    opsFollowUpArchitectCheckpoint:
+      summaryPayload?.opsFollowUpArchitectCheckpoint ?? null,
+  };
+}
+
 function appendCheckpointLines(
   lines: string[],
   fields: OpsFollowUpCheckpoint,

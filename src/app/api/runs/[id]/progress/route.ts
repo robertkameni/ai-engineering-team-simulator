@@ -1,24 +1,20 @@
-import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
 import { getRunProgressIfOwned } from "@/lib/db/run-progress";
+import {
+  loadOwnedRunResource,
+  type OwnedRunRouteParams,
+} from "@/lib/api/owned-run-route";
 
 export const runtime = "nodejs";
-
-interface RouteParams {
-  params: Promise<{ id: string }>;
-}
 
 /**
  * Lightweight run progress for stream-drop recovery (arch-review F2).
  * Full messages/artifacts stay on GET /api/runs/[id].
  */
-export async function GET(_request: Request, { params }: RouteParams) {
-  const { id } = await params;
-  const scope = await getRunOwnershipContext();
-  const progress = await getRunProgressIfOwned(id, scope);
-
-  if (!progress) {
-    return Response.json({ error: "Run not found" }, { status: 404 });
+export async function GET(_request: Request, { params }: OwnedRunRouteParams) {
+  const loaded = await loadOwnedRunResource(params, getRunProgressIfOwned);
+  if (!loaded.ok) {
+    return loaded.response;
   }
 
-  return Response.json(progress);
+  return Response.json(loaded.data);
 }

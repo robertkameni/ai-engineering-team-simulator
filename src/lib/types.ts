@@ -3,6 +3,7 @@ import type { RunUsageTotals } from "@/lib/ai/run-usage";
 import type { DebateExitOutcome } from "@/ai/orchestration/reviewer-decision";
 import type { OpsFollowUpCheckpoint } from "@/lib/db/ops-follow-up-summary";
 import type { DebateFinalizationTelemetry } from "@/lib/db/debate-finalization-telemetry";
+import type { ArtifactErrorTelemetry } from "@/lib/db/run-summary.types";
 
 /**
  * Shared domain types for UI + lib (arch-review F4).
@@ -87,13 +88,7 @@ export interface MockRun extends Partial<OpsFollowUpCheckpoint> {
   /** Deterministic debate finalization telemetry. */
   finalization?: DebateFinalizationTelemetry | null;
   /** Populated when core artifact synthesis fails after debate. */
-  artifactError?: {
-    readonly message: string;
-    readonly failedArtifact: string | null;
-    readonly timestamp: string;
-    readonly retryFailed: boolean;
-    readonly errorCode?: string;
-  } | null;
+  artifactError?: ArtifactErrorTelemetry | null;
 }
 
 export type { DebateExitOutcome };

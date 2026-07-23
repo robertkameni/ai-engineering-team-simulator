@@ -47,8 +47,13 @@ type PostApproveTruncationState = {
   postApproveTruncation: boolean;
   hasTruncatedCriticalTurn: boolean;
   postApproveContinuationFailed: boolean;
-  truncationRecoveryAttemptedRoles: readonly SimulationAgentRole[];
+  truncationRecoveryAttemptedRoles: SimulationAgentRole[];
 };
+
+export type TruncationRecoveryPlan =
+  | { readonly kind: "recovered"; }
+  | { readonly kind: "schedule"; readonly role: SimulationAgentRole; }
+  | { readonly kind: "ship_with_warning"; };
 
 /**
  * Clears post-approve truncation flags when no critical truncation remains.
@@ -85,4 +90,36 @@ export function applyPostApproveTruncationFlags(
   if (state.truncationRecoveryAttemptedRoles.length > 0) {
     state.postApproveContinuationFailed = true;
   }
+}
+
+/**
+ * Shared post-approve truncation recovery planner used by debate convergence
+ * and the resolve-reviewer truncation gate.
+ */
+export function planPostApproveTruncationRecovery(
+  state: PostApproveTruncationState,
+  transcript: readonly TranscriptEntry[],
+  remainingBudget?: number,
+): TruncationRecoveryPlan {
+  if (clearPostApproveTruncationIfRecovered(state, transcript)) {
+    return { kind: "recovered" };
+  }
+
+  const truncatedRoles = getLatestTruncatedCriticalRoles(transcript);
+  const recoverableRole = truncatedRoles.find(
+    (role) => !state.truncationRecoveryAttemptedRoles.includes(role),
+  );
+  const hasBudget =
+    remainingBudget === undefined ? true : remainingBudget >= 1;
+
+  if (recoverableRole && hasBudget) {
+    state.truncationRecoveryAttemptedRoles = [
+      ...state.truncationRecoveryAttemptedRoles,
+      recoverableRole,
+    ];
+    return { kind: "schedule", role: recoverableRole };
+  }
+
+  applyPostApproveTruncationFlags(state, transcript);
+  return { kind: "ship_with_warning" };
 }

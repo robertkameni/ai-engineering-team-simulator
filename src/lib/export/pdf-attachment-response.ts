@@ -1,3 +1,5 @@
+const PDF_COMPILE_AUTHOR = "AI Engineering Team Simulator";
+
 export function buildPdfAttachmentResponse(
   pdf: Buffer,
   filename: string,
@@ -11,4 +13,32 @@ export function buildPdfAttachmentResponse(
       Pragma: "no-cache",
     },
   });
+}
+
+type CompileRunPdf = (
+  markdown: string,
+  options: { title: string; author?: string },
+) => Promise<Buffer>;
+
+/**
+ * Compile markdown to a PDF attachment, or a generic 500 on compile failure.
+ */
+export async function buildCompiledPdfAttachmentResponse(params: {
+  readonly markdown: string;
+  readonly title: string;
+  readonly filename: string;
+  readonly compileRunPdfFromMarkdown: CompileRunPdf;
+}): Promise<Response> {
+  try {
+    const pdf = await params.compileRunPdfFromMarkdown(params.markdown, {
+      title: params.title,
+      author: PDF_COMPILE_AUTHOR,
+    });
+    return buildPdfAttachmentResponse(pdf, params.filename);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "PDF generation failed";
+    console.error("[export/pdf]", message, error);
+    return Response.json({ error: "PDF generation failed" }, { status: 500 });
+  }
 }

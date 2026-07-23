@@ -75,6 +75,14 @@ function markActiveMessageIdle(
   context.activeMessageIdRef.current = null;
 }
 
+function flushAndMarkStreamSettled(
+  context: SimulationStreamEventContext,
+  textDeltaCoalescer: { flush: () => void },
+): void {
+  textDeltaCoalescer.flush();
+  context.streamSettledRef.current = true;
+}
+
 export function createSimulationStreamEventHandler(
   context: SimulationStreamEventContext,
 ): SimulationStreamEventHandler {
@@ -217,8 +225,7 @@ export function createSimulationStreamEventHandler(
     }
 
     if (event.type === "error") {
-      textDeltaCoalescer.flush();
-      context.streamSettledRef.current = true;
+      flushAndMarkStreamSettled(context, textDeltaCoalescer);
       context.setError(event.message);
       context.setStatus("failed");
       context.setActiveAgent(null);
@@ -237,8 +244,7 @@ export function createSimulationStreamEventHandler(
     }
 
     if (event.type === "done") {
-      textDeltaCoalescer.flush();
-      context.streamSettledRef.current = true;
+      flushAndMarkStreamSettled(context, textDeltaCoalescer);
 
       if (!context.isActive()) return;
 

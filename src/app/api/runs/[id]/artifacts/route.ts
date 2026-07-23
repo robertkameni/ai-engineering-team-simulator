@@ -7,6 +7,7 @@ import {
   deriveArtifactsPanelStatus,
   toAppArtifactStatus,
 } from "@/lib/db/artifact-status";
+import { opsFollowUpApiFieldsFromSummaryPayload } from "@/lib/db/ops-follow-up-summary";
 import { getRunForArtifactsIfOwned } from "@/lib/db/runs";
 import { toAppRunStatus } from "@/lib/db/run-status";
 
@@ -41,27 +42,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     debateOutcome: parseDebateOutcomeFromRunSummary(run.summary),
     stackValidationFailed: summaryPayload?.stackValidationFailed === true,
     crossValidationFailed: summaryPayload?.crossValidationFailed === true,
-    opsFollowUpEvaluated: summaryPayload?.opsFollowUpEvaluated === true,
-    opsFollowUpTriggered: summaryPayload?.opsFollowUpTriggered === true,
-    opsFollowUpSkipReason: summaryPayload?.opsFollowUpSkipReason ?? null,
-    opsFollowUpEligible: summaryPayload?.opsFollowUpEligible === true,
-    opsFollowUpUnresolvedDevopsIssueCount:
-      summaryPayload?.opsFollowUpUnresolvedDevopsIssueCount ?? 0,
-    opsFollowUpOpenIssueCount:
-      summaryPayload?.opsFollowUpOpenIssueCount ??
-      summaryPayload?.opsFollowUpUnresolvedDevopsIssueCount ??
-      0,
-    opsFollowUpAddressedIssueCount:
-      summaryPayload?.opsFollowUpAddressedIssueCount ?? 0,
-    opsFollowUpAcceptedRiskIssueCount:
-      summaryPayload?.opsFollowUpAcceptedRiskIssueCount ?? 0,
-    opsFollowUpAcceptedRiskReasons:
-      summaryPayload?.opsFollowUpAcceptedRiskReasons ?? [],
-    opsFollowUpLastCorrectionRole:
-      summaryPayload?.opsFollowUpLastCorrectionRole ?? null,
-    opsFollowUpEvaluationTurn: summaryPayload?.opsFollowUpEvaluationTurn ?? null,
-    opsFollowUpArchitectCheckpoint:
-      summaryPayload?.opsFollowUpArchitectCheckpoint ?? null,
+    ...opsFollowUpApiFieldsFromSummaryPayload(summaryPayload),
     finalization: summaryPayload?.finalization ?? null,
   });
 }

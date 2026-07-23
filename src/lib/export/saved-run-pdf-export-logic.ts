@@ -11,7 +11,7 @@ import type { RateLimitResult } from "@/lib/rate-limit-config";
 import { canExportApprovedRun } from "@/features/artifacts/artifact-panel-phase";
 import type { MockRun } from "@/features/agents/types";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
-import { buildPdfAttachmentResponse } from "@/lib/export/pdf-attachment-response";
+import { buildCompiledPdfAttachmentResponse } from "@/lib/export/pdf-attachment-response";
 
 export interface SavedRunPdfExportHooks {
   requireRunAccess: (
@@ -90,18 +90,10 @@ export async function executeSavedRunPdfExport(
   const exportId = Date.now();
   const filename = hooks.buildRunPdfFilename(run.title, exportId);
 
-  let pdf: Buffer;
-  try {
-    pdf = await hooks.compileRunPdfFromMarkdown(markdown, {
-      title: run.title,
-      author: "AI Engineering Team Simulator",
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "PDF generation failed";
-    console.error("[export/pdf]", message, error);
-    return Response.json({ error: "PDF generation failed" }, { status: 500 });
-  }
-
-  return buildPdfAttachmentResponse(pdf, filename);
+  return buildCompiledPdfAttachmentResponse({
+    markdown,
+    title: run.title,
+    filename,
+    compileRunPdfFromMarkdown: hooks.compileRunPdfFromMarkdown,
+  });
 }
