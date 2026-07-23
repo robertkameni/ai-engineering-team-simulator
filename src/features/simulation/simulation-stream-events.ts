@@ -83,6 +83,63 @@ function flushAndMarkStreamSettled(
   context.streamSettledRef.current = true;
 }
 
+async function handleStreamErrorEvent(
+  context: SimulationStreamEventContext,
+  textDeltaCoalescer: { flush: () => void },
+  artifactSetters: ArtifactPollSetters,
+  message: string,
+): Promise<void> {
+  flushAndMarkStreamSettled(context, textDeltaCoalescer);
+  markActiveMessageIdle(context);
+  context.setActiveAgent(null);
+  context.setStatus("failed");
+  context.setError(message);
+
+  const runId = context.currentRunIdRef.current;
+  if (runId) {
+    await pollArtifactsUntilSettled(runId, artifactSetters, context.signal);
+    return;
+  }
+
+  if (context.isActive()) {
+    context.setArtifactsStatus("unavailable");
+  }
+}
+
+async function handleStreamDoneEvent(
+  context: SimulationStreamEventContext,
+  textDeltaCoalescer: { flush: () => void },
+  artifactSetters: ArtifactPollSetters,
+  event: Extract<SimulationStreamEvent, { type: "done" }>,
+): Promise<void> {
+  flushAndMarkStreamSettled(context, textDeltaCoalescer);
+  if (!context.isActive()) {
+    return;
+  }
+
+  context.setRunId(event.runId);
+  context.currentRunIdRef.current = event.runId;
+
+  const shouldPoll =
+    event.artifactTimeout === true ||
+    !context.artifactsSettledViaStreamRef.current;
+
+  const finalPanel = shouldPoll
+    ? await pollArtifactsUntilSettled(
+        event.runId,
+        artifactSetters,
+        context.signal,
+      )
+    : await fetchArtifactsOnce(event.runId, artifactSetters, context.signal);
+
+  if (!context.isActive()) {
+    return;
+  }
+
+  finalizeDoneStatus(context, finalPanel);
+  context.router.replace(`/runs/${event.runId}`);
+}
+
 export function createSimulationStreamEventHandler(
   context: SimulationStreamEventContext,
 ): SimulationStreamEventHandler {
@@ -225,52 +282,22 @@ export function createSimulationStreamEventHandler(
     }
 
     if (event.type === "error") {
-      flushAndMarkStreamSettled(context, textDeltaCoalescer);
-      context.setError(event.message);
-      context.setStatus("failed");
-      context.setActiveAgent(null);
-      markActiveMessageIdle(context);
-
-      if (context.currentRunIdRef.current) {
-        await pollArtifactsUntilSettled(
-          context.currentRunIdRef.current,
-          artifactSetters,
-          context.signal,
-        );
-      } else if (context.isActive()) {
-        context.setArtifactsStatus("unavailable");
-      }
+      await handleStreamErrorEvent(
+        context,
+        textDeltaCoalescer,
+        artifactSetters,
+        event.message,
+      );
       return;
     }
 
     if (event.type === "done") {
-      flushAndMarkStreamSettled(context, textDeltaCoalescer);
-
-      if (!context.isActive()) return;
-
-      context.setRunId(event.runId);
-      context.currentRunIdRef.current = event.runId;
-
-      const shouldPoll =
-        event.artifactTimeout === true ||
-        !context.artifactsSettledViaStreamRef.current;
-
-      const finalPanel = shouldPoll
-        ? await pollArtifactsUntilSettled(
-            event.runId,
-            artifactSetters,
-            context.signal,
-          )
-        : await fetchArtifactsOnce(
-            event.runId,
-            artifactSetters,
-            context.signal,
-          );
-
-      if (!context.isActive()) return;
-
-      finalizeDoneStatus(context, finalPanel);
-      context.router.replace(`/runs/${event.runId}`);
+      await handleStreamDoneEvent(
+        context,
+        textDeltaCoalescer,
+        artifactSetters,
+        event,
+      );
     }
   };
 

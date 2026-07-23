@@ -1,6 +1,5 @@
 import { deleteRunIfOwned, getRunForWorkspaceIfOwned } from "@/lib/db/runs";
 import {
-  loadOwnedRunResource,
   resolveOwnedRunRoute,
   runNotFoundResponse,
   type OwnedRunRouteParams,
@@ -11,12 +10,12 @@ import { rosterToPreview } from "@/features/simulation/team-roster-preview";
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, { params }: OwnedRunRouteParams) {
-  const loaded = await loadOwnedRunResource(params, getRunForWorkspaceIfOwned);
-  if (!loaded.ok) {
-    return loaded.response;
-  }
+  const { id, scope } = await resolveOwnedRunRoute(params);
+  const run = await getRunForWorkspaceIfOwned(id, scope);
 
-  const run = loaded.data;
+  if (!run) {
+    return runNotFoundResponse();
+  }
 
   return Response.json({
     id: run.id,

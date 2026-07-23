@@ -44,20 +44,16 @@ export function useSimulationStream() {
 
   const panelArtifactsStatus = artifactsStatus;
 
-  const artifactSetters = {
-    setArtifacts,
-    setArtifactsStatus,
-    setDebateOutcome,
-    setStackValidationFailed,
-    setCrossValidationFailed,
-  };
-
   const recoverAfterDrop = useCallback(
     (id: string, signal?: AbortSignal) =>
       recoverRunAfterStreamDrop(
         id,
         {
-          ...artifactSetters,
+          setArtifacts,
+          setArtifactsStatus,
+          setDebateOutcome,
+          setStackValidationFailed,
+          setCrossValidationFailed,
           setStatus,
           setError,
           setActiveAgent,

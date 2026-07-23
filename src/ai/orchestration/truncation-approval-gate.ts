@@ -59,7 +59,7 @@ export type TruncationRecoveryPlan =
  * Clears post-approve truncation flags when no critical truncation remains.
  * Returns true when cleared (caller should stop truncation recovery).
  */
-export function clearPostApproveTruncationIfRecovered(
+function clearPostApproveTruncationIfRecovered(
   state: PostApproveTruncationState,
   transcript: readonly TranscriptEntry[],
 ): boolean {

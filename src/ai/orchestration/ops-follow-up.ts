@@ -333,6 +333,5 @@ export function scheduleOpsFollowUpTurn(
 }
 
 export {
-  inferIssueOwnerFromConcern,
   matchesOperationalCategory,
 } from "@/ai/orchestration/issue-ownership";

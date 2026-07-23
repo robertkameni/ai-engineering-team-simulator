@@ -1,6 +1,6 @@
 const PDF_COMPILE_AUTHOR = "AI Engineering Team Simulator";
 
-export function buildPdfAttachmentResponse(
+function buildPdfAttachmentResponse(
   pdf: Buffer,
   filename: string,
 ): Response {

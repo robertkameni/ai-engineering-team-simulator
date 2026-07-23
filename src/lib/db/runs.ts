@@ -37,7 +37,6 @@ import {
 import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
 
 export type { RunOwnershipScope };
-export { canAccessRun };
 
 /** Workspace run view including roster resolved once in mapRunToWorkspace (F9). */
 export type RunWorkspaceView = MockRun & {
