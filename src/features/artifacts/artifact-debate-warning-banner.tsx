@@ -5,7 +5,7 @@ import {
   isSoftApprovedDebateOutcome,
   isUnapprovedDebateOutcome,
 } from "@/features/artifacts/artifact-panel-phase";
-import type { DebateExitOutcome } from "@/features/agents/types";
+import type { DebateExitOutcome } from "@/lib/types";
 
 interface ArtifactDebateWarningBannerProps {
   debateOutcome: DebateExitOutcome | null | undefined;

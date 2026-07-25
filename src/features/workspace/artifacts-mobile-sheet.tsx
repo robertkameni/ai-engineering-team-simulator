@@ -5,7 +5,7 @@ import { ArtifactPanel } from "@/features/artifacts/artifact-panel";
 import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
 import type { DebateProgress } from "@/features/artifacts/types";
 import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
-import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
+import type { TeamRosterPreview } from "@/lib/team-roster-preview";
 
 interface ArtifactsMobileSheetProps {
   open: boolean;

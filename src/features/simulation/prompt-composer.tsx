@@ -9,11 +9,8 @@ import { PromptComposerForm } from "@/features/simulation/prompt-composer-form";
 import type {
   PromptComposerProps,
   PromptComposerFabProps,
+  PromptComposerRunSession,
 } from "@/features/simulation/prompt-composer-types";
-import {
-  useWorkspaceRun,
-  workspaceRunCanRerun,
-} from "@/features/workspace/workspace-run-context";
 import { useMinWidth } from "@/hooks/use-media-query";
 import { hasWorkspacePrompt } from "@/lib/workspace-url";
 import { cn } from "@/lib/utils";
@@ -31,18 +28,18 @@ function resolveDerivedState(
   defaultValue: string,
   disabled: boolean,
   onSimulate: ((prompt: string) => void | Promise<void>) | undefined,
-  workspaceRun: ReturnType<typeof useWorkspaceRun>,
+  runSession: PromptComposerRunSession | null | undefined,
 ) {
   const text = value ?? defaultValue;
   const hasPrompt =
     hasWorkspacePrompt(text) ||
-    (workspaceRun != null && hasWorkspacePrompt(workspaceRun.currentPrompt));
+    (runSession != null && hasWorkspacePrompt(runSession.currentPrompt));
   const isLiveWorkspace = onSimulate != null && hasPrompt;
   const canRerun =
     isLiveWorkspace &&
     !disabled &&
     hasWorkspacePrompt(text) &&
-    (workspaceRun == null || workspaceRunCanRerun(workspaceRun));
+    (runSession == null || runSession.canRerun);
 
   return {
     text,
@@ -95,15 +92,22 @@ export function PromptComposer({
   value,
   onChange,
   onSimulate,
+  runSession = null,
 }: PromptComposerProps) {
   const isDesktop = useMinWidth(720);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileSheetReady, setMobileSheetReady] = useState(false);
-  const workspaceRun = useWorkspaceRun();
 
   const derived = useMemo(
-    () => resolveDerivedState(value, defaultValue, disabled, onSimulate, workspaceRun),
-    [value, defaultValue, disabled, onSimulate, workspaceRun],
+    () =>
+      resolveDerivedState(
+        value,
+        defaultValue,
+        disabled,
+        onSimulate,
+        runSession,
+      ),
+    [value, defaultValue, disabled, onSimulate, runSession],
   );
 
   const handleRerun = useCallback(
@@ -111,14 +115,14 @@ export function PromptComposer({
       const trimmed = (promptOverride ?? derived.text).trim();
       if (!trimmed) return;
 
-      if (workspaceRun && workspaceRunCanRerun(workspaceRun)) {
-        workspaceRun.rerun(trimmed);
+      if (runSession != null && runSession.canRerun) {
+        runSession.onRerun(trimmed);
         return;
       }
 
       onSimulate?.(trimmed);
     },
-    [derived.text, onSimulate, workspaceRun],
+    [derived.text, onSimulate, runSession],
   );
 
   const handleMobileOpen = useCallback(() => {

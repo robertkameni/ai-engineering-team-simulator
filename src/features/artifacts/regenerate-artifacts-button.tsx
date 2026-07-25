@@ -9,7 +9,7 @@ import {
 } from "@/features/artifacts/regenerate-artifacts-state";
 import { regenerateRunArtifactsAction } from "@/features/artifacts/regenerate-artifacts-action";
 import { Button } from "@/components/ui/button";
-import { workspaceHeaderRegenerateButtonClass } from "@/features/workspace/workspace-header-button-styles";
+import { workspaceHeaderRegenerateButtonClass } from "@/components/ui/button-styles";
 import { cn } from "@/lib/utils";
 
 interface RegenerateArtifactsButtonProps {

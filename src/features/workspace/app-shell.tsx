@@ -8,13 +8,12 @@ import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skele
 import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
 import type { DebateProgress } from "@/features/artifacts/types";
 import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
-import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
+import type { TeamRosterPreview } from "@/lib/team-roster-preview";
 import { Sidebar } from "@/features/workspace/sidebar";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { useWorkspaceMobileSheetState } from "@/features/workspace/use-workspace-mobile-sheet-state";
 import { WorkspaceMobileContext } from "@/features/workspace/workspace-mobile-context";
 import { WorkspaceMobileSheetPortals } from "@/features/workspace/workspace-mobile-sheet-portals";
-import { WorkspaceRunProvider } from "@/features/workspace/workspace-run-context";
 import { SiteFooter } from "@/components/site-footer";
 import { useMinWidth } from "@/hooks/use-media-query";
 
@@ -109,8 +108,7 @@ export function AppShell({
   };
 
   return (
-    <WorkspaceRunProvider>
-      <WorkspaceMobileContext.Provider value={mobileContext}>
+    <WorkspaceMobileContext.Provider value={mobileContext}>
       <div className="@container/app-shell ambient-mesh relative flex h-svh flex-col overflow-hidden">
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden min-[720px]:flex-row">
           <Sidebar initialRecentRuns={initialRecentRuns} />
@@ -136,7 +134,6 @@ export function AppShell({
         artifactsSheetReady={artifactsSheetReady}
         artifactPanelProps={artifactPanelProps}
       />
-      </WorkspaceMobileContext.Provider>
-    </WorkspaceRunProvider>
+    </WorkspaceMobileContext.Provider>
   );
 }

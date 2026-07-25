@@ -5,7 +5,7 @@ import { useState } from "react";
 import { LogOut } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { workspaceHeaderAccountButtonClass } from "@/features/workspace/workspace-header-button-styles";
+import { workspaceHeaderAccountButtonClass } from "@/components/ui/button-styles";
 
 const NON_RELEASABLE_RUN_IDS = new Set(["live", "new"]);
 

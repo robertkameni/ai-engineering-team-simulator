@@ -1,4 +1,4 @@
-import type { AgentRole } from "@/features/agents/types";
+import type { AgentRole } from "@/lib/types";
 
 export const LANDING_DEBATE_SNIPPETS: {
   role: AgentRole;

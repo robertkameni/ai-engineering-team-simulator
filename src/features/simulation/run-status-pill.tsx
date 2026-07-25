@@ -1,5 +1,4 @@
-import type { RunStatus } from "@/features/agents/types";
-import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
+import type { ArtifactsPanelStatus, RunStatus } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import {
   deriveRunDisplayLabel,

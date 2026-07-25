@@ -1,5 +1,15 @@
 import type { ReactNode } from "react";
 
+/**
+ * Live-run session supplied by the workspace composition root (Sprint A / N1).
+ * PromptComposer must not import workspace context directly.
+ */
+export type PromptComposerRunSession = {
+  readonly currentPrompt: string;
+  readonly canRerun: boolean;
+  readonly onRerun: (prompt: string) => void;
+};
+
 export type PromptComposerProps = {
   readonly disabled?: boolean;
   readonly placeholder?: string;
@@ -8,6 +18,7 @@ export type PromptComposerProps = {
   readonly value?: string;
   readonly onChange?: (value: string) => void;
   readonly onSimulate?: (prompt: string) => void | Promise<void>;
+  readonly runSession?: PromptComposerRunSession | null;
 };
 
 export type ComposerDerivedState = {

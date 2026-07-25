@@ -1,7 +1,7 @@
 import { isApprovedDebateOutcome } from "@/ai/orchestration/approval-tier";
 import { SIMULATION_AGENT_ORDER } from "@/ai/agents/config";
 import { ARTIFACT_TYPES, CORE_ARTIFACT_TYPES } from "@/lib/artifact-constants";
-import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
+import type { AgentRole, DebateExitOutcome } from "@/lib/types";
 import type {
   ArtifactsPanelStatus,
   DebateProgress,

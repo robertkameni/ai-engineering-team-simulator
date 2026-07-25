@@ -5,7 +5,7 @@ import { Users } from "lucide-react";
 
 import { AgentMessage } from "@/features/simulation/agent-message";
 import { MessageThreadSkeleton } from "@/features/simulation/message-thread-skeleton";
-import type { SimulationMessage } from "@/features/agents/types";
+import type { SimulationMessage } from "@/lib/types";
 
 interface MessageThreadProps {
   messages: SimulationMessage[];

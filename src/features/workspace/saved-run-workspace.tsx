@@ -10,7 +10,7 @@ import { WorkspaceHeaderSaved } from "@/features/workspace/workspace-header-save
 import { WorkspaceMain } from "@/features/workspace/workspace-main";
 import type { MockRun } from "@/features/agents/types";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
-import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
+import type { TeamRosterPreview } from "@/lib/team-roster-preview";
 
 interface SavedRunWorkspaceProps {
   run: MockRun;

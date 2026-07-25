@@ -1,5 +1,5 @@
-import { getPersona } from "@/features/agents/personas";
-import type { AgentRole } from "@/features/agents/types";
+import { getPersona } from "@/lib/agents/personas";
+import type { AgentRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const FLOATING_AGENTS: {

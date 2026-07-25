@@ -1,5 +1,5 @@
 import { AgentMessage } from "@/features/simulation/agent-message";
-import type { SimulationMessage } from "@/features/agents/types";
+import type { SimulationMessage } from "@/lib/types";
 
 interface MessageThreadStaticProps {
   messages: SimulationMessage[];

@@ -14,7 +14,7 @@ import {
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { MockRun } from "@/features/agents/types";
 import { ExportAuthModal } from "@/features/workspace/export-auth-modal";
-import { workspaceHeaderExportButtonClass } from "@/features/workspace/workspace-header-button-styles";
+import { workspaceHeaderExportButtonClass } from "@/components/ui/button-styles";
 import { exportRunMarkdown } from "@/lib/export/run-markdown";
 import { exportRunPdf } from "@/lib/export/run-pdf-client";
 import type { ExportFormat } from "@/features/workspace/export-format";
