@@ -9,6 +9,7 @@ description: >
   commit mode (human-approved). Auto-apply to multi-step implementation,
   debugging, refactoring, and any task with multiple acceptance criteria.
 disable-model-invocation: false
+alwaysApply: true
 ---
 
 # DeepFocus (enforced mode)
