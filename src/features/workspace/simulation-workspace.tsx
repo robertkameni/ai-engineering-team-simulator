@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { MockRun } from "@/features/agents/types";
+import type { MockRun } from "@/lib/types";
 import { AppShell } from "@/features/workspace/app-shell";
 import { WorkspaceMain } from "@/features/workspace/workspace-main";
 import { WorkspaceHeader } from "@/features/workspace/workspace-header";
@@ -12,8 +12,7 @@ import { SimulationErrorBanner } from "@/features/simulation/simulation-error-ba
 import { AgentTypingIndicator } from "@/features/simulation/agent-typing-indicator";
 import { debateProgressFromMessages } from "@/features/artifacts/artifact-panel-phase";
 import { useSimulationStream } from "@/features/simulation/use-simulation-stream";
-import { useWorkspaceRunSession } from "@/features/workspace/workspace-run-context";
-import { teamMemberPreview } from "@/features/simulation/team-roster-preview";
+import { teamMemberPreview } from "@/lib/team-roster-preview";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import { useWorkspaceMobile } from "@/features/workspace/workspace-mobile-context";
 import { truncateTitle } from "@/lib/truncate-title";
@@ -97,16 +96,16 @@ export function SimulationWorkspace({
     [currentPrompt, start],
   );
 
-  const workspaceRunSession = useMemo(
+  const promptRunSession = useMemo(
     () => ({
       currentPrompt,
-      status,
-      rerun: rerunSimulation,
+      canRerun: status !== "running",
+      onRerun: (prompt: string) => {
+        rerunSimulation(prompt);
+      },
     }),
     [currentPrompt, status, rerunSimulation],
   );
-
-  useWorkspaceRunSession(workspaceRunSession);
 
   const showBootstrapping =
     status === "running" && messages.length === 0 && !error;
@@ -197,6 +196,7 @@ export function SimulationWorkspace({
         value={currentPrompt}
         onChange={setCurrentPrompt}
         onSimulate={start}
+        runSession={promptRunSession}
       />
     </AppShell>
   );

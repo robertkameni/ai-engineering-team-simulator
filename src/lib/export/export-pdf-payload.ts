@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import { isTeamTemplateId } from "@/ai/agents/team-templates";
-import type { MockRun } from "@/features/agents/types";
+import type { MockRun } from "@/lib/types";
 import {
   countExportArtifactItems,
   EXPORT_PDF_MAX_ARTIFACT_ITEM_CHARS,

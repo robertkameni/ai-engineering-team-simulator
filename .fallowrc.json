@@ -38,10 +38,6 @@
     {
       "file": "src/ai/orchestration/reviewer-decision.ts",
       "exports": ["*"]
-    },
-    {
-      "file": "src/features/agents/types.ts",
-      "exports": ["*"]
     }
   ]
 }

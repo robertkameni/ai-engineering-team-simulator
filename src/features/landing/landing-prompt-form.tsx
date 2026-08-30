@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef } from "react";
 import { ArrowRight } from "lucide-react";
-import { ExamplePromptChips } from "@/features/simulation/example-prompt-chips";
+import { ExamplePromptChips } from "@/components/example-prompt-chips";
 import { useExamplePromptChips } from "@/features/landing/use-example-prompt-chips";
 import { useRotatingPlaceholder } from "@/features/landing/use-rotating-placeholder";
 import { Button } from "@/components/ui/button";

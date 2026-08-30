@@ -1,6 +1,6 @@
-import { AgentAvatar } from "@/features/agents/agent-avatar";
-import { getPersona } from "@/features/agents/personas";
-import type { SimulationMessage } from "@/features/agents/types";
+import { AgentAvatar } from "@/components/agents/agent-avatar";
+import { getPersona } from "@/lib/agents/personas";
+import type { SimulationMessage } from "@/lib/types";
 import { MessageContent } from "@/features/simulation/message-content";
 import { QuotedBlock } from "@/features/simulation/quoted-block";
 import { formatToolActivityLabel } from "@/features/simulation/tool-activity-label";

@@ -3,15 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
-import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
 import type {
   AgentRole,
+  ArtifactsPanelStatus,
   DebateExitOutcome,
+  PartialRunArtifacts,
   RunStatus,
   SimulationMessage,
-} from "@/features/agents/types";
+} from "@/lib/types";
 import { parseSimulationEvent } from "@/lib/simulation-stream";
-import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
+import type { TeamRosterPreview } from "@/lib/team-roster-preview";
 
 import { createSimulationStreamEventHandler } from "./simulation-stream-events";
 import {

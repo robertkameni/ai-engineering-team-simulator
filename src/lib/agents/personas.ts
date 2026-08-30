@@ -1,4 +1,4 @@
-import type { AgentPersona, AgentPersonaBase, AgentRole } from "@/features/agents/types";
+import type { AgentPersona, AgentPersonaBase, AgentRole } from "@/lib/types";
 
 const BASE_PERSONAS: Record<AgentRole, AgentPersonaBase> = {
   pm: {
@@ -44,8 +44,7 @@ export const AGENT_PERSONAS: Record<AgentRole, AgentPersona> = {
     ...BASE_PERSONAS.pm,
     accentClass: "text-agent-pm",
     borderClass: "border-l-agent-pm",
-    badgeClass:
-      "border-agent-pm/40 bg-agent-pm/10 text-agent-pm",
+    badgeClass: "border-agent-pm/40 bg-agent-pm/10 text-agent-pm",
   },
   architect: {
     ...BASE_PERSONAS.architect,
@@ -92,17 +91,4 @@ export function getPersonaBase(role: AgentRole): AgentPersonaBase {
 /** Returns the full persona with CSS accent classes — for UI rendering only. */
 export function getPersona(role: AgentRole): AgentPersona {
   return AGENT_PERSONAS[role];
-}
-
-function getPersonaWithName(
-  role: AgentRole,
-  name: string,
-  title?: string,
-): AgentPersona {
-  const base = getPersona(role);
-  return {
-    ...base,
-    name,
-    title: title ?? base.title,
-  };
 }

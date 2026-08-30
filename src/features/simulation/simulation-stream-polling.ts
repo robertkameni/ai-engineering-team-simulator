@@ -1,6 +1,11 @@
-import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
-import type { DebateExitOutcome, RunStatus, SimulationMessage } from "@/features/agents/types";
-import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
+import type {
+  ArtifactsPanelStatus,
+  DebateExitOutcome,
+  PartialRunArtifacts,
+  RunStatus,
+  SimulationMessage,
+} from "@/lib/types";
+import type { TeamRosterPreview } from "@/lib/team-roster-preview";
 import {
   computeArtifactPollIntervalMs,
   POLL_ARTIFACT_MAX_MS,

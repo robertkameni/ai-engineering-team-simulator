@@ -1,8 +1,8 @@
 import { SIMULATION_AGENT_ORDER, type SimulationAgentRole } from "@/ai/agents/config";
-import { getPersona } from "@/features/agents/personas";
-import type { AgentRole } from "@/features/agents/types";
-import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
-import { teamMemberPreview } from "@/features/simulation/team-roster-preview";
+import { getPersona } from "@/lib/agents/personas";
+import type { AgentRole } from "@/lib/types";
+import type { TeamRosterPreview } from "@/lib/team-roster-preview";
+import { teamMemberPreview } from "@/lib/team-roster-preview";
 import { cn } from "@/lib/utils";
 
 type StepState = "complete" | "active" | "upcoming";

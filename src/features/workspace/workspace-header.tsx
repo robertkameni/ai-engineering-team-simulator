@@ -12,8 +12,8 @@ import { SignOutButton } from "@/features/workspace/sign-out-button";
 import { WorkspaceHeaderFrame } from "@/features/workspace/workspace-header-frame";
 import { useWorkspaceMobile } from "@/features/workspace/workspace-mobile-context";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
-import type { MockRun } from "@/features/agents/types";
-import type { RunStatus } from "@/features/agents/types";
+import type { MockRun } from "@/lib/types";
+import type { RunStatus } from "@/lib/types";
 import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
 import type { DebateProgress } from "@/features/artifacts/types";
 

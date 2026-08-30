@@ -15,8 +15,8 @@ import type {
     ArtifactsPanelStatus,
     PartialRunArtifacts,
 } from "@/features/artifacts/types";
-import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
-import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
+import type { AgentRole, DebateExitOutcome } from "@/lib/types";
+import type { TeamRosterPreview } from "@/lib/team-roster-preview";
 import { cn } from "@/lib/utils";
 
 interface ArtifactPanelStaticProps {

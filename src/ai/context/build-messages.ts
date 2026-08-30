@@ -17,7 +17,7 @@ import {
 } from "@/ai/orchestration/reviewer-preflight";
 import type { ReviewIssue } from "@/ai/orchestration/review-issue-tracker";
 import { getAgentTurnPrompt } from "@/ai/prompts";
-import type { AgentRole } from "@/features/agents/types";
+import type { AgentRole } from "@/lib/types";
 
 export interface CorrectionIssueAssignment {
   readonly issueId: string;

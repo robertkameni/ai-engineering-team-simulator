@@ -5,7 +5,7 @@ import {
   type OwnedRunRouteParams,
 } from "@/lib/api/owned-run-route";
 import { assertRateLimit, rateLimitResponse } from "@/lib/rate-limit";
-import { rosterToPreview } from "@/features/simulation/team-roster-preview";
+import { rosterToPreview } from "@/lib/team-roster-preview";
 
 export const runtime = "nodejs";
 

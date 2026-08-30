@@ -11,7 +11,7 @@ import {
 } from "@/lib/db/runs";
 import { getRunOwnershipContext } from "@/lib/auth/run-ownership";
 import { getSessionUser } from "@/lib/auth/session";
-import { rosterToPreview } from "@/features/simulation/team-roster-preview";
+import { rosterToPreview } from "@/lib/team-roster-preview";
 
 import { getCachedRunPageView } from "./get-cached-run-page-view";
 

@@ -1,6 +1,6 @@
-import { getPersona } from "@/features/agents/personas";
-import type { AgentRole } from "@/features/agents/types";
-import { AgentAvatar } from "@/features/agents/agent-avatar";
+import { AgentAvatar } from "@/components/agents/agent-avatar";
+import { getPersona } from "@/lib/agents/personas";
+import type { AgentRole } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 

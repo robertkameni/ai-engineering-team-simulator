@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import { AgentAvatar } from "@/features/agents/agent-avatar";
-import { getPersona } from "@/features/agents/personas";
+import { AgentAvatar } from "@/components/agents/agent-avatar";
+import { getPersona } from "@/lib/agents/personas";
 import { LANDING_DEBATE_SNIPPETS } from "@/features/landing/landing-content";
 import { cn } from "@/lib/utils";
 

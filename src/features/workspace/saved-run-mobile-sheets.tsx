@@ -10,7 +10,7 @@ import type {
   ArtifactsPanelStatus,
   PartialRunArtifacts,
 } from "@/features/artifacts/types";
-import type { DebateExitOutcome } from "@/features/agents/types";
+import type { DebateExitOutcome } from "@/lib/types";
 
 interface SavedRunMobileSheetsProps {
   pathname: string;

@@ -1,6 +1,6 @@
 ---
 description: AI SDK v7, DeepSeek v4, streaming, cost tracking, structured output
-globs: "src/{ai,features/agents,orchestration}/**/*.ts"
+globs: "src/{ai,lib/agents,orchestration}/**/*.ts"
 alwaysApply: true
 ---
 

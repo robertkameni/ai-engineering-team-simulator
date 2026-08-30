@@ -2,6 +2,7 @@ import { stepCountIs, streamText, type ModelMessage } from "ai";
 
 import {
   getAgentConfig,
+  supportsTemperature,
   type SimulationAgentRole
 } from "@/ai/agents/config";
 import type { TeamRoster } from "@/ai/agents/roster";
@@ -73,7 +74,9 @@ export async function collectAgentStream(
     system: getAgentSystemPrompt(role, roster, templateId, productIdea),
     messages,
     maxOutputTokens: config.maxOutputTokens,
-    temperature: config.temperature,
+    ...(supportsTemperature(config)
+      ? { temperature: config.temperature }
+      : {}),
     tools,
     stopWhen: disableTools ? undefined : stepCountIs(3),
     abortSignal,

@@ -18,6 +18,19 @@ export type AgentRole =
   | "reviewer"
   | "devops";
 
+export interface AgentPersonaBase {
+  role: AgentRole;
+  name: string;
+  title: string;
+  initials: string;
+}
+
+export interface AgentPersona extends AgentPersonaBase {
+  accentClass: string;
+  borderClass: string;
+  badgeClass: string;
+}
+
 export type RunStatus = "idle" | "running" | "complete" | "failed";
 
 export type ArtifactsPanelStatus =

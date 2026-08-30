@@ -32,6 +32,17 @@ export const ARTIFACT_SYNTHESIS_ORDER = [
   "review",
 ] as const satisfies readonly ArtifactType[];
 
+const ARTIFACT_MAX_OUTPUT_TOKENS = 2400;
+
+/** Blueprint is the densest artifact — give it room to finish a full JSON document. */
+const BLUEPRINT_MAX_OUTPUT_TOKENS = 4800;
+
+function maxOutputTokensFor(type: ArtifactType): number {
+  return type === "blueprint"
+    ? BLUEPRINT_MAX_OUTPUT_TOKENS
+    : ARTIFACT_MAX_OUTPUT_TOKENS;
+}
+
 // STATE CONSISTENCY — notice for every unapproved exit, including degraded_truncated
 const UNAPPROVED_DEBATE_NOTICE =
   "DEBATE_STATUS: unapproved — The simulation ended without a clean approved close (cap_reached, degraded_truncated, reviewer unresolved, or budget failure). This document MUST be conservative: do NOT describe open reviewer gaps as resolved, do NOT promote recommendations to implemented features, and label every recommendation, proposed mitigation, and risk item as provisional or recommended — never as finalized or shipped.";
@@ -143,9 +154,9 @@ export function buildArtifactPrompt(
   ].join("");
 }
 
-// STATE CONSISTENCY BUG FIX — apply open-gap rule to all artifact types
-// so that no artifact silently resolves reviewer-flagged open items.
-function buildOpenGapsSystemRule(type: ArtifactType): string {
+// The open-gap rule is uniform across all artifact types so no artifact
+// silently resolves reviewer-flagged open items.
+function buildOpenGapsSystemRule(): string {
   return [
     "Open-gap rule: When reviewer open gaps are listed in the prompt, never describe those items as implemented, mitigated, or already present.",
     "Use \"recommended\", \"proposed\", \"open gap\", or \"reviewer flagged — unresolved\" for those topics.",
@@ -167,6 +178,74 @@ function extractJsonObject(text: string): unknown {
     }
     return JSON.parse(candidate.slice(start, end + 1));
   }
+}
+
+const JSON_FALLBACK_INSTRUCTION =
+  'Respond with ONLY a JSON object: { "sections": [{ "title": string, "items": string[] }] }';
+
+const JSON_FALLBACK_RETRY_INSTRUCTION = `The previous JSON output was truncated or malformed. Output a COMPLETE, well-formed replacement JSON object: { "sections": [{ "title": string, "items": string[] }] }. Close every string and bracket. If the content exceeds your output limit, use fewer sections or bullets — but the response MUST end with a valid JSON object.`;
+
+async function synthesizeJsonFallback({
+  system,
+  prompt,
+  type,
+  usageAccumulator,
+}: {
+  system: string;
+  prompt: string;
+  type: ArtifactType;
+  usageAccumulator?: RunUsageAccumulator;
+}): Promise<ArtifactDocument> {
+  const attempts: readonly string[] = [
+    JSON_FALLBACK_INSTRUCTION,
+    JSON_FALLBACK_RETRY_INSTRUCTION,
+  ];
+
+  let lastError: unknown;
+
+  for (const instruction of attempts) {
+    if (usageAccumulator) {
+      assertSimulationWithinBudget(usageAccumulator);
+    }
+
+    const fallback = await generateText({
+      model: getDeepSeekModel(ARTIFACT_MODEL),
+      system: `${system}\n\n${instruction}`,
+      prompt,
+      maxOutputTokens: maxOutputTokensFor(type),
+      temperature: 0.2,
+      providerOptions: {
+        deepseek: DEEPSEEK_CHAT_OPTIONS,
+      },
+    });
+
+    await usageAccumulator?.addFromGenerateTextResult(fallback, ARTIFACT_MODEL);
+
+    if (usageAccumulator) {
+      assertSimulationWithinBudget(usageAccumulator);
+    }
+
+    try {
+      const json = extractJsonObject(fallback.text);
+      const parsed = artifactDocumentSchema.safeParse(json);
+      if (parsed.success) {
+        return parsed.data;
+      }
+      lastError = new Error(`Schema mismatch: ${parsed.error.message}`);
+    } catch (error) {
+      lastError = error;
+    }
+
+    console.warn("ARTIFACT SYNTHESIS JSON fallback attempt failed", {
+      artifactType: type,
+      attempt: attempts.indexOf(instruction) + 1,
+      error: lastError instanceof Error ? lastError.message : String(lastError),
+    });
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Failed to synthesize ${type} artifact JSON`);
 }
 
 export async function generateArtifactDocument(
@@ -200,7 +279,7 @@ export async function generateArtifactDocument(
     : "Synthesize consensus; note disagreement only in the review artifact.";
 
   const stackReferenceBlock = buildStackReferenceBlock(type);
-  const openGapsSystemRule = buildOpenGapsSystemRule(type);
+  const openGapsSystemRule = buildOpenGapsSystemRule();
 
   const system = `${unapprovedNotice}${additionalSystemNotice ? `${additionalSystemNotice}\n\n` : ""}You are a technical writer producing the "${type}" deliverable from a team debate.
 
@@ -234,7 +313,7 @@ ${openGapsSystemRule ? `- ${openGapsSystemRule}\n` : ""}- Write as a polished in
       model: getDeepSeekModel(ARTIFACT_MODEL),
       system,
       prompt,
-      maxOutputTokens: 2400,
+      maxOutputTokens: maxOutputTokensFor(type),
       temperature: 0.2,
       output: Output.object({ schema: artifactDocumentSchema }),
       providerOptions: {
@@ -276,31 +355,10 @@ ${openGapsSystemRule ? `- ${openGapsSystemRule}\n` : ""}- Write as a polished in
     assertSimulationWithinBudget(usageAccumulator);
   }
 
-  const fallback = await generateText({
-    model: getDeepSeekModel(ARTIFACT_MODEL),
-    system: `${system}
-
-Respond with ONLY a JSON object: { "sections": [{ "title": string, "items": string[] }] }`,
+  return synthesizeJsonFallback({
+    system,
     prompt,
-    maxOutputTokens: 2400,
-    temperature: 0.2,
-    providerOptions: {
-      deepseek: DEEPSEEK_CHAT_OPTIONS,
-    },
+    type,
+    usageAccumulator,
   });
-
-  await usageAccumulator?.addFromGenerateTextResult(fallback, ARTIFACT_MODEL);
-
-  if (usageAccumulator) {
-    assertSimulationWithinBudget(usageAccumulator);
-  }
-
-  const json = extractJsonObject(fallback.text);
-  const parsed = artifactDocumentSchema.safeParse(json);
-  if (!parsed.success) {
-    throw new Error(
-      `Failed to parse ${type} artifact: ${parsed.error.message}`,
-    );
-  }
-  return parsed.data;
 }

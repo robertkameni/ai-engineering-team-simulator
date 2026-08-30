@@ -1,7 +1,7 @@
 import { ArtifactDebateWarningBanner } from "@/features/artifacts/artifact-debate-warning-banner";
 import { ArtifactSynthesisWarningBanner } from "@/features/artifacts/artifact-synthesis-warning-banner";
 import type { SynthesisValidationFlags } from "@/features/artifacts/synthesis-validation.types";
-import type { DebateExitOutcome } from "@/features/agents/types";
+import type { DebateExitOutcome } from "@/lib/types";
 
 interface ArtifactPanelWarningsProps {
   showDebateWarning: boolean;

@@ -5,8 +5,8 @@ import { RegenerateArtifactsButton } from "@/features/artifacts/regenerate-artif
 import type { DebateProgress } from "@/features/artifacts/types";
 import { DebateProgressStepper } from "@/features/artifacts/debate-progress-stepper";
 import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
-import type { AgentRole } from "@/features/agents/types";
-import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
+import type { AgentRole } from "@/lib/types";
+import type { TeamRosterPreview } from "@/lib/team-roster-preview";
 
 export interface ArtifactPanelPlaceholderProps {
   status: ArtifactsPanelStatus;

@@ -6,8 +6,8 @@ import { SignOutButton } from "@/features/workspace/sign-out-button";
 import { SavedRunMobileActions } from "@/features/workspace/saved-run-mobile-actions";
 import { WorkspaceHeaderFrame } from "@/features/workspace/workspace-header-frame";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
-import type { MockRun } from "@/features/agents/types";
-import type { RunStatus } from "@/features/agents/types";
+import type { MockRun } from "@/lib/types";
+import type { RunStatus } from "@/lib/types";
 
 interface WorkspaceHeaderSavedProps {
   title: string;

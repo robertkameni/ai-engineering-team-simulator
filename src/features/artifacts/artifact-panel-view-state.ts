@@ -10,7 +10,7 @@ import {
 } from "@/features/artifacts/synthesis-validation";
 import type { SynthesisValidationFlags } from "@/features/artifacts/synthesis-validation.types";
 import type { ArtifactsPanelStatus, DebateProgress } from "@/features/artifacts/types";
-import type { DebateExitOutcome } from "@/features/agents/types";
+import type { DebateExitOutcome } from "@/lib/types";
 
 export interface ArtifactPanelViewState {
   synthesisValidation: SynthesisValidationFlags;

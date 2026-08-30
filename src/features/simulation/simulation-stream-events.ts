@@ -5,8 +5,8 @@ import type {
   AgentRole,
   RunStatus,
   SimulationMessage,
-} from "@/features/agents/types";
-import type { TeamRosterPreview } from "@/features/simulation/team-roster-preview";
+} from "@/lib/types";
+import type { TeamRosterPreview } from "@/lib/team-roster-preview";
 import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 
 import { formatMessageTime } from "@/lib/format-time";

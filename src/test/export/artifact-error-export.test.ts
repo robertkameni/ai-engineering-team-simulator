@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { buildRunMarkdown } from "@/lib/export/build-run-export-document";
-import type { MockRun } from "@/features/agents/types";
+import type { MockRun } from "@/lib/types";
 
 function baseRun(overrides: Partial<MockRun> = {}): MockRun {
   return {

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Home } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { workspaceHeaderHomeButtonClass } from "@/features/workspace/workspace-header-button-styles";
+import { workspaceHeaderHomeButtonClass } from "@/components/ui/button-styles";
 
 export function WorkspaceHeaderHomeButton() {
   return (

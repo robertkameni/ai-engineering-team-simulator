@@ -2,7 +2,7 @@ import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { DebateTurnContext } from "@/ai/context/build-messages";
-import type { AgentRole } from "@/features/agents/types";
+import type { AgentRole } from "@/lib/types";
 import { hasPhysicalKeywords } from "@/ai/orchestration/classify-project";
 import { truncateFeedbackExcerpt } from "@/ai/prompts/shared";
 
@@ -11,6 +11,7 @@ import {
   buildArchitectRevisionTurnPrompt,
   buildArchitectTurnPrompt,
 } from "@/ai/prompts/architect";
+import { buildDeepFocusSkillDirective } from "@/ai/prompts/deep-focus";
 import {
   buildDeveloperSystemPrompt,
   buildDeveloperTurnPrompt,
@@ -50,14 +51,14 @@ export function buildCorrectionTurnPrompt(
   reviewerName: string,
   feedbackExcerpt: string,
   nearCap = false,
-  assignedIssues: readonly { readonly issueId: string; readonly excerpt: string }[] = [],
+  assignedIssues: readonly { readonly issueId: string; readonly excerpt: string; }[] = [],
 ): string {
   const excerpt = truncateFeedbackExcerpt(feedbackExcerpt, { nearCap });
   const issueBlock =
     assignedIssues.length > 0
       ? assignedIssues
-          .map((issue) => `- ${issue.issueId}: ${issue.excerpt}`)
-          .join("\n")
+        .map((issue) => `- ${issue.issueId}: ${issue.excerpt}`)
+        .join("\n")
       : "- (no tracked issue IDs — address only the reviewer objections below)";
 
   return `
@@ -102,47 +103,63 @@ export function getAgentSystemPrompt(
   templateId: TeamTemplateId = roster.templateId,
   productIdea = "",
 ): string {
+  let prompt: string;
+
   if (shouldRouteHybridComplianceBackend(role, templateId, productIdea)) {
-    return buildPhysicalComplianceExpertSystemPrompt(roster);
-  }
+    prompt = buildPhysicalComplianceExpertSystemPrompt(roster);
+  } else {
+    const resolved = resolvePromptTemplateId(templateId);
 
-  const resolved = resolvePromptTemplateId(templateId);
-
-  if (resolved === "physical") {
-    switch (role) {
-      case "pm":
-        return buildPhysicalPmSystemPrompt(roster);
-      case "architect":
-        return buildPhysicalTechnicalEngineerSystemPrompt(roster);
-      case "backend":
-        return buildPhysicalComplianceExpertSystemPrompt(roster);
-      case "frontend":
-        return buildPhysicalPlanningBudgetSystemPrompt(roster);
-      case "devops":
-        return buildPhysicalDevOpsSystemPrompt(roster);
-      case "reviewer":
-        return buildPhysicalReviewerSystemPrompt(roster);
-      default:
-        throw new Error(`No system prompt for role: ${role}`);
+    if (resolved === "physical") {
+      switch (role) {
+        case "pm":
+          prompt = buildPhysicalPmSystemPrompt(roster);
+          break;
+        case "architect":
+          prompt = buildPhysicalTechnicalEngineerSystemPrompt(roster);
+          break;
+        case "backend":
+          prompt = buildPhysicalComplianceExpertSystemPrompt(roster);
+          break;
+        case "frontend":
+          prompt = buildPhysicalPlanningBudgetSystemPrompt(roster);
+          break;
+        case "devops":
+          prompt = buildPhysicalDevOpsSystemPrompt(roster);
+          break;
+        case "reviewer":
+          prompt = buildPhysicalReviewerSystemPrompt(roster);
+          break;
+        default:
+          throw new Error(`No system prompt for role: ${role}`);
+      }
+    } else {
+      switch (role) {
+        case "pm":
+          prompt = buildPmSystemPrompt(roster);
+          break;
+        case "architect":
+          prompt = buildArchitectSystemPrompt(roster);
+          break;
+        case "backend":
+          prompt = buildDeveloperSystemPrompt(roster);
+          break;
+        case "frontend":
+          prompt = buildFrontendDeveloperSystemPrompt(roster);
+          break;
+        case "devops":
+          prompt = buildDevOpsSystemPrompt(roster);
+          break;
+        case "reviewer":
+          prompt = buildReviewerSystemPrompt(roster);
+          break;
+        default:
+          throw new Error(`No system prompt for role: ${role}`);
+      }
     }
   }
 
-  switch (role) {
-    case "pm":
-      return buildPmSystemPrompt(roster);
-    case "architect":
-      return buildArchitectSystemPrompt(roster);
-    case "backend":
-      return buildDeveloperSystemPrompt(roster);
-    case "frontend":
-      return buildFrontendDeveloperSystemPrompt(roster);
-    case "devops":
-      return buildDevOpsSystemPrompt(roster);
-    case "reviewer":
-      return buildReviewerSystemPrompt(roster);
-    default:
-      throw new Error(`No system prompt for role: ${role}`);
-  }
+  return `${prompt}\n${buildDeepFocusSkillDirective()}`;
 }
 
 export function getAgentTurnPrompt(

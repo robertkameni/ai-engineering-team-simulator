@@ -1,4 +1,4 @@
-import type { RunStatus as AppRunStatus } from "@/features/agents/types";
+import type { RunStatus as AppRunStatus } from "@/lib/types";
 import type { ArtifactsPanelStatus } from "@/features/artifacts/types";
 import type { AppArtifactStatus } from "@/lib/db/artifact-status";
 

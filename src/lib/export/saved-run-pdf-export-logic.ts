@@ -9,7 +9,7 @@ import {
 import type { RequireRunAccessResult } from "@/lib/auth/run-ownership";
 import type { RateLimitResult } from "@/lib/rate-limit-config";
 import { canExportApprovedRun } from "@/features/artifacts/artifact-panel-phase";
-import type { MockRun } from "@/features/agents/types";
+import type { MockRun } from "@/lib/types";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import { buildCompiledPdfAttachmentResponse } from "@/lib/export/pdf-attachment-response";
 
