@@ -59,8 +59,78 @@ describe("extractDeclaredApiSurface", () => {
     );
   });
 
+  it("reads method plus path when the path is wrapped in backticks", () => {
+    const surface = extractDeclaredApiSurface([
+      entry(
+        "backend",
+        [
+          "- **POST `/api/reservations`** — body `{ lockerId, date }`. Response: 201 or 409.",
+          "- **DELETE `/api/reservations/:id`** — sets status=RELEASED; 204.",
+          "- **GET `/api/lockers?date=ISO`** — returns slots; 5s cache.",
+        ].join("\n"),
+      ),
+    ]);
+
+    assert.deepEqual(
+      surface.map((item) => `${item.method} ${item.path}`),
+      [
+        "POST /api/reservations",
+        "DELETE /api/reservations/:id",
+        "GET /api/lockers?date=ISO",
+      ],
+    );
+  });
+
+  it("keeps brace and trailing-bracket parameter placeholders", () => {
+    const surface = extractDeclaredApiSurface([
+      entry(
+        "backend",
+        "Retry is POST /api/reminders/{id} and GET /api/hires/[id].",
+      ),
+    ]);
+
+    assert.deepEqual(
+      surface.map((item) => `${item.method} ${item.path}`),
+      ["POST /api/reminders/{id}", "GET /api/hires/[id]"],
+    );
+  });
+
   it("returns nothing when no endpoints were declared", () => {
     assert.deepEqual(extractDeclaredApiSurface([entry("pm", "Scope and users only.")]), []);
+  });
+
+  it("keeps public product routes that are not under /api/", () => {
+    const surface = extractDeclaredApiSurface([
+      entry("backend", "Public itinerary lives at GET /share/:token."),
+      entry("devops", "Liveness is GET /healthz and readiness is GET /readyz."),
+      entry("frontend", "Silent refresh uses POST /auth/refresh."),
+    ]);
+
+    assert.deepEqual(
+      surface.map((item) => `${item.method} ${item.path}`),
+      [
+        "GET /share/:token",
+        "GET /healthz",
+        "GET /readyz",
+        "POST /auth/refresh",
+      ],
+    );
+  });
+
+  it("skips endpoints flagged for later or future versions", () => {
+    const surface = extractDeclaredApiSurface([
+      entry("backend", "v1 reads use GET /api/trips/:id."),
+      entry(
+        "frontend",
+        "I flag it for `GET /api/trips` later; v1 stays on the by-id route.",
+      ),
+      entry("devops", "A future v2 POST /api/trips/import stays out of scope."),
+    ]);
+
+    assert.deepEqual(
+      surface.map((item) => `${item.method} ${item.path}`),
+      ["GET /api/trips/:id"],
+    );
   });
 
   it("drops provider API paths that are not product /api/ routes", () => {

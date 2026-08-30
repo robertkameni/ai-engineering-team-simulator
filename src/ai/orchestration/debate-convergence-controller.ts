@@ -274,6 +274,28 @@ function applyFinalization(
   };
 }
 
+function lastReviewerIndex(transcript: readonly TranscriptEntry[]): number {
+  for (let index = transcript.length - 1; index >= 0; index -= 1) {
+    if (transcript[index]?.role === "reviewer") {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function hasUnreviewedTargetedTurns(
+  transcript: readonly TranscriptEntry[],
+): boolean {
+  const reviewerIndex = lastReviewerIndex(transcript);
+  if (reviewerIndex < 0) {
+    return false;
+  }
+
+  return transcript
+    .slice(reviewerIndex + 1)
+    .some((entry) => entry.role !== "reviewer");
+}
+
 function maybeScheduleApprovedRecovery(
   state: DebateConvergenceState,
 ): DebateConvergenceDirective | null {
@@ -287,6 +309,44 @@ function maybeScheduleApprovedRecovery(
     phase: "correction_wave",
     role: plan.role,
   };
+}
+
+function hasUnreviewedCorrectionFrom(
+  transcript: readonly TranscriptEntry[],
+  role: SimulationAgentRole,
+): boolean {
+  const reviewerIndex = lastReviewerIndex(transcript);
+  if (reviewerIndex < 0) {
+    return false;
+  }
+
+  return transcript
+    .slice(reviewerIndex + 1)
+    .some((entry) => entry.role === role);
+}
+
+function lastSpeakerRole(
+  transcript: readonly TranscriptEntry[],
+): SimulationAgentRole | undefined {
+  return transcript[transcript.length - 1]?.role as SimulationAgentRole | undefined;
+}
+
+function maybeScheduleScopedFinalReview(
+  state: DebateConvergenceState,
+  templateId: TeamTemplateId,
+): DebateConvergenceDirective | null {
+  if (countReviewerTurns(state.transcript) >= 2) {
+    return null;
+  }
+  if (state.turnCount >= getMaxTurns(templateId)) {
+    return null;
+  }
+  if (!hasUnreviewedTargetedTurns(state.transcript)) {
+    return null;
+  }
+
+  state.phase = "final_review";
+  return { kind: "schedule_turn", phase: "final_review", role: "reviewer" };
 }
 
 function syncApprovedFinalizationFlags(
@@ -318,26 +378,45 @@ function decideApprovedPath(
     return recoveryDirective;
   }
 
-  if (isSoftwareBoundedTemplate(templateId) && state.turnCount >= SOFTWARE_FINALIZATION_PRIORITY_TURN) {
-    syncApprovedFinalizationFlags(state);
-    if (state.postApproveTruncation) {
-      console.error(
-        "TRUNCATION DEFECT: critical turn still truncated after recovery; finalizing with truncationRetried",
-        {
-          turnCount: state.turnCount,
-          attemptedRoles: state.truncationRecoveryAttemptedRoles,
-        },
-      );
-      state.truncationRetried = true;
-    }
-    return applyFinalization(
-      state,
-      state.turnCount,
-      "Software debate reached deterministic finalization priority.",
-    );
+  const scopedReviewDirective = maybeScheduleScopedFinalReview(state, templateId);
+  if (scopedReviewDirective) {
+    return scopedReviewDirective;
   }
 
-  return applyFinalization(state, state.turnCount, "Reviewer approved debate closure.");
+  syncApprovedFinalizationFlags(state);
+  if (state.postApproveTruncation) {
+    console.error(
+      "TRUNCATION DEFECT: critical turn still truncated after recovery; finalizing with truncationRetried",
+      {
+        turnCount: state.turnCount,
+        attemptedRoles: state.truncationRecoveryAttemptedRoles,
+      },
+    );
+    state.truncationRetried = true;
+  }
+
+  return applyFinalization(
+    state,
+    state.turnCount,
+    resolveApprovedFinalizationReason(state, templateId),
+  );
+}
+
+function resolveApprovedFinalizationReason(
+  state: DebateConvergenceState,
+  templateId: TeamTemplateId,
+): string {
+  const reviewerTurns = countReviewerTurns(state.transcript);
+  if (reviewerTurns >= 2 && lastSpeakerRole(state.transcript) === "reviewer") {
+    return "Reviewer completed scoped final review.";
+  }
+  if (
+    isSoftwareBoundedTemplate(templateId) &&
+    state.turnCount >= SOFTWARE_FINALIZATION_PRIORITY_TURN
+  ) {
+    return "Software debate reached deterministic finalization priority.";
+  }
+  return "Reviewer approved debate closure.";
 }
 
 function decideInitialDeliveryOrReview(
@@ -391,6 +470,16 @@ function decideSoftwarePath(
   const targetRole = getRejectTarget(state);
   if (proposal?.decision === "reject") {
     if (shouldAdvanceToSoftwareFinalReview(state, targetRole)) {
+      state.phase = "final_review";
+      return { kind: "schedule_turn", phase: "final_review", role: "reviewer" };
+    }
+
+    if (targetRole && hasUnreviewedCorrectionFrom(state.transcript, targetRole)) {
+      if (shouldScheduleOpsClosure(state)) {
+        state.phase = "ops_closure";
+        return { kind: "schedule_turn", phase: "ops_closure", role: "devops" };
+      }
+
       state.phase = "final_review";
       return { kind: "schedule_turn", phase: "final_review", role: "reviewer" };
     }

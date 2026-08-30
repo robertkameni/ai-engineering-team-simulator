@@ -63,13 +63,25 @@ function resolveApproveDecision(
  * finalization does not auto-accept resolved work as "accepted critical risks"
  * (which makes artifacts describe implemented fixes as unresolved).
  */
+function lastNonReviewerEntry(
+  transcript: DebateState["transcript"],
+): DebateState["transcript"][number] | undefined {
+  for (let index = transcript.length - 1; index >= 0; index -= 1) {
+    const entry = transcript[index];
+    if (entry && entry.role !== "reviewer") {
+      return entry;
+    }
+  }
+  return undefined;
+}
+
 function closeScopedReReviewIssues(state: DebateState): void {
   const targetRole = state.lastRejectTarget;
   if (!targetRole) {
     return;
   }
 
-  const lastEntry = state.transcript[state.transcript.length - 1];
+  const lastEntry = lastNonReviewerEntry(state.transcript);
   if (!lastEntry || lastEntry.role !== targetRole) {
     return;
   }

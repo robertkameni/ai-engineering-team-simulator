@@ -67,6 +67,39 @@ describe("extractUnresolvedProseCriticalRisks", () => {
     assert.match(risks[1]!.excerpt, /auth token refresh/);
   });
 
+  it("promotes must-include and missing-mitigation critical gaps", () => {
+    const review = `## Critical Risks
+
+**Risk 1 — Share-link IDOR (security).** The public share token must include an unguessable secret and a revocation path. This is a critical auth gap.
+
+**Risk 2 — Restore drill (data_loss).** Backup restore must include a named staging drill. Mitigation is required before ship.
+
+**Risk 3 — Poller lag (silent degradation).** Workers must include a lag alert.`;
+
+    const risks = extractUnresolvedProseCriticalRisks(review, fixedRoster());
+
+    assert.equal(risks.length, 2);
+    assert.deepEqual(
+      risks.map((risk) => risk.category),
+      ["security", "data_loss"],
+    );
+    assert.match(risks[0]!.excerpt, /Share-link IDOR/);
+    assert.match(risks[1]!.excerpt, /Restore drill/);
+  });
+
+  it("skips restore-drill tuning notes marked as not a blocker", () => {
+    const review = `## Critical Risks
+
+**Risk 1 — Row-count tolerance (data_loss).** The 0.1% restore-drill tolerance could mask a partial restore. This is a tuning note, not a blocker.
+
+**Risk 2 — Backup restore untested (data_loss).** Unresolved — no named restore test exists.`;
+
+    const risks = extractUnresolvedProseCriticalRisks(review, fixedRoster());
+
+    assert.equal(risks.length, 1);
+    assert.match(risks[0]!.excerpt, /Backup restore untested/);
+  });
+
   it("skips risks the reviewer marked resolved", () => {
     const risks = extractUnresolvedProseCriticalRisks(
       RESOLVED_RISK_REVIEW,

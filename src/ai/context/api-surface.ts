@@ -6,7 +6,66 @@ export interface ApiSurfaceEntry {
 }
 
 const ENDPOINT_PATTERN =
-  /\b(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+(\/[^\s,;)}"'`]+)/gi;
+  /\b(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s+`?(\/[^\s,;)"'`]+)`?/gi;
+
+const PRODUCT_PATH_PREFIXES = [
+  "/api/",
+  "/auth",
+  "/share",
+  "/health",
+  "/healthz",
+  "/readyz",
+  "/webhooks",
+] as const;
+
+const DEFERRED_ENDPOINT_WINDOW_BEFORE_CHARS = 100;
+const DEFERRED_ENDPOINT_WINDOW_AFTER_CHARS = 80;
+
+const DEFERRED_ENDPOINT_CONTEXT =
+  /\b(later|future|v2|not (?:in|for) v1|flag(?:ged)?(?:\s+it)?\s+for(?:\s+later)?|deferred|out of scope)\b/i;
+
+function isProductPath(path: string): boolean {
+  return PRODUCT_PATH_PREFIXES.some((prefix) => {
+    if (prefix.endsWith("/")) {
+      return path.startsWith(prefix);
+    }
+    return path === prefix || path.startsWith(`${prefix}/`);
+  });
+}
+
+function isDeferredEndpointMention(
+  content: string,
+  matchIndex: number,
+  matchLength: number,
+): boolean {
+  const windowStart = Math.max(0, matchIndex - DEFERRED_ENDPOINT_WINDOW_BEFORE_CHARS);
+  const windowEnd = Math.min(
+    content.length,
+    matchIndex + matchLength + DEFERRED_ENDPOINT_WINDOW_AFTER_CHARS,
+  );
+  return DEFERRED_ENDPOINT_CONTEXT.test(content.slice(windowStart, windowEnd));
+}
+
+function trimDeclaredPath(path: string): string {
+  const withoutSoftPunctuation = path.replace(/[.,;:>]+$/u, "");
+  if (
+    withoutSoftPunctuation.includes("{") &&
+    withoutSoftPunctuation.includes("}")
+  ) {
+    return withoutSoftPunctuation.replace(/[)>]+$/u, "");
+  }
+  if (
+    withoutSoftPunctuation.includes("[") &&
+    withoutSoftPunctuation.includes("]")
+  ) {
+    return withoutSoftPunctuation.replace(/[)>]+$/u, "");
+  }
+  return withoutSoftPunctuation.replace(/[)\]}>]+$/u, "");
+}
+
+function endpointKey(method: string, path: string): string {
+  return `${method} ${path.toLowerCase()}`;
+}
 
 /**
  * Extracts the method + path pairs the team actually declared in the debate.
@@ -17,26 +76,27 @@ const ENDPOINT_PATTERN =
 export function extractDeclaredApiSurface(
   transcript: readonly TranscriptEntry[],
 ): ApiSurfaceEntry[] {
-  const entries: ApiSurfaceEntry[] = [];
-  const seen = new Set<string>();
+  const entries = new Map<string, ApiSurfaceEntry>();
 
   for (const entry of transcript) {
     for (const match of entry.content.matchAll(ENDPOINT_PATTERN)) {
       const method = match[1]!.toUpperCase();
-      const path = match[2]!.replace(/[.,;:)\]}>]+$/u, "");
-      if (!path.startsWith("/api/")) {
+      const path = trimDeclaredPath(match[2]!);
+      if (!isProductPath(path)) {
         continue;
       }
-      const key = `${method} ${path.toLowerCase()}`;
-      if (seen.has(key)) {
+      if (
+        match.index !== undefined &&
+        isDeferredEndpointMention(entry.content, match.index, match[0].length)
+      ) {
         continue;
       }
-      seen.add(key);
-      entries.push({ method, path });
+
+      entries.set(endpointKey(method, path), { method, path });
     }
   }
 
-  return entries;
+  return [...entries.values()];
 }
 
 export function buildApiSurfaceDirective(

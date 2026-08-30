@@ -24,6 +24,11 @@ const CRITICAL_PATTERNS: RegExp[] = [
   /\bI will (change|modify|alter|revise|keep|add)\b/i,
   /\boperational (weakness|gap|concern)\b/i,
   /\bthis is (wrong|incorrect|problematic|insufficient)\b/i,
+  /\bfold(?:s|ed|ing)?\s+(?:it\s+)?into\b/i,
+  /\badds?\s+(?:\w+\s+){0,3}(?:cost|overhead)\b/i,
+  /\b(?:over|under)-?normaliz/i,
+  /\bI split(?:\s+\w+){0,6}\s+into\b/i,
+  /\bbut\s+.{0,120}\b(?:cost|overhead|fold|join cost|without query|under-?normaliz)\b/i,
 ];
 
 const EXCERPT_MIN_CHARS = 20;

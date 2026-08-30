@@ -52,6 +52,11 @@ const UNRESOLVED_SIGNALS: readonly RegExp[] = [
   /no scheduled job/i,
   /no named test/i,
   /without this,? .{0,120}\b(theater|theatre)\b/i,
+  /this is a critical\b/i,
+  /\bcritical (?:security|auth|data.?loss).{0,80}\bgap\b/i,
+  /\b(?:no|without(?: a)?|missing|lacks?)\s+(?:named\s+)?mitigation\b/i,
+  /\bmitigation (?:is )?(?:required|needed|missing|absent)\b/i,
+  /\bmust include\b/i,
 ];
 
 const RESOLVED_SIGNALS: readonly RegExp[] = [
@@ -59,6 +64,9 @@ const RESOLVED_SIGNALS: readonly RegExp[] = [
   /already present/i,
   /already in /i,
   /now (?:present|addressed|implemented|adopted)/i,
+  /\btuning note\b/i,
+  /\bnot a blocker\b/i,
+  /\bno reject\b/i,
 ];
 
 function extractCriticalRisksSection(text: string): string {

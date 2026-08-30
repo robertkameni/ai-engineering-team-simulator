@@ -162,6 +162,29 @@ describe("decideDebateConvergence", () => {
     );
     assertSchedule(correctionDirective, "correction_wave", "backend");
 
+    const afterOneCorrection = decideDebateConvergence(
+      buildState({
+        phase: "correction_wave",
+        turnCount: 7,
+        transcript: buildTranscript([
+          "pm",
+          "architect",
+          "backend",
+          "frontend",
+          "devops",
+          "reviewer",
+          "backend",
+        ]),
+        reviewerProposal: buildProposal("reject", {
+          rejectRole: "backend",
+          scopedRejectRole: "backend",
+        }),
+        roleCorrectionCounts: { backend: 1 },
+      }),
+      { templateId: "software" },
+    );
+    assertSchedule(afterOneCorrection, "final_review", "reviewer");
+
     const opsDirective = decideDebateConvergence(
       buildState({
         phase: "correction_wave",
@@ -218,6 +241,89 @@ describe("decideDebateConvergence", () => {
       { templateId: "software" },
     );
     assertSchedule(finalReviewDirective, "final_review", "reviewer");
+  });
+
+  it("schedules scoped final review after targeted turns even at finalization priority", () => {
+    const directive = decideDebateConvergence(
+      buildState({
+        phase: "correction_wave",
+        turnCount: 8,
+        transcript: buildTranscript([
+          "pm",
+          "architect",
+          "backend",
+          "frontend",
+          "devops",
+          "reviewer",
+          "backend",
+          "frontend",
+        ]),
+        reviewerProposal: buildProposal("approve", {
+          issuedOnTurn: 6,
+        }),
+      }),
+      { templateId: "software" },
+    );
+
+    assertSchedule(directive, "final_review", "reviewer");
+  });
+
+  it("finalizes after scoped final review when the reviewer is the last speaker", () => {
+    const directive = decideDebateConvergence(
+      buildState({
+        phase: "final_review",
+        turnCount: 9,
+        transcript: buildTranscript([
+          "pm",
+          "architect",
+          "backend",
+          "frontend",
+          "devops",
+          "reviewer",
+          "backend",
+          "frontend",
+          "reviewer",
+        ]),
+        reviewerProposal: buildProposal("approve", {
+          issuedOnTurn: 9,
+        }),
+      }),
+      { templateId: "software" },
+    );
+
+    assert.equal(directive.kind, "finalize");
+    if (directive.kind === "finalize") {
+      assert.equal(directive.outcome, "approved");
+    }
+  });
+
+  it("names scoped final review as the finalize reason after a second reviewer turn", () => {
+    const state = buildState({
+      phase: "final_review",
+      turnCount: 9,
+      transcript: buildTranscript([
+        "pm",
+        "architect",
+        "backend",
+        "frontend",
+        "devops",
+        "reviewer",
+        "backend",
+        "frontend",
+        "reviewer",
+      ]),
+      reviewerProposal: buildProposal("approve", {
+        issuedOnTurn: 9,
+      }),
+    });
+
+    const directive = decideDebateConvergence(state, { templateId: "software" });
+
+    assert.equal(directive.kind, "finalize");
+    assert.equal(
+      state.finalizationProposal?.reason,
+      "Reviewer completed scoped final review.",
+    );
   });
 
   it("prioritizes finalization at turn 8 instead of another correction", () => {

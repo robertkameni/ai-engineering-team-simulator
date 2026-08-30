@@ -102,6 +102,65 @@ describe("buildCritiqueMatrix", () => {
     );
   });
 
+  it("detects a contrastive cost challenge without challenge or gap keywords", () => {
+    const transcript = [
+      {
+        role: "backend" as const,
+        agentName: roster.backend.name,
+        content: `## Decisions\n\n${roster.architect.name}'s model is well-normalized for a trip planner, but \`BudgetLine\` as a separate 1:N table adds join cost without query benefit—fold it into \`Day\` as a JSON column.`,
+      },
+    ];
+
+    const matrix = buildCritiqueMatrix(transcript, roster);
+
+    const backend = matrix.find((entry) => entry.role === "backend")!;
+    assert.ok(
+      backend.critiques.some(
+        (critique) =>
+          critique.targetRole === "architect" &&
+          critique.excerpt.includes("BudgetLine") &&
+          critique.excerpt.includes("adds join cost"),
+      ),
+    );
+  });
+
+  it("detects an under-normalized split challenge without challenge or gap keywords", () => {
+    const transcript = [
+      {
+        role: "backend" as const,
+        agentName: roster.backend.name,
+        content: `## Summary\n\n${roster.architect.name}'s model is sound but under-normalized for signatures: storing SHA-256 hash on the signature row couples content-addressing with metadata. I split into SignatureDocument and SignatureRecord for independent verification.`,
+      },
+    ];
+
+    const matrix = buildCritiqueMatrix(transcript, roster);
+
+    const backend = matrix.find((entry) => entry.role === "backend")!;
+    assert.ok(
+      backend.critiques.some(
+        (critique) =>
+          critique.targetRole === "architect" &&
+          critique.excerpt.includes("under-normalized") &&
+          critique.excerpt.includes("I split into"),
+      ),
+    );
+  });
+
+  it("does not treat contrastive praise as a critique", () => {
+    const transcript = [
+      {
+        role: "backend" as const,
+        agentName: roster.backend.name,
+        content: `## Decisions\n\n${roster.architect.name}'s model is well-normalized and I adopt it wholesale.`,
+      },
+    ];
+
+    const matrix = buildCritiqueMatrix(transcript, roster);
+
+    const backend = matrix.find((entry) => entry.role === "backend")!;
+    assert.equal(backend.critiques.length, 0);
+  });
+
   it("treats plural 'gaps' as a critical-language signal", () => {
     const transcript = [
       {

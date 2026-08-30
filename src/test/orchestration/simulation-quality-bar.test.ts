@@ -358,6 +358,12 @@ describe("scoped re-review approval closes assigned issues", () => {
           content:
             "## Changes\nAdded nightly pg_dump and a monthly restore-drill CI job.",
         },
+        {
+          role: "reviewer",
+          agentName: "R",
+          content:
+            "All assigned issues are addressed with named mechanisms.",
+        },
       ],
     });
     const ctx = buildCtx("software");
