@@ -76,14 +76,19 @@ export function SimulationWorkspace({
     mobile.openArtifacts();
   }, [artifactsStatus, mobile]);
 
+  const startRef = useRef(start);
+  useEffect(() => {
+    startRef.current = start;
+  });
+
   useEffect(() => {
     if (!autoStart) {
       return;
     }
     const controller = new AbortController();
-    void start(userPrompt, { signal: controller.signal });
+    void startRef.current(userPrompt, { signal: controller.signal });
     return () => controller.abort();
-  }, [autoStart, userPrompt, start]);
+  }, [autoStart, userPrompt]);
 
   const rerunSimulation = useCallback(
     (overridePrompt?: string) => {

@@ -215,6 +215,9 @@ export function buildAgentMessages(
         targetRole: debateContext.reReviewTargetRole ?? null,
         issues: debateContext.reReviewIssues ?? [],
         roster,
+        targetLatestMessage: debateContext.reReviewTargetRole
+          ? findLatestMessageByRole(transcript, debateContext.reReviewTargetRole)
+          : null,
       })
       : buildReviewerPreflightChecklist(transcript, roster);
 
@@ -245,4 +248,12 @@ export function buildAgentMessages(
 
 function formatTranscriptMessage(entry: TranscriptEntry): string {
   return `**${entry.agentName}** (${entry.role}):\n\n${entry.content}`;
+}
+
+function findLatestMessageByRole(
+  transcript: readonly TranscriptEntry[],
+  role: SimulationAgentRole,
+): string | null {
+  const entry = transcript.findLast((item) => item.role === role);
+  return entry?.content ?? null;
 }

@@ -3,6 +3,9 @@ import { incrementRoleCorrectionCount } from "@/ai/orchestration/debate-correcti
 import { parseReviewerDecisionWithMangleRecovery } from "@/ai/orchestration/normalize-mangled-decision-tag";
 import { getMaxSimulationTurns } from "@/ai/orchestration/reviewer-decision";
 import {
+  markIssuesAddressed,
+} from "@/ai/orchestration/review-issue-tracker";
+import {
   shouldScheduleMissingRoleFirstTurn,
 } from "@/ai/orchestration/role-participation";
 import { updateReviewerRejectIssues } from "@/ai/orchestration/review-reject-issue-scope";
@@ -40,6 +43,7 @@ function resolveApproveDecision(
   displayText: string,
   state: DebateState,
 ): TurnDirective {
+  closeScopedReReviewIssues(state);
   state.lastRejectFeedback = null;
   state.lastRejectTarget = null;
   state.hasHadOpsFollowUpForCurrentReject = false;
@@ -51,6 +55,38 @@ function resolveApproveDecision(
     issuedOnTurn: state.turnCount,
   };
   return { kind: "progress" };
+}
+
+/**
+ * A scoped re-review approval is the reviewer's verdict that every assigned
+ * issue for the corrected role is resolved. Close those issues so deterministic
+ * finalization does not auto-accept resolved work as "accepted critical risks"
+ * (which makes artifacts describe implemented fixes as unresolved).
+ */
+function closeScopedReReviewIssues(state: DebateState): void {
+  const targetRole = state.lastRejectTarget;
+  if (!targetRole) {
+    return;
+  }
+
+  const lastEntry = state.transcript[state.transcript.length - 1];
+  if (!lastEntry || lastEntry.role !== targetRole) {
+    return;
+  }
+
+  const assignedIssues = state.reviewIssues.filter(
+    (issue) => issue.targetRole === targetRole && issue.status === "open",
+  );
+  if (assignedIssues.length === 0) {
+    return;
+  }
+
+  console.info("RE-REVIEW APPROVE: closing assigned issues as addressed", {
+    targetRole,
+    closedIssueCount: assignedIssues.length,
+    issueIds: assignedIssues.map((issue) => issue.id),
+  });
+  markIssuesAddressed(assignedIssues);
 }
 
 /**

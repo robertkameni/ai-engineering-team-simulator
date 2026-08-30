@@ -73,6 +73,16 @@ export async function scheduleCoreArtifactSynthesis({
       onArtifactComplete,
     });
 
+    if (!synthesis.ok && synthesis.error === "not_found") {
+      // Run deleted while background synthesis was in flight; nothing to
+      // persist or reconcile.
+      return {
+        ok: false,
+        artifactDurationMs: synthesis.artifactDurationMs ?? null,
+        error: "not_found",
+      };
+    }
+
     await setRunUsageTotals(runId, accumulator.getTotals());
 
     if (synthesis.ok) {

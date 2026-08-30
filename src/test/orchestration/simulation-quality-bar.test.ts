@@ -336,6 +336,78 @@ describe("near-cap approve via resolveReviewerOutcome", () => {
   });
 });
 
+describe("scoped re-review approval closes assigned issues", () => {
+  it("marks the corrected role's open issues addressed on re-review approve", () => {
+    const roster = createSimulationRoster("software");
+    const reviewIssues = createReviewIssues(
+      [],
+      "devops",
+      "**Disagree** Automated backup with tested restore is missing. **UNRESOLVED.**",
+      0,
+      6,
+      roster,
+    );
+    const state = buildState({
+      lastRejectTarget: "devops",
+      reviewIssues,
+      transcript: [
+        ...fullParticipationTranscript().slice(0, 5),
+        {
+          role: "devops",
+          agentName: "D",
+          content:
+            "## Changes\nAdded nightly pg_dump and a monthly restore-drill CI job.",
+        },
+      ],
+    });
+    const ctx = buildCtx("software");
+
+    resolveReviewerOutcome(
+      "reviewer",
+      "All assigned issues are addressed with named mechanisms.\n\n[APPROVE]",
+      state,
+      ctx,
+    );
+
+    assert.equal(
+      state.reviewIssues.filter((issue) => issue.status === "open").length,
+      0,
+    );
+    assert.equal(
+      state.reviewIssues.filter((issue) => issue.status === "addressed").length,
+      state.reviewIssues.length,
+    );
+  });
+
+  it("keeps issues open when the approve is not a scoped re-review", () => {
+    const roster = createSimulationRoster("software");
+    const reviewIssues = createReviewIssues(
+      [],
+      "backend",
+      "**Disagree** Outbox ordering remains unresolved. **UNRESOLVED.**",
+      0,
+      6,
+      roster,
+    );
+    const state = buildState({
+      reviewIssues,
+      transcript: fullParticipationTranscript(),
+    });
+    const ctx = buildCtx("software");
+
+    resolveReviewerOutcome(
+      "reviewer",
+      "Looks good.\n\n[APPROVE]",
+      state,
+      ctx,
+    );
+
+    assert.ok(
+      state.reviewIssues.some((issue) => issue.status === "open"),
+    );
+  });
+});
+
 describe("ops follow-up near-cap after non-architect correction", () => {
   it("triggers DevOps invite near cap despite not_architect_correction gate", () => {
     const roster = createSimulationRoster("software");

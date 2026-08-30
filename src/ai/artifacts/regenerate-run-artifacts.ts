@@ -29,6 +29,7 @@ import type { ArtifactType } from "@/features/artifacts/schemas";
 import type { PartialRunArtifacts } from "@/features/artifacts/types";
 import {
   runArtifactsOutputToBundle,
+  runStillExists,
   saveSingleArtifact,
 } from "@/lib/db/artifacts";
 import {
@@ -285,6 +286,16 @@ export async function regenerateRunArtifacts(
       },
     });
 
+    if (!(await runStillExists(runId))) {
+      // Run deleted while artifacts were being generated; there is nothing to
+      // finalize for it.
+      return {
+        ok: false,
+        error: "not_found",
+        artifactDurationMs: Date.now() - artifactPhaseStartedAt,
+      };
+    }
+
     const bundle = await finalizeRegenerateSuccess(
       runId,
       run,
@@ -300,6 +311,10 @@ export async function regenerateRunArtifacts(
     };
   } catch (error) {
     const artifactDurationMs = Date.now() - artifactPhaseStartedAt;
+
+    if (!(await runStillExists(runId))) {
+      return { ok: false, error: "not_found", artifactDurationMs };
+    }
 
     if (isSimulationBudgetExceeded(error)) {
       console.warn("Regenerate artifacts: budget exceeded during generation", {

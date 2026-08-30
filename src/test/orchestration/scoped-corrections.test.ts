@@ -78,6 +78,39 @@ describe("scoped correction and re-review prompts", () => {
     assert.doesNotMatch(checklist, /FIRST-PASS REVIEW/);
   });
 
+  it("credits the corrected agent's latest full re-post in the checklist", () => {
+    const checklist = buildScopedReReviewChecklist({
+      targetRole: "frontend",
+      roster,
+      issues: [
+        {
+          issueId: "ri_banner",
+          excerpt: "Geocode stall banner stays dismissed for the session.",
+          status: "open",
+        },
+      ],
+      targetLatestMessage:
+        "## Changes\nAdded unlocated poll.\n\n## Frontend Strategy\n...the banner re-appears on subsequent polls if the stall persists, even after dismissal.",
+    });
+
+    assert.match(checklist, /ri_banner/);
+    assert.match(checklist, /Corrected agent's latest message \(verbatim\)/);
+    assert.match(checklist, /banner re-appears on subsequent polls/);
+    assert.match(checklist, /LATEST message/);
+    assert.match(checklist, /it is authoritative/i);
+  });
+
+  it("omits the latest-message block when the corrected agent never spoke", () => {
+    const checklist = buildScopedReReviewChecklist({
+      targetRole: "devops",
+      roster,
+      issues: [],
+      targetLatestMessage: null,
+    });
+
+    assert.doesNotMatch(checklist, /Corrected agent's latest message/);
+  });
+
   it("uses the scoped re-review turn prompt", () => {
     const prompt = getAgentTurnPrompt("reviewer", "Expense splitter", roster, "software", {
       isReReview: true,

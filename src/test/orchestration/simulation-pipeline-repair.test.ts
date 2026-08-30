@@ -115,6 +115,23 @@ describe("buildReviewerPreflightChecklist frontend gate", () => {
 
     assert.ok(checklist.includes("prefer [REJECT: frontend] until complete"));
   });
+
+  it("includes the server-computed cross-critique matrix", () => {
+    const roster = createSimulationRoster("software");
+    const checklist = buildReviewerPreflightChecklist(
+      [
+        {
+          role: "pm",
+          agentName: roster.pm.name,
+          content: `## Scope\n\n${roster.frontend.name} proposed node-cron but it has no retry and no dead-letter handling — a real flaw I am challenging.`,
+        },
+      ],
+      roster,
+    );
+
+    assert.ok(checklist.includes("Cross-critique matrix (server-computed)"));
+    assert.ok(checklist.includes("no verbatim critique detected"));
+  });
 });
 
 describe("normalizeMangledReviewerDecisionText — study-group fixture", () => {

@@ -1,5 +1,7 @@
-import type { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
+import type { Artifact as ArtifactRow } from "@/generated/prisma/client";
 
+import { isForeignKeyViolation } from "@/lib/db/foreign-key-error";
 import type {
   ArtifactDocument,
   RunArtifactsOutput,
@@ -13,18 +15,35 @@ import type { RunArtifacts } from "@/features/artifacts/types";
 import { TEAM_ROSTER_ARTIFACT_TYPE } from "@/lib/db/team-roster";
 import { prisma } from "@/lib/prisma";
 
+export async function runStillExists(runId: string): Promise<boolean> {
+  const run = await prisma.run.findUnique({
+    where: { id: runId },
+    select: { id: true },
+  });
+  return run !== null;
+}
+
 async function upsertArtifact(
   runId: string,
   type: string,
   data: Prisma.InputJsonValue,
-) {
-  return prisma.artifact.upsert({
-    where: {
-      runId_type: { runId, type },
-    },
-    create: { runId, type, data },
-    update: { data },
-  });
+): Promise<ArtifactRow | null> {
+  try {
+    return await prisma.artifact.upsert({
+      where: {
+        runId_type: { runId, type },
+      },
+      create: { runId, type, data },
+      update: { data },
+    });
+  } catch (error) {
+    if (isForeignKeyViolation(error)) {
+      // The run was deleted while background synthesis was in flight; there is
+      // no run left to attach the artifact to, so skip the write.
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function getArtifactsForRun(runId: string) {

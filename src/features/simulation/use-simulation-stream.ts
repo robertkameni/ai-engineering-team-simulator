@@ -14,6 +14,7 @@ import type {
 import { parseSimulationEvent } from "@/lib/simulation-stream";
 import type { TeamRosterPreview } from "@/lib/team-roster-preview";
 
+import { shouldSuppressDuplicateStart } from "./duplicate-start-guard";
 import { createSimulationStreamEventHandler } from "./simulation-stream-events";
 import {
   formatSimulationStreamError,
@@ -42,6 +43,10 @@ export function useSimulationStream() {
   const [crossValidationFailed, setCrossValidationFailed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const activeMessageIdRef = useRef<string | null>(null);
+  const pendingStartRef = useRef<{ prompt: string; attemptId: number; } | null>(
+    null,
+  );
+  const attemptCounterRef = useRef(0);
 
   const panelArtifactsStatus = artifactsStatus;
 
@@ -83,11 +88,39 @@ export function useSimulationStream() {
 
   const start = useCallback(
     async (prompt: string, options: StartSimulationOptions = {}) => {
+      const trimmedPrompt = prompt.trim();
+      if (
+        shouldSuppressDuplicateStart(
+          pendingStartRef.current?.prompt ?? null,
+          trimmedPrompt,
+        )
+      ) {
+        return;
+      }
+      const attemptId = ++attemptCounterRef.current;
+      pendingStartRef.current = { prompt: trimmedPrompt, attemptId };
+
       abortRef.current?.abort();
 
       const ownsController = options.signal == null;
       const abortController = ownsController ? new AbortController() : null;
       const signal = options.signal ?? abortController!.signal;
+
+      // Dropping this attempt (user cancel, StrictMode remount, or prompt
+      // change) must release the in-flight guard synchronously. Otherwise the
+      // following start for the same prompt is suppressed even though nothing
+      // is running, leaving the UI stuck on a canceled fetch. Matching by
+      // attempt id keeps a late-completing earlier attempt from clearing a
+      // newer attempt's guard for the same prompt.
+      signal.addEventListener(
+        "abort",
+        () => {
+          if (pendingStartRef.current?.attemptId === attemptId) {
+            pendingStartRef.current = null;
+          }
+        },
+        { once: true },
+      );
 
       if (abortController) {
         abortRef.current = abortController;
@@ -261,6 +294,10 @@ export function useSimulationStream() {
         setActiveAgent(null);
         setArtifactsStatus("unavailable");
         setError(formatSimulationStreamError(err));
+      } finally {
+        if (pendingStartRef.current?.attemptId === attemptId) {
+          pendingStartRef.current = null;
+        }
       }
     },
     [recoverAfterDrop, router],

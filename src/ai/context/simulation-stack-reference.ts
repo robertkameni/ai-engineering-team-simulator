@@ -13,8 +13,6 @@ const STACK_PACKAGE_KEYS = [
   "prisma",
   "@prisma/client",
   "zod",
-  "ai",
-  "@ai-sdk/deepseek",
 ] as const;
 
 function readPackageVersions(): ReadonlyMap<string, string> {
@@ -62,9 +60,11 @@ export function buildSimulationStackReferenceDirective(): string {
     .join("\n");
 
   return `## Verified modern web stack reference
-Use these versions for greenfield product specs unless the product idea explicitly requires something else:
+These are the reference versions the product being designed will use. Treat them as the product's own chosen stack.
 ${versionLines}
 - Test runner: Node.js native \`node --test\` (not vitest or jest unless verified for that product)
 - Database migrations: Prisma \`migrate dev\` / \`migrate deploy\` (not node-pg-migrate or raw SQL migration runners unless required)
-Do not cite stale major versions (Next.js 14, Prisma 6, TypeScript 5) when a newer verified version is listed above.`;
+Do not cite stale major versions (Next.js 14, Prisma 6, TypeScript 5) when a newer verified version is listed above.
+Do not introduce AI / LLM features or AI SDK dependencies unless the Product Idea explicitly requires them — an AI feature that no team member proposed is out of scope.
+Never reference the host application, its repository, its package.json, or any surrounding simulator tooling in your deliverables. Describe dependencies as the product's stack, never as versions copied from an existing project file.`;
 }

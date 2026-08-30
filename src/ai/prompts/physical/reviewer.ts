@@ -32,7 +32,7 @@ export function buildPhysicalReviewerTurnPrompt(
   const base = `Write a short review. Quote at least two claims from the previous agents. ${buildImplementationQuoteHint(roster)} Stay under 220 words. Reject any software drift. End with [APPROVE] or [REJECT: role] on its own last line (role = pm, architect, backend, frontend, or devops). Nothing may follow the tag.`;
 
   if (options?.isReReview) {
-    return `SCOPED RE-REVIEW: Judge only the assigned issue IDs from the scoped checklist. Do not invent unrelated blockers. If each assigned open issue is addressed, emit [APPROVE] alone on the last line. Reject only when a listed issue ID remains unresolved. End with [APPROVE] or [REJECT: role] alone on the absolute last line.`;
+    return `SCOPED RE-REVIEW: Judge only the assigned issue IDs from the scoped checklist. The corrected agent's LATEST message (shown verbatim in the checklist) is authoritative — credit a fix that appears there even if the earlier delta correction omitted it. Do not invent unrelated blockers. If each assigned open issue is addressed, emit [APPROVE] alone on the last line. Reject only when a listed issue ID remains unresolved. End with [APPROVE] or [REJECT: role] alone on the absolute last line.`;
   }
 
   return base;

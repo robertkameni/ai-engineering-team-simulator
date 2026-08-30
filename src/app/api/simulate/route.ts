@@ -95,6 +95,7 @@ export async function POST(request: Request) {
             userId,
             guestSessionId,
             usageAccumulator,
+            abortSignal: signal,
           },
         );
         runId = simulation.runId;
@@ -171,7 +172,15 @@ export async function POST(request: Request) {
         send({ type: "error", message: "Simulation failed" });
       } finally {
         clearInterval(keepaliveTimer);
-        controller.close();
+        try {
+          controller.close();
+        } catch (error) {
+          // Client disconnected; the stream is already torn down.
+          console.warn("Simulation stream: close after disconnect", {
+            runId,
+            error,
+          });
+        }
       }
     },
     cancel() {
