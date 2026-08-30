@@ -20,7 +20,7 @@ In Railway project → **Variables**, configure at least:
 | `DATABASE_URL` | ✓ | Pooled Postgres URL from Neon. |
 | `DEEPSEEK_API_KEY` | ✓ | Simulations and artifact generation. |
 | `AUTH_SECRET` | ✓ | **Required in production** — JWT session signing (`src/lib/auth/auth-session.ts`). |
-| `NEXT_PUBLIC_APP_URL` | ✓ | Canonical origin (no trailing slash). Used for Origin allowlist on mutating `/api` routes and artifact synthesize worker dispatch. Example: `https://ai-engineering-team-simulator.up.railway.app`. |
+| `NEXT_PUBLIC_APP_URL` | ✓ | Canonical origin (no trailing slash). Used for Origin allowlist on mutating `/api` routes and artifact synthesize worker dispatch. Example: `https://aisim.lucastar.de`. |
 | `UPSTASH_REDIS_REST_URL` | ✓ | Rate limiting (simulate, delete, export, regenerate, auth). |
 | `UPSTASH_REDIS_REST_TOKEN` | ✓ | Pair with URL above. |
 
@@ -77,13 +77,13 @@ This ensures Railway waits for the health check and restarts only on failure.
 4. **Ensure `nixpacks.toml`** includes `unzip` (required by `md-to-pdf` / Puppeteer for Chrome browser extraction during `npm i`).
 5. Deploy. Watch the build log for `prisma migrate deploy` succeeding.
 
-After deploy, Railway enables **Public Networking** automatically when configured. The production URL follows the pattern:
+After deploy, Railway enables **Public Networking** automatically when configured. The auto-generated production URL follows the pattern:
 
 ```
 https://<service-name>.up.railway.app
 ```
 
-Example: [ai-engineering-team-simulator.up.railway.app](https://ai-engineering-team-simulator.up.railway.app)
+This service is served on the custom domain: [aisim.lucastar.de](https://aisim.lucastar.de). To attach your own domain, in Railway → service → **Settings → Networking → Domains → Custom Domain**, then add the verification/DNS records it shows at your registrar.
 
 ### Bootstrap admin user (optional)
 
@@ -122,4 +122,4 @@ If simulate returns `503` with a rate-limit message, confirm Upstash env vars ar
 
 ---
 
-*Last updated: 2026-07-13 — Railway production deploy live.*
+*Last updated: 2026-08-30 — live on custom domain `aisim.lucastar.de`.*
