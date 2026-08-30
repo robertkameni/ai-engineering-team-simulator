@@ -1,0 +1,202 @@
+---
+name: deep-focus
+description: >
+  DeepFocus — an enforced anti-underthinking skill for agents working in this
+  repository. Build a Recursive Focus Tree, allocate the full parent budget to
+  every leaf, require mandatory self-review and project-standard verification
+  (typecheck, lint, unit tests), and produce verifiable artifacts before marking
+  work done. Use in no-commit mode (agent prepares patches and evidence) or
+  commit mode (human-approved). Auto-apply to multi-step implementation,
+  debugging, refactoring, and any task with multiple acceptance criteria.
+disable-model-invocation: false
+---
+
+# DeepFocus (enforced mode)
+
+## Purpose
+
+DeepFocus prevents premature, shallow completion of complex tasks by forcing structured decomposition, exhaustive effort per sub-task, mandatory self-review, and verification against the repository's own standards before work is considered done. Each leaf in the Recursive Focus Tree receives the full parent budget and must produce concrete evidence (tests, verification reports, diffs) before it counts as Done.
+
+The skill operates in two modes:
+
+- **No-commit mode** (default): the agent generates patches, tests, and evidence; a human applies commits/PRs.
+- **Commit-enabled mode**: only when the user explicitly authorizes it. Merges remain human-controlled.
+
+## When to use
+
+Activate DeepFocus when any of the following hold:
+
+- The task has multiple independent acceptance criteria or outcomes.
+- The task requires multi-step reasoning, design + implementation, or cross-module coordination.
+- Prior attempts were shallow, incomplete, or exhibited frequent thought-switching.
+- The user explicitly requests exhaustive coverage, proofs, or verification.
+
+Do not use DeepFocus for:
+
+- Trivial edits, single-line fixes, or purely factual lookups.
+- Tasks where latency/cost constraints prohibit deep verification.
+
+## Core principles
+
+1. **Recursive Focus Tree (RFT)**: decompose the root task into orthogonal sub-tasks, recursively to depth D. Track the tree and all node states in a `FOCUS_PLAN.md` ledger.
+2. **Full-budget-per-leaf**: each leaf receives the entire effort/time budget of the parent task (not budget/N^D). This enforces a strict minimum-effort floor per granular unit.
+3. **Four-pass execution per leaf**: IMPLEMENT → RE-EXPLORE → VERIFY → POLISH.
+4. **Evidence-first Done**: a leaf is Done only when evidence artifacts are present and confidence thresholds are met.
+5. **Standards-aligned verification**: verify against the repository's authoritative spec — `AGENTS.md`, `.cursor/rules/*.mdc`, and `tsconfig`/ESLint/test contracts. These are the project's design authority (in place of external design tools).
+
+## Architecture overview
+
+- **Planner**: reads the incoming task and constructs the RFT (params D, N).
+- **Executor**: for each leaf, produces implementation artifacts, runs self-review, and performs verification.
+- **Verifier**: runs typecheck, lint, and the unit test suite, mapped to spec items.
+- **Aggregator**: merges leaf results bottom-up into a root result with provenance and confidence.
+- **Controller (human)**: reviews patches/PRs and authorizes merges — never automatic.
+
+## Required artifacts per leaf
+
+Each leaf must produce the following before it is considered Done:
+
+- **Deliverable** (code change, test, or document) — no placeholders.
+- **`test-report.md`** — results of typecheck, lint, and unit tests, with mapping to spec paragraphs or acceptance criteria.
+- **`patches/*.patch` or commit metadata** — depending on the active mode.
+- **`FOCUS_PLAN.md`** — updated locally (status, confidence, verification evidence).
+- **`PR_BODY_TEMPLATE.md`** — draft PR description for the human to review.
+- **`README_NEXT_STEPS.md`** — exact human commands to apply patches and run final verification.
+- **UI screenshots** (before/after) only when the change is user-visible.
+
+## The Recursive Focus Tree algorithm
+
+Inputs:
+
+- T: root task
+- N: branching factor (default 4; allowed 3–5)
+- D: depth (simple: 1–2; complex: 3–4)
+- B: parent budget (time/tokens/compute)
+
+Procedure:
+
+1. Build RFT(T, N, D):
+   - If depthRemaining == 0 → leaf node.
+   - Else → produce N orthogonal sub-tasks; recurse.
+2. For each leaf f in leaves(RFT):
+   - Assign budget_f := B (full parent budget).
+   - Execute the leaf with the four-pass loop (below).
+3. Aggregate leaf results bottom-up using the aggregation strategy.
+
+## Leaf execution (four-pass loop)
+
+For each leaf f with budget B:
+
+### IMPLEMENT
+
+- Produce the full deliverable for the leaf.
+- Keep changes atomic and focused on one concern.
+
+### RE-EXPLORE
+
+- Generate at least 2 independent approaches (A and B).
+- Execute approach A thoroughly; switch to B only after documenting why A failed or reached its limits.
+
+### VERIFY (mandatory)
+
+Run the repository verification suite:
+
+```bash
+npx tsc --noEmit        # typecheck (strict mode, TypeScript 6)
+npm run lint            # ESLint
+npm test                # node --import tsx --test src/test/**/*.test.ts
+```
+
+- Produce `test-report.md` mapping each test to a specific spec paragraph or acceptance criterion.
+- Run contradiction checks: attempt to falsify the main claims where practical (e.g., ownership gaps, IDOR exposure, rate-limit bypasses, crash-safety of two-store writes).
+- Alignment check: re-read the touched files against the relevant `.cursor/rules/*.mdc` (clean code, testing, architecture, security, AI orchestration) and fix any violations.
+
+### POLISH
+
+- Address test failures, lint issues, and rule violations.
+- Re-run verification until passing or until the retry policy triggers.
+
+## Decision and confidence
+
+After each attempt, assign a confidence score and decide:
+
+- **PASS** if tests and verification checks pass → confidence ≥ 0.85 (recommendation).
+- **EARLY PASS** if exceptionally thorough → confidence ≥ 0.95.
+- **RETRY** if confidence < 0.85: generate an alternative patch/approach and repeat (max attempts = 3).
+- **BLOCK** if after 3 attempts confidence is still < 0.85: produce `spec-clarification.md` and escalate to the user.
+
+## No-commit vs commit-enabled modes
+
+**No-commit mode** (default for safety):
+
+- The agent generates unified diff (`.patch`) files for every change, an `apply-patches.sh` script, and tests/verification artifacts.
+- The agent must NOT perform git operations (checkout, commit, push, PR).
+- The human applies patches, runs scripts, creates the PR, and merges after review.
+
+**Commit-enabled mode** (only with explicit human permission):
+
+- The agent may create a branch and commit locally, but merges always require explicit human approval.
+- Keep this mode narrow and audited.
+
+## Evidence and provenance requirements
+
+Every Done leaf must include:
+
+- **`test-report.md`** — exact command outputs and mapping to spec locations.
+- **`manifest.json`** — one entry per leaf summarizing attempts and final confidence.
+- **`PR_BODY_TEMPLATE.md`** — draft text for the human to paste into the PR description.
+- **`README_NEXT_STEPS.md`** — exact human commands to apply patches and run final verification.
+- **`FOCUS_PLAN.md`** — updated tree with node states, evidence pointers, and confidence.
+
+## Retry and escalation policy
+
+- Max attempts per leaf: 3.
+- Log each attempt: approach name, diff filename, tests run, pass/fail, confidence, timestamp.
+- After 3 unsuccessful attempts:
+  - Create `spec-clarification.md` quoting the exact requirement.
+  - Mark the leaf BLOCKED in `FOCUS_PLAN.md`.
+  - Stop retries until the human responds.
+
+## Thought-switching penalty
+
+To avoid underthinking:
+
+- Document why an approach is being abandoned: how long and how deep the previous approach was explored, and which failure signals justify switching.
+- Rapid or unexplained switching is disallowed. Prefer deeper exploration of the current approach before changing direction.
+
+## Tooling and operational hints
+
+- **Test runner**: Node native test runner (`node:test` + `node:assert/strict`) — never Vitest/Jest. See `.cursor/rules/08-testing.mdc`.
+- **Verification commands**: `npx tsc --noEmit`, `npm run lint`, `npm test`. `npm run build` is heavier (Prisma generate + Next build) and may require env vars — run it only when the change touches the build pipeline.
+- **Standards spec**: `AGENTS.md` and `.cursor/rules/*.mdc` are the design authority for this repository. Never verify against invented standards.
+- **Evidence folder structure** (recommended):
+
+```text
+deep-focus/evidence/<task-id>/
+  patches/
+  tests/
+  test-logs/
+  test-report.md
+  manifest.json
+  PR_BODY_TEMPLATE.md
+  README_NEXT_STEPS.md
+  spec-clarification.md   # only if blocked
+  FOCUS_PLAN.md
+```
+
+- **Branch naming** (when a human applies patches): `feature/<ticket>/<scope>-<fix>`.
+- **Commit style**: `scope(type): short description` e.g. `fix(header): adjust header height to spec`.
+
+## Minimal human prompts (templates)
+
+1. **Start loop (no-commit mode):**
+
+> Apply DeepFocus. Task: <task>. Produce patches, tests, and evidence under `deep-focus/evidence/<task-id>/`.
+
+2. **Start loop (commit-enabled mode):**
+
+> Apply DeepFocus in commit-enabled mode. I authorize local commits but not pushes. Task: <task>.
+
+3. **Unblock after BLOCK:**
+
+> Leaf <id> is BLOCKED (see `spec-clarification.md`). Here is the clarification: <answer>. Resume retries.
