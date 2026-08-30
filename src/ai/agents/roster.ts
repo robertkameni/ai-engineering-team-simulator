@@ -6,7 +6,7 @@ import {
   getTeamTemplate,
   type TeamTemplateId,
 } from "@/ai/agents/team-templates";
-import { AGENT_PERSONAS } from "@/features/agents/personas";
+import { AGENT_PERSONAS } from "@/lib/agents/personas";
 
 const FIRST_NAMES = [
   "Alex",

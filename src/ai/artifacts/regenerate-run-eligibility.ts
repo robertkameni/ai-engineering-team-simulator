@@ -1,6 +1,6 @@
 import { isDebateComplete } from "@/ai/orchestration/reviewer-decision";
 import type { RegenerateRunArtifactsError } from "@/ai/artifacts/regenerate-run-artifacts.types";
-import type { RunStatus as AppRunStatus } from "@/features/agents/types";
+import type { RunStatus as AppRunStatus } from "@/lib/types";
 import type { AppArtifactStatus } from "@/lib/db/artifact-status";
 
 export function getRegenerateBlockingError(

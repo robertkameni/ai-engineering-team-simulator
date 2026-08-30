@@ -1,12 +1,9 @@
 import type { Prisma } from "@/generated/prisma/client";
 
-import {
-  SIMULATION_AGENT_ORDER,
-  type SimulationAgentRole,
-} from "@/ai/agents/config";
+import { SIMULATION_AGENT_ORDER, type SimulationAgentRole } from "@/lib/agent-roles";
 import type { TeamMember, TeamRoster } from "@/ai/agents/roster";
 import { getTeamTemplate, isTeamTemplateId } from "@/ai/agents/team-templates";
-import { AGENT_PERSONAS } from "@/features/agents/personas";
+import { AGENT_PERSONAS } from "@/lib/agents/personas";
 import { prisma } from "@/lib/prisma";
 
 export const TEAM_ROSTER_ARTIFACT_TYPE = "team-roster";

@@ -7,7 +7,7 @@ import {
 } from "@/lib/export/export-filename";
 import { downloadExportBlob } from "@/lib/export/download-export-blob";
 import { openSavePickerForBlob } from "@/lib/export/save-export-file";
-import type { MockRun } from "@/features/agents/types";
+import type { MockRun } from "@/lib/types";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 
 export { type RunExportContext };

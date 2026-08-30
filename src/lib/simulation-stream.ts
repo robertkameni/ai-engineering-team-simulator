@@ -1,6 +1,6 @@
 import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
-import type { AgentRole } from "@/features/agents/types";
+import type { AgentRole } from "@/lib/types";
 
 /** Shared SSE event shapes (client + server). */
 export type SimulationStreamEvent =

@@ -17,9 +17,13 @@ export function useExamplePromptChips(
   const [prompts, setPrompts] = useState<string[]>(() =>
     getDefaultExamplePrompts(count),
   );
+  const [previousCount, setPreviousCount] = useState(count);
+  if (previousCount !== count) {
+    setPreviousCount(count);
+    setPrompts(getDefaultExamplePrompts(count));
+  }
 
   useEffect(() => {
-    setPrompts(getDefaultExamplePrompts(count));
     const pick = () => setPrompts(pickRandomExamplePrompts(count));
     queueMicrotask(pick);
 

@@ -13,7 +13,7 @@ import {
   updateArtifactStatus,
 } from "@/lib/db/artifact-status";
 import { toAppRunStatus, toPrismaRunStatus } from "@/lib/db/run-status";
-import type { RunStatus as AppRunStatus } from "@/features/agents/types";
+import type { RunStatus as AppRunStatus } from "@/lib/types";
 import { prisma } from "@/lib/prisma";
 
 /** Simulate route maxDuration (600s) + buffer for stale detection. */

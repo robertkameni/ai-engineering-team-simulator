@@ -1,4 +1,4 @@
-import { SIMULATION_AGENT_ORDER, type SimulationAgentRole } from "@/ai/agents/config";
+import { SIMULATION_AGENT_ORDER, type SimulationAgentRole } from "@/lib/agent-roles";
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 

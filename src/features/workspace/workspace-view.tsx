@@ -6,7 +6,7 @@ import { WorkspaceHeader } from "@/features/workspace/workspace-header";
 import { MessageThread } from "@/features/simulation/message-thread";
 import { MessageThreadStatic } from "@/features/simulation/message-thread-static";
 import { PromptComposerPlaceholder } from "@/features/simulation/prompt-composer-placeholder";
-import type { MockRun } from "@/features/agents/types";
+import type { MockRun } from "@/lib/types";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import {
   debateProgressFromMessages,

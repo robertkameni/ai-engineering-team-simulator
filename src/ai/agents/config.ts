@@ -2,7 +2,10 @@ import type { DeepSeekLanguageModelOptions } from "@ai-sdk/deepseek";
 
 import { DEEPSEEK_CHAT_OPTIONS, DEEPSEEK_REASONING_OPTIONS } from "@/ai/deepseek-options";
 import type { DeepSeekModelId } from "@/ai/providers";
-import type { AgentRole } from "@/features/agents/types";
+import { SIMULATION_AGENT_ORDER, type SimulationAgentRole } from "@/lib/agent-roles";
+import type { AgentRole } from "@/lib/types";
+
+export { SIMULATION_AGENT_ORDER, type SimulationAgentRole };
 
 export interface AgentModelConfig {
   role: AgentRole;
@@ -11,18 +14,6 @@ export interface AgentModelConfig {
   temperature: number;
   deepseek: DeepSeekLanguageModelOptions;
 }
-
-/** PM → Architect → Backend → Frontend → DevOps → Reviewer */
-export const SIMULATION_AGENT_ORDER = [
-  "pm",
-  "architect",
-  "backend",
-  "frontend",
-  "devops",
-  "reviewer",
-] as const;
-
-export type SimulationAgentRole = (typeof SIMULATION_AGENT_ORDER)[number];
 
 const ACTIVE_AGENTS: Record<SimulationAgentRole, AgentModelConfig> = {
   pm: {

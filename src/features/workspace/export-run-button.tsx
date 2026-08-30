@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, FileText, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
-import type { MockRun } from "@/features/agents/types";
+import type { MockRun } from "@/lib/types";
 import { ExportAuthModal } from "@/features/workspace/export-auth-modal";
 import { workspaceHeaderExportButtonClass } from "@/components/ui/button-styles";
 import { exportRunMarkdown } from "@/lib/export/run-markdown";
@@ -57,7 +57,9 @@ export function ExportRunButton({
   const [exportError, setExportError] = useState<string | null>(null);
   const isExporting = exportingFormat != null;
   const templateIdRef = useRef(templateId);
-  templateIdRef.current = templateId;
+  useEffect(() => {
+    templateIdRef.current = templateId;
+  }, [templateId]);
 
   const performExport = useCallback(
     async (targetRun: MockRun, format: ExportFormat) => {

@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { RunOwnershipScope } from "@/lib/auth/run-ownership";
-import type { RunStatus as AppRunStatus } from "@/features/agents/types";
+import type { RunStatus as AppRunStatus } from "@/lib/types";
 import { toAppArtifactStatus } from "@/lib/db/artifact-status";
 import { buildRunOwnershipWhere } from "@/lib/db/run-ownership-where";
 import { toAppRunStatus } from "@/lib/db/run-status";

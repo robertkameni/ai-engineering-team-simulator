@@ -53,8 +53,8 @@ export interface ArtifactSynthesisRetryContext {
   ) => Promise<void> | void;
 }
 
-export interface RetryStackInconsistentArtifactsParams
-  extends ArtifactSynthesisRetryContext {}
+export type RetryStackInconsistentArtifactsParams =
+  ArtifactSynthesisRetryContext;
 
 export interface RetryCrossInconsistentArtifactsParams
   extends ArtifactSynthesisRetryContext {

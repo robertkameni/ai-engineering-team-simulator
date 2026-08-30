@@ -240,7 +240,7 @@ async function main(): Promise<void> {
 
   let artifactsStatus: string | null = null;
   let debateOutcome: string | null = null;
-  let coreCounts: Record<string, number> = {};
+  const coreCounts: Record<string, number> = {};
   let filledCore = 0;
   let db: DbSummaryResult | null = null;
 

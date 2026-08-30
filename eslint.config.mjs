@@ -10,7 +10,6 @@ const FEATURE_BOUNDARY_MESSAGE =
   "Feature modules may not import other features. Import from @/lib or @/components, or compose in @/features/workspace.";
 
 const NON_WORKSPACE_FEATURES = [
-  "agents",
   "simulation",
   "artifacts",
   "landing",
@@ -23,7 +22,7 @@ function otherFeatureImportPatterns(featureName) {
   ];
 
   return others.map((name) => ({
-    group: [`@/features/${name}`, `@/features/${name}/*`],
+    group: [`@/features/${name}`, `@/features/${name}/*`, `@/features/${name}/**`],
     message: FEATURE_BOUNDARY_MESSAGE,
   }));
 }

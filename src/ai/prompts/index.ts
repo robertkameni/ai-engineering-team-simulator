@@ -2,7 +2,7 @@ import type { SimulationAgentRole } from "@/ai/agents/config";
 import type { TeamRoster } from "@/ai/agents/roster";
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
 import type { DebateTurnContext } from "@/ai/context/build-messages";
-import type { AgentRole } from "@/features/agents/types";
+import type { AgentRole } from "@/lib/types";
 import { hasPhysicalKeywords } from "@/ai/orchestration/classify-project";
 import { truncateFeedbackExcerpt } from "@/ai/prompts/shared";
 

@@ -11,8 +11,8 @@ import type {
   MockRun,
   RunStatus as AppRunStatus,
   SimulationMessage,
-} from "@/features/agents/types";
-import { getPersonaBase } from "@/features/agents/personas";
+} from "@/lib/types";
+import { getPersonaBase } from "@/lib/agents/personas";
 import { formatMessageTime, formatRelativeTime } from "@/lib/format-time";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
 import type { RunUsageTotals } from "@/lib/ai/run-usage";

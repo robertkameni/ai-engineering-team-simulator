@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { ArtifactPanelSkeleton } from "@/features/artifacts/artifact-panel-skeleton";
 import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
 import type { DebateProgress } from "@/features/artifacts/types";
-import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
+import type { AgentRole, DebateExitOutcome } from "@/lib/types";
 import type { TeamRosterPreview } from "@/lib/team-roster-preview";
 import { Sidebar } from "@/features/workspace/sidebar";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";

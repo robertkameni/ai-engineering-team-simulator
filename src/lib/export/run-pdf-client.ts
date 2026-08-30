@@ -1,7 +1,7 @@
 "use client";
 
 import type { TeamTemplateId } from "@/ai/agents/team-templates";
-import type { MockRun } from "@/features/agents/types";
+import type { MockRun } from "@/lib/types";
 import { buildRunPdfFilename } from "@/lib/export/export-filename";
 import { downloadExportBlob } from "@/lib/export/download-export-blob";
 import {

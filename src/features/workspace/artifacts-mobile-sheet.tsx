@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { ArtifactPanel } from "@/features/artifacts/artifact-panel";
 import type { ArtifactsPanelStatus, PartialRunArtifacts } from "@/features/artifacts/types";
 import type { DebateProgress } from "@/features/artifacts/types";
-import type { AgentRole, DebateExitOutcome } from "@/features/agents/types";
+import type { AgentRole, DebateExitOutcome } from "@/lib/types";
 import type { TeamRosterPreview } from "@/lib/team-roster-preview";
 
 interface ArtifactsMobileSheetProps {

@@ -9,8 +9,8 @@ import {
   isSimulationBudgetExceeded,
   type SimulationBudgetExceededError,
 } from "@/ai/orchestration/simulation-budget";
-import type { AgentRole } from "@/features/agents/types";
-import { getPersonaBase } from "@/features/agents/personas";
+import type { AgentRole } from "@/lib/types";
+import { getPersonaBase } from "@/lib/agents/personas";
 import { getTeamRoster, parseTeamRoster, TEAM_ROSTER_ARTIFACT_TYPE } from "@/lib/db/team-roster";
 import type { RunUsageAccumulator } from "@/lib/ai/run-usage-accumulator";
 

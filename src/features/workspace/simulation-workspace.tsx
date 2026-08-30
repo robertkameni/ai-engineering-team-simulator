@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { MockRun } from "@/features/agents/types";
+import type { MockRun } from "@/lib/types";
 import { AppShell } from "@/features/workspace/app-shell";
 import { WorkspaceMain } from "@/features/workspace/workspace-main";
 import { WorkspaceHeader } from "@/features/workspace/workspace-header";

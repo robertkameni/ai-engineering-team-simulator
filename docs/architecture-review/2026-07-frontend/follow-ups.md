@@ -9,6 +9,7 @@ Open items after F1–F12 shipped. Do **not** treat these as merge blockers for 
   - PromptComposer takes `runSession` props from workspace (no workspace context import).
   - Header action styles live in `@/components/ui/button-styles`.
   - Avatars/personas shared via `@/components/agents` + `@/lib/agents/personas`; example chips via `@/components/example-prompt-chips`.
+  - **Sprint A follow-up:** `src/features/agents/` deleted — kernel/AI/test imports now go through `@/lib/types` / `@/lib/agents/personas`; canonical agent order moved to `@/lib/agent-roles` (re-exported by `@/ai/agents/config`); dead `workspace-header-button-styles` shim removed.
 
 - [ ] **(b) F5 — finer-grained Suspense for roster (deferred — reactivation criteria below)**
   - **Status:** Deferred. Route `loading.tsx` + 404 gate + post-ownership Suspense are in place and verified (404/404/200 trio). The remaining finer-grained split (roster as its own Suspense child) is incremental polish, not a regression.

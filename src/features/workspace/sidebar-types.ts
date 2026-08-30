@@ -1,4 +1,4 @@
-import type { RunStatus } from "@/features/agents/types";
+import type { RunStatus } from "@/lib/types";
 
 export interface SidebarRunItemData {
   id: string;
