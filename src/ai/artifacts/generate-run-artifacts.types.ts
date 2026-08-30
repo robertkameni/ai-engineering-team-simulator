@@ -43,6 +43,7 @@ export interface ArtifactSynthesisRetryContext {
   readonly transcriptPrompt: string;
   readonly consensusDirectives: string;
   readonly openGapsDirective: string;
+  readonly apiSurfaceDirective?: string;
   readonly templateId: TeamTemplateId;
   readonly productIdea: string;
   readonly usageAccumulator?: RunUsageAccumulator;

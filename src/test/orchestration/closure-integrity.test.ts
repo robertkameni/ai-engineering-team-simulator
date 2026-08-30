@@ -122,6 +122,77 @@ describe("mergeContinuationText", () => {
       1,
     );
   });
+
+  it("collapses a full-plan re-post continuation into one copy of each section", () => {
+    const prior = [
+      "## Summary",
+      "A normalized outbox with a single transaction.",
+      "",
+      "## Decisions",
+      "- **Decision:** idempotent eventId unique index.",
+      "- **Decision:** keyset pagination on events.",
+      "",
+      "## Backend Risks",
+      "- **Risk:** Outbox poller lag under high volume.",
+    ].join("\n");
+    const repost = [
+      "## Backend Risks",
+      "- **Risk:** Outbox poller lag under high volume. Mitigation: batch size 100, poll 500ms.",
+      "- **Risk:** KMS key rotation breaks decryption. Mitigation: monthly rotation drill.",
+      "",
+      "## Summary",
+      "Compressed re-emission of the normalized outbox.",
+      "",
+      "## Decisions",
+      "- Decision: idempotent eventId unique index.",
+      "",
+      "## Jobs & Tests",
+      "Compressed tail section the prior never reached.",
+    ].join("\n");
+
+    const merged = mergeContinuationText(prior, repost);
+
+    assert.equal((merged.match(/^## Summary$/gm) ?? []).length, 1);
+    assert.equal((merged.match(/^## Decisions$/gm) ?? []).length, 1);
+    assert.equal((merged.match(/^## Backend Risks$/gm) ?? []).length, 1);
+    assert.match(merged, /A normalized outbox with a single transaction/);
+    assert.match(merged, /## Jobs & Tests/);
+    assert.match(merged, /Compressed tail section the prior never reached/);
+  });
+
+  it("takes the continuation's complete version of a section the prior truncated", () => {
+    const prior = [
+      "## Summary",
+      "A normalized outbox with a single transaction.",
+      "",
+      "## Backend Risks",
+      "- **Risk:** Outbox poller lag under high vol",
+    ].join("\n");
+    const repost = [
+      "## Backend Risks",
+      "- **Risk:** Outbox poller lag under high volume. Mitigation: batch size 100.",
+      "",
+      "## Summary",
+      "Compressed re-emission of the normalized outbox.",
+    ].join("\n");
+
+    const merged = mergeContinuationText(prior, repost);
+
+    assert.equal((merged.match(/^## Summary$/gm) ?? []).length, 1);
+    assert.equal((merged.match(/^## Backend Risks$/gm) ?? []).length, 1);
+    assert.match(merged, /A normalized outbox with a single transaction/);
+    assert.match(merged, /Mitigation: batch size 100/);
+  });
+
+  it("keeps a non-repost continuation with repeated headings untouched", () => {
+    const prior = "## Summary\nCore write path.";
+    const continuation =
+      "## Backend Risks\nPool exhaustion under load.";
+    const merged = mergeContinuationText(prior, continuation);
+    assert.match(merged, /## Summary/);
+    assert.match(merged, /## Backend Risks/);
+    assert.match(merged, /Pool exhaustion under load/);
+  });
 });
 
 describe("buildTruncationContinuationPrompt", () => {

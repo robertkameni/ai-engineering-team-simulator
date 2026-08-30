@@ -3,6 +3,7 @@ import type { useRouter } from "next/navigation";
 
 import type {
   AgentRole,
+  ArtifactsPanelStatus,
   RunStatus,
   SimulationMessage,
 } from "@/lib/types";
@@ -12,6 +13,7 @@ import type { SimulationStreamEvent } from "@/lib/simulation-stream";
 import { formatMessageTime } from "@/lib/format-time";
 
 import { createTextDeltaCoalescer } from "./text-delta-coalescer";
+import { shouldFetchArtifactsOnDone } from "./should-fetch-artifacts-on-done";
 import {
   fetchArtifactsOnce,
   pollArtifactsUntilSettled,
@@ -35,6 +37,7 @@ export type SimulationStreamEventContext = ArtifactPollSetters & {
   streamSettledRef: { current: boolean };
   /** Set when SSE delivered `all_artifacts_complete` — skip poll storm. */
   artifactsSettledViaStreamRef: { current: boolean };
+  artifactsPanelFromStreamRef: { current: ArtifactsPanelStatus | null };
 };
 
 export type SimulationStreamEventHandler = {
@@ -120,17 +123,26 @@ async function handleStreamDoneEvent(
   context.setRunId(event.runId);
   context.currentRunIdRef.current = event.runId;
 
-  const shouldPoll =
-    event.artifactTimeout === true ||
-    !context.artifactsSettledViaStreamRef.current;
+  const shouldFetch = shouldFetchArtifactsOnDone({
+    artifactTimeout: event.artifactTimeout,
+    alreadyFetchedViaStream: context.artifactsSettledViaStreamRef.current,
+  });
 
-  const finalPanel = shouldPoll
-    ? await pollArtifactsUntilSettled(
-        event.runId,
-        artifactSetters,
-        context.signal,
-      )
-    : await fetchArtifactsOnce(event.runId, artifactSetters, context.signal);
+  let finalPanel: ArtifactsPanelStatus | null =
+    context.artifactsPanelFromStreamRef.current;
+  if (shouldFetch && event.artifactTimeout === true) {
+    finalPanel = await pollArtifactsUntilSettled(
+      event.runId,
+      artifactSetters,
+      context.signal,
+    );
+  } else if (shouldFetch) {
+    finalPanel = await fetchArtifactsOnce(
+      event.runId,
+      artifactSetters,
+      context.signal,
+    );
+  }
 
   if (!context.isActive()) {
     return;
@@ -172,6 +184,7 @@ export function createSimulationStreamEventHandler(
       context.setRunId(event.runId);
       context.setArtifactsStatus("pending");
       context.artifactsSettledViaStreamRef.current = false;
+      context.artifactsPanelFromStreamRef.current = null;
       return;
     }
 
@@ -273,7 +286,11 @@ export function createSimulationStreamEventHandler(
         return;
       }
 
-      await fetchArtifactsOnce(runId, artifactSetters, context.signal);
+      context.artifactsPanelFromStreamRef.current = await fetchArtifactsOnce(
+        runId,
+        artifactSetters,
+        context.signal,
+      );
       return;
     }
 

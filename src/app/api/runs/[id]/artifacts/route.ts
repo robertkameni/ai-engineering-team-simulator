@@ -10,7 +10,6 @@ import {
 import { opsFollowUpApiFieldsFromSummaryPayload } from "@/lib/db/ops-follow-up-summary";
 import { getRunForArtifactsIfOwned } from "@/lib/db/runs";
 import { toAppRunStatus } from "@/lib/db/run-status";
-import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const maxDuration = 600;
@@ -25,18 +24,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
   const run = await getRunForArtifactsIfOwned(id, scope);
 
   if (!run) {
-    const unscoped = await prisma.run.findUnique({
-      where: { id },
-      select: { id: true, userId: true, guestSessionId: true },
-    });
-    console.warn("Artifacts GET: run not found or forbidden", {
-      runId: id,
-      scope: { userId: scope.userId, guestSessionId: scope.guestSessionId },
-      runExists: unscoped !== null,
-      runOwner: unscoped
-        ? { userId: unscoped.userId, guestSessionId: unscoped.guestSessionId }
-        : null,
-    });
     return Response.json({ error: "Run not found" }, { status: 404 });
   }
 

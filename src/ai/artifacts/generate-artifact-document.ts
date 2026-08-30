@@ -145,11 +145,13 @@ export function buildArtifactPrompt(
   consensusDirectives: string,
   openGapsDirective: string,
   priorArtifactsPrompt: string,
+  apiSurfaceDirective = "",
 ): string {
   return [
     transcriptPrompt,
     consensusDirectives.trim() ? `\n\n${consensusDirectives.trim()}` : "",
     openGapsDirective.trim() ? `\n\n${openGapsDirective.trim()}` : "",
+    apiSurfaceDirective.trim() ? `\n\n${apiSurfaceDirective.trim()}` : "",
     priorArtifactsPrompt.trim() ? `\n\n${priorArtifactsPrompt.trim()}` : "",
   ].join("");
 }

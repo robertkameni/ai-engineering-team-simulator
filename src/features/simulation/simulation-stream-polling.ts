@@ -10,6 +10,7 @@ import {
   computeArtifactPollIntervalMs,
   POLL_ARTIFACT_MAX_MS,
 } from "@/features/simulation/artifact-poll-backoff";
+import { isRetryableArtifactsFailure } from "@/features/simulation/is-retryable-artifacts-failure";
 
 const POLL_RUN_PROGRESS_INTERVAL_MS = 2_000;
 /** Railway SSE cap is 15 minutes; allow polling slightly longer. */
@@ -37,22 +38,19 @@ type RunFullSnapshot = {
 
 type ArtifactsFetchResult =
   | {
-      ok: true;
-      artifacts: PartialRunArtifacts | null;
-      status: ArtifactsPanelStatus;
-      debateOutcome: DebateExitOutcome | null;
-      stackValidationFailed: boolean;
-      crossValidationFailed: boolean;
-    }
-  | { ok: false; retryable: boolean };
+    ok: true;
+    artifacts: PartialRunArtifacts | null;
+    status: ArtifactsPanelStatus;
+    debateOutcome: DebateExitOutcome | null;
+    stackValidationFailed: boolean;
+    crossValidationFailed: boolean;
+  }
+  | { ok: false; retryable: boolean; };
 
 export function isRunProgressTerminal(status: RunStatus): boolean {
   return status === "complete" || status === "failed";
 }
 
-function isRetryableArtifactsHttpStatus(status: number): boolean {
-  return status === 408 || status === 429 || status >= 500;
-}
 
 async function fetchJsonOrNull<T>(
   url: string,
@@ -131,7 +129,10 @@ async function fetchArtifactsState(
   if (!response.ok) {
     return {
       ok: false,
-      retryable: isRetryableArtifactsHttpStatus(response.status),
+      retryable: isRetryableArtifactsFailure(
+        response.status,
+        response.headers.get("content-type"),
+      ),
     };
   }
 
@@ -163,7 +164,7 @@ export type ArtifactPollSetters = {
 
 function applyArtifactsFetchResult(
   setters: ArtifactPollSetters,
-  result: Extract<ArtifactsFetchResult, { ok: true }>,
+  result: Extract<ArtifactsFetchResult, { ok: true; }>,
 ): void {
   setters.setArtifacts(result.artifacts);
   setters.setArtifactsStatus(result.status);
@@ -255,9 +256,21 @@ export async function fetchArtifactsOnce(
     return null;
   }
 
-  const result = await fetchArtifactsState(id, signal);
+  let result = await fetchArtifactsState(id, signal);
   if (signal?.aborted) {
     return null;
+  }
+
+  if (!result.ok && result.retryable) {
+    try {
+      await waitForAbortableTimeout(computeArtifactPollIntervalMs(0), signal);
+    } catch {
+      return null;
+    }
+    result = await fetchArtifactsState(id, signal);
+    if (signal?.aborted) {
+      return null;
+    }
   }
 
   if (!result.ok) {

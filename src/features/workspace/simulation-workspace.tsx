@@ -11,6 +11,7 @@ import { PromptComposer } from "@/features/simulation/prompt-composer";
 import { SimulationErrorBanner } from "@/features/simulation/simulation-error-banner";
 import { AgentTypingIndicator } from "@/features/simulation/agent-typing-indicator";
 import { debateProgressFromMessages } from "@/features/artifacts/artifact-panel-phase";
+import { scheduleDeferredCallback } from "@/features/simulation/defer-auto-start";
 import { useSimulationStream } from "@/features/simulation/use-simulation-stream";
 import { teamMemberPreview } from "@/lib/team-roster-preview";
 import type { SidebarRunItemData } from "@/features/workspace/sidebar-types";
@@ -86,8 +87,13 @@ export function SimulationWorkspace({
       return;
     }
     const controller = new AbortController();
-    void startRef.current(userPrompt, { signal: controller.signal });
-    return () => controller.abort();
+    const cancelDeferredStart = scheduleDeferredCallback(() => {
+      void startRef.current(userPrompt, { signal: controller.signal });
+    });
+    return () => {
+      cancelDeferredStart();
+      controller.abort();
+    };
   }, [autoStart, userPrompt]);
 
   const rerunSimulation = useCallback(

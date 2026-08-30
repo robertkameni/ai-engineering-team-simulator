@@ -4,6 +4,11 @@ import { createSimulationRoster, getTeamMember } from "@/ai/agents/roster";
 import { classifyProjectTeamTemplate } from "@/ai/orchestration/classify-project";
 import { buildIssueSnapshot } from "@/ai/orchestration/review-issue-tracker";
 import {
+  extractUnresolvedProseCriticalRisks,
+  type ProseCriticalRisk,
+} from "@/ai/orchestration/prose-critical-risks";
+import type { AcceptedCriticalRisk } from "@/ai/orchestration/debate-convergence-controller";
+import {
   isSimulationBudgetExceeded,
   assertSimulationWithinBudget,
 } from "@/ai/orchestration/simulation-budget";
@@ -125,8 +130,23 @@ export async function runSimulation(
 
     debateComplete = true;
 
-    const acceptedCriticalRisks =
+    const trackedAcceptedRisks =
       state.finalizationProposal?.acceptedCriticalRisks ?? [];
+    const finalReview = [...state.transcript]
+      .reverse()
+      .find((entry) => entry.role === "reviewer");
+    const proseCriticalRisks = finalReview
+      ? extractUnresolvedProseCriticalRisks(
+          finalReview.content,
+          roster,
+          state.lastRejectTarget ?? "architect",
+        )
+      : [];
+    const acceptedCriticalRisks = mergeProseCriticalRisks(
+      trackedAcceptedRisks,
+      proseCriticalRisks,
+      state.turnCount,
+    );
     const approvedMapping =
       rawDebateExitOutcome === "approved"
         ? resolveApprovedDebateOutcome({
@@ -215,4 +235,33 @@ function buildNotifyHandler(
       });
     }
   };
+}
+
+/**
+ * Merges critical prose risks from the final review into the tracked accepted
+ * risks. A prose risk is skipped when the same (role, category) gap is already
+ * covered by a tracked issue promoted at finalization, so the count reflects
+ * distinct critical gaps.
+ */
+function mergeProseCriticalRisks(
+  tracked: readonly AcceptedCriticalRisk[],
+  prose: readonly ProseCriticalRisk[],
+  acceptedOnTurn: number,
+): AcceptedCriticalRisk[] {
+  const covered = new Set(
+    tracked.map((risk) => `${risk.targetRole}:${risk.category}`),
+  );
+
+  return [
+    ...tracked,
+    ...prose
+      .filter((risk) => !covered.has(`${risk.targetRole}:${risk.category}`))
+      .map((risk) => ({
+        issueId: risk.issueId,
+        targetRole: risk.targetRole,
+        category: risk.category,
+        excerpt: risk.excerpt,
+        acceptedOnTurn,
+      })),
+  ];
 }

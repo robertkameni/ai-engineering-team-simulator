@@ -7,6 +7,10 @@ import {
   extractAcceptedCriticalRisksFromSummary,
   partitionOpenGapsByAcceptedRisks,
 } from "@/ai/artifacts/accepted-risks-for-artifacts";
+import {
+  buildApiSurfaceDirective,
+  extractDeclaredApiSurface,
+} from "@/ai/context/api-surface";
 import { buildCompressedDebateSummary } from "@/ai/artifacts/compress-debate-summary";
 import { buildConsensusDirectives } from "@/ai/artifacts/build-consensus-directives";
 import {
@@ -58,6 +62,12 @@ function resolveSynthesisOrder(
   return ARTIFACT_SYNTHESIS_ORDER.filter((type) => requested.has(type));
 }
 
+function artifactShowsApiSurface(type: ArtifactType): boolean {
+  return (
+    type === "architecture" || type === "implementation" || type === "blueprint"
+  );
+}
+
 export async function generateRunArtifacts({
   productIdea,
   transcript,
@@ -94,6 +104,8 @@ export async function generateRunArtifacts({
     acceptedCriticalRisks,
   );
   const consensusDirectives = buildConsensusDirectives(mergedTranscript);
+  const declaredApiSurface = extractDeclaredApiSurface(mergedTranscript);
+  const apiSurfaceDirective = buildApiSurfaceDirective(declaredApiSurface);
   // One compressed summary reused across all generators (Group 6.1).
   // cap_reached / unapproved outcomes still synthesize (Group 6.3).
   const transcriptPrompt = buildCompressedDebateSummary(
@@ -131,6 +143,7 @@ export async function generateRunArtifacts({
       consensusDirectives,
       [openGapsDirective, acceptedRisksDirective].filter(Boolean).join("\n\n"),
       priorArtifactsPrompt,
+      artifactShowsApiSurface(type) ? apiSurfaceDirective : "",
     );
 
     console.info("ARTIFACT SYNTHESIS queue", {
@@ -225,6 +238,7 @@ export async function generateRunArtifacts({
     transcriptPrompt,
     consensusDirectives,
     openGapsDirective,
+    apiSurfaceDirective,
     templateId,
     productIdea,
     usageAccumulator,

@@ -7,6 +7,10 @@ import {
   isShortWordFragment,
   lastNonEmptyLine,
 } from "@/ai/orchestration/agent-output-completion";
+import {
+  isFullRepost,
+  mergeRepostSections,
+} from "@/ai/orchestration/continuation-repost";
 
 const DECISION_TAG_AT_END =
   /\[(?:APPROVE|REJECT:\s*(?:pm|architect|backend|frontend|devops))\]\s*$/i;
@@ -252,6 +256,11 @@ export function mergeContinuationText(
   continuation: string,
 ): string {
   const base = prior.trimEnd();
+  if (isFullRepost(base, continuation)) {
+    return sanitizeMergedContinuation(
+      mergeRepostSections(base, continuation.trimStart()),
+    );
+  }
   const next = stripOverlappingContinuationPrefix(base, continuation);
   if (!next) {
     return sanitizeMergedContinuation(base);

@@ -17,6 +17,7 @@ export async function regenerateArtifactsForViolations(
     transcriptPrompt,
     consensusDirectives,
     openGapsDirective,
+    apiSurfaceDirective,
     templateId,
     productIdea,
     usageAccumulator,
@@ -35,6 +36,7 @@ export async function regenerateArtifactsForViolations(
       consensusDirectives,
       openGapsDirective,
       priorArtifactsPrompt,
+      apiSurfaceDirective,
     );
 
     const document = await generateArtifactDocument(
