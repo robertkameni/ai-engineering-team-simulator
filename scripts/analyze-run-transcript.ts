@@ -4,11 +4,19 @@
  */
 import { PrismaNeon } from "@prisma/adapter-neon";
 
+import {
+  SIMULATION_AGENT_ORDER,
+  type SimulationAgentRole,
+} from "../src/ai/agents/config";
 import { createSimulationRoster } from "../src/ai/agents/roster";
 import { extractDeclaredApiSurface } from "../src/ai/context/api-surface";
 import type { TranscriptEntry } from "../src/ai/context/transcript";
 import { buildCritiqueMatrix } from "../src/ai/orchestration/peer-criticism-detector";
 import { PrismaClient } from "../src/generated/prisma/client";
+
+function isRosterRole(role: string): role is SimulationAgentRole {
+  return (SIMULATION_AGENT_ORDER as readonly string[]).includes(role);
+}
 
 const runId = process.argv[2]?.trim();
 if (!runId) {
@@ -56,10 +64,11 @@ async function main(): Promise<void> {
 
     const roster = createSimulationRoster("software");
     for (const message of run.messages) {
-      const role = message.agentRole as keyof typeof roster;
-      if (roster[role] && message.agentName) {
-        roster[role] = { ...roster[role], name: message.agentName };
+      if (!isRosterRole(message.agentRole) || !message.agentName) {
+        continue;
       }
+      const member = roster[message.agentRole];
+      roster[message.agentRole] = { ...member, name: message.agentName };
     }
 
     const roles = run.messages.map((message) => message.agentRole);
