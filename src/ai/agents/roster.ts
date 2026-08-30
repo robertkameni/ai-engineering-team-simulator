@@ -94,9 +94,3 @@ export function getTeamMember(
 export function formatTeammateNames(roster: TeamRoster): string {
   return SIMULATION_AGENT_ORDER.map((role) => roster[role].name).join(", ");
 }
-
-function formatTeammateRoles(roster: TeamRoster): string {
-  return SIMULATION_AGENT_ORDER.map(
-    (role) => `${roster[role].name} (${roster[role].title})`,
-  ).join(", ");
-}
