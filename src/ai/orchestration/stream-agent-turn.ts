@@ -17,6 +17,12 @@ import {
 } from "@/ai/orchestration/agent-deliverable-quality";
 import { normalizeAgentPersistedText } from "@/ai/orchestration/agent-stream-text";
 import {
+  buildDeepFocusContinuationPrompt,
+  evaluateDeepFocusTurn,
+  mergeDeepFocusTagContinuation,
+  needsDeepFocusTagRetry,
+} from "@/ai/orchestration/deep-focus-gate";
+import {
   buildTruncationContinuationPrompt,
   isWorthlessContinuation,
   looksLikeTruncatedAgentOutput,
@@ -121,6 +127,12 @@ export async function streamAgentTurn({
     });
 
     fullText = await retryRoleDeliverableIfNeeded({
+      ...streamParams,
+      config,
+      fullText,
+    });
+
+    fullText = await retryDeepFocusTagsIfNeeded({
       ...streamParams,
       config,
       fullText,
@@ -483,4 +495,72 @@ async function retryRoleDeliverableIfNeeded(
     send,
     fullText: merged,
   });
+}
+
+async function retryDeepFocusTagsIfNeeded(
+  params: AgentStreamRetryParams,
+): Promise<string> {
+  const {
+    runId,
+    role,
+    productIdea,
+    transcript,
+    roster,
+    templateId,
+    config,
+    debateContext,
+    usageAccumulator,
+    abortSignal,
+    send,
+    fullText,
+  } = params;
+
+  const evaluation = evaluateDeepFocusTurn({
+    role,
+    text: fullText,
+    transcript,
+    roster,
+    isCorrection: Boolean(debateContext?.correction),
+  });
+  if (!needsDeepFocusTagRetry(evaluation.violations)) {
+    return fullText;
+  }
+
+  const supplementalUserPrompt = buildDeepFocusContinuationPrompt(
+    evaluation.violations,
+  );
+  if (!supplementalUserPrompt) {
+    return fullText;
+  }
+
+  assertNotAborted(abortSignal);
+  console.warn(`${role}: DeepFocus tags missing, requesting tag continuation`, {
+    runId,
+    violations: evaluation.violations,
+  });
+
+  const completionText = await collectAgentStream({
+    runId,
+    role,
+    productIdea,
+    transcript,
+    roster,
+    templateId,
+    config: {
+      ...config,
+      maxOutputTokens: Math.min(config.maxOutputTokens, 400),
+    },
+    debateContext,
+    usageAccumulator,
+    abortSignal,
+    send,
+    continuationOf: fullText,
+    supplementalUserPrompt,
+  });
+
+  if (!completionText.trim() || isWorthlessContinuation(completionText)) {
+    return fullText;
+  }
+
+  return mergeDeepFocusTagContinuation(fullText, completionText, roster);
 }

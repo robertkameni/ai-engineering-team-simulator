@@ -39,7 +39,8 @@ describe("buildDeepFocusSkillDirective", () => {
     const directive = buildDeepFocusSkillDirective();
 
     assert.match(directive, /Never state that a capability is tested/);
-    assert.match(directive, /concrete mechanism/);
-    assert.match(directive, /BLOCKED\/NEEDS_CLARIFICATION/);
+    assert.match(directive, /\[EVIDENCE:/);
+    assert.match(directive, /\[CHALLENGE:/);
+    assert.match(directive, /\[BLOCKED:/);
   });
 });

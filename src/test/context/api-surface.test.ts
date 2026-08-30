@@ -99,6 +99,28 @@ describe("extractDeclaredApiSurface", () => {
     assert.deepEqual(extractDeclaredApiSurface([entry("pm", "Scope and users only.")]), []);
   });
 
+  it("keeps product REST routes that omit the /api prefix", () => {
+    const surface = extractDeclaredApiSurface([
+      entry(
+        "backend",
+        "POST /orders, GET /orders/:id, POST /orders/:id/status, and POST /splits/:id/settle.",
+      ),
+      entry("frontend", "List vendors with GET /vendors?cursor= and GET /vendors/:id/menu."),
+    ]);
+
+    assert.deepEqual(
+      surface.map((item) => `${item.method} ${item.path}`),
+      [
+        "POST /orders",
+        "GET /orders/:id",
+        "POST /orders/:id/status",
+        "POST /splits/:id/settle",
+        "GET /vendors?cursor=",
+        "GET /vendors/:id/menu",
+      ],
+    );
+  });
+
   it("keeps public product routes that are not under /api/", () => {
     const surface = extractDeclaredApiSurface([
       entry("backend", "Public itinerary lives at GET /share/:token."),

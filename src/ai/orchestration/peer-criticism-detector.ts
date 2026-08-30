@@ -1,6 +1,13 @@
 import type { SimulationAgentRole } from "@/ai/agents/config";
-import { getTeamMember, type TeamRoster } from "@/ai/agents/roster";
+import { getTeamMember } from "@/ai/agents/roster";
+import type { TeamRoster } from "@/ai/agents/roster";
 import type { TranscriptEntry } from "@/ai/context/transcript";
+
+import {
+  excerptAroundChallengeTag,
+  hasDeepFocusChallengeTag,
+  parseDeepFocusTags,
+} from "@/ai/orchestration/deep-focus-tags";
 
 export interface CriticismResult {
   criticized: boolean;
@@ -29,6 +36,10 @@ const CRITICAL_PATTERNS: RegExp[] = [
   /\b(?:over|under)-?normaliz/i,
   /\bI split(?:\s+\w+){0,6}\s+into\b/i,
   /\bbut\s+.{0,120}\b(?:cost|overhead|fold|join cost|without query|under-?normaliz)\b/i,
+  /\bconflicts?\b/i,
+  /\bcontradict(?:s|ed|ion|ory)?\b/i,
+  /\bbut\s+your\b/i,
+  /\bforces the (?:client|frontend)\b/i,
 ];
 
 const EXCERPT_MIN_CHARS = 20;
@@ -129,6 +140,9 @@ export function hasAnySubstantiveDisagreement(
 }
 
 function hasCriticalLanguage(text: string): boolean {
+  if (hasDeepFocusChallengeTag(text)) {
+    return true;
+  }
   return CRITICAL_PATTERNS.some((pattern) => pattern.test(text));
 }
 
@@ -170,8 +184,21 @@ export function buildCritiqueMatrix(
         continue;
       }
 
+      for (const targetRole of parseDeepFocusTags(entry.content, roster).challenges) {
+        if (targetRole === role) {
+          continue;
+        }
+        const excerpt =
+          excerptAroundChallengeTag(entry.content, targetRole, roster) ??
+          `[CHALLENGE: ${targetRole}]`;
+        critiques.push({ targetRole, excerpt });
+      }
+
       for (const targetRole of CRITIQUE_TARGET_ROLES) {
         if (targetRole === role) {
+          continue;
+        }
+        if (critiques.some((critique) => critique.targetRole === targetRole)) {
           continue;
         }
 

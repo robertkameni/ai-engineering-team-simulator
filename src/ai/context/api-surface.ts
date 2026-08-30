@@ -16,7 +16,22 @@ const PRODUCT_PATH_PREFIXES = [
   "/healthz",
   "/readyz",
   "/webhooks",
+  "/orders",
+  "/vendors",
+  "/splits",
+  "/menu",
+  "/menus",
+  "/users",
+  "/items",
 ] as const;
+
+const PROVIDER_FIRST_SEGMENTS = new Set([
+  "account",
+  "subscriptions",
+  "charges",
+  "customers",
+  "invoices",
+]);
 
 const DEFERRED_ENDPOINT_WINDOW_BEFORE_CHARS = 100;
 const DEFERRED_ENDPOINT_WINDOW_AFTER_CHARS = 80;
@@ -24,12 +39,32 @@ const DEFERRED_ENDPOINT_WINDOW_AFTER_CHARS = 80;
 const DEFERRED_ENDPOINT_CONTEXT =
   /\b(later|future|v2|not (?:in|for) v1|flag(?:ged)?(?:\s+it)?\s+for(?:\s+later)?|deferred|out of scope)\b/i;
 
+function isProviderPath(path: string): boolean {
+  const firstSegment = path.split("/").filter(Boolean)[0]?.toLowerCase() ?? "";
+  if (!firstSegment) {
+    return false;
+  }
+  if (/^v\d+$/.test(firstSegment)) {
+    return true;
+  }
+  return PROVIDER_FIRST_SEGMENTS.has(firstSegment);
+}
+
+function pathWithoutQuery(path: string): string {
+  const queryIndex = path.indexOf("?");
+  return queryIndex === -1 ? path : path.slice(0, queryIndex);
+}
+
 function isProductPath(path: string): boolean {
+  const pathname = pathWithoutQuery(path);
+  if (isProviderPath(pathname)) {
+    return false;
+  }
   return PRODUCT_PATH_PREFIXES.some((prefix) => {
     if (prefix.endsWith("/")) {
-      return path.startsWith(prefix);
+      return pathname.startsWith(prefix);
     }
-    return path === prefix || path.startsWith(`${prefix}/`);
+    return pathname === prefix || pathname.startsWith(`${prefix}/`);
   });
 }
 

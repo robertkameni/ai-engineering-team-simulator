@@ -16,7 +16,7 @@ export interface ProseCriticalRisk {
 
 const CRITICAL_RISKS_SECTION = /^#{1,3}\s+.*critical risks?\s*$/im;
 
-const RISK_ENTRY_SPLIT = /(?=^\*\*\s*(?:risk\s+)?\d+\b)/im;
+const RISK_ENTRY_SPLIT = /(?=^(?:\*\*\s*(?:risk\s+)?\d+\b|\d+\.\s+\*\*))/im;
 
 const CRITICAL_CATEGORY_PATTERNS: ReadonlyArray<{
   category: ProseCriticalRiskCategory;
@@ -41,7 +41,9 @@ const CRITICAL_CATEGORY_PATTERNS: ReadonlyArray<{
 
 const UNRESOLVED_SIGNALS: readonly RegExp[] = [
   /\bunresolved\b/i,
-  /no (?:concrete )?mechanism/i,
+  /no(?:\s+\w+){0,4}\s+mechanism/i,
+  /\blacks? (?:a )?(?:named\s+)?mechanism\b/i,
+  /\bopen (?:data[ -]?loss|security) gap\b/i,
   /not yet implemented/i,
   /remains open/i,
   /\bopen gap\b/i,
@@ -114,6 +116,17 @@ function normalizeExcerpt(entry: string): string {
   return `${cleaned.slice(0, EXCERPT_MAX_CHARS).trimEnd()}…`;
 }
 
+function collectCandidateEntries(reviewerMessage: string): string[] {
+  const section = extractCriticalRisksSection(reviewerMessage);
+  const fromSection = extractRiskEntries(section);
+  const fromParagraphs = reviewerMessage
+    .split(/\n\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph.length > 40);
+
+  return [...fromSection, ...fromParagraphs];
+}
+
 /**
  * Extracts critical risks the final review described as unresolved but that
  * were never promoted into tracked review issues (e.g., introduced after the
@@ -125,21 +138,25 @@ export function extractUnresolvedProseCriticalRisks(
   roster: TeamRoster,
   fallbackRole: SimulationAgentRole = "architect",
 ): ProseCriticalRisk[] {
-  const section = extractCriticalRisksSection(reviewerMessage);
-  if (!section) {
-    return [];
-  }
-
   const risks: ProseCriticalRisk[] = [];
-  for (const [index, entry] of extractRiskEntries(section).entries()) {
+  const covered = new Set<string>();
+
+  for (const [index, entry] of collectCandidateEntries(reviewerMessage).entries()) {
     const category = classifyCriticalCategory(entry);
     if (!category || !isUnresolved(entry)) {
       continue;
     }
 
+    const targetRole = inferIssueOwnerFromConcern(entry, roster, fallbackRole);
+    const coverageKey = `${targetRole}:${category}`;
+    if (covered.has(coverageKey)) {
+      continue;
+    }
+    covered.add(coverageKey);
+
     risks.push({
       issueId: `prose_${index + 1}`,
-      targetRole: inferIssueOwnerFromConcern(entry, roster, fallbackRole),
+      targetRole,
       category,
       excerpt: normalizeExcerpt(entry),
     });

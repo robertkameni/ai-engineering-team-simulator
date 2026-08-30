@@ -117,4 +117,47 @@ describe("extractUnresolvedProseCriticalRisks", () => {
       [],
     );
   });
+
+  it("promotes numbered Critical Risks and a Disagree open data-loss gap", () => {
+    const roster = fixedRoster();
+    const review = `## Review of Team Plans
+
+**Disagree — ${roster.devops.name}'s restore drill:** "restore drill monthly, ~15 min RTO." You assert the drill but name no mechanism. Without that, this is an open data-loss gap.
+
+## Critical Risks
+
+1. **Async write atomicity (outbox → S3):** Crash between outbox insert and S3 upload leaves an orphaned row. Mitigation: lease TTL. Acceptance: sweeper uses SKIP LOCKED.
+
+2. **Worker starvation:** A photo flood could starve PDF jobs. Acceptance: per-queue semaphore.
+
+3. **Security — token refresh:** ${roster.frontend.name} mentions auth token refresh, but no interceptor mechanism is specified. Mid-session expiry without silent refresh will log users out.
+
+4. **Silent degradation:** No alert on S3 upload failures that don't throw.
+
+## Non-Critical Observations
+
+- SMTP version pin is good.
+
+[APPROVE]`;
+
+    const risks = extractUnresolvedProseCriticalRisks(review, roster);
+
+    assert.equal(risks.length, 2);
+    assert.ok(
+      risks.some(
+        (risk) =>
+          risk.category === "security" &&
+          risk.targetRole === "frontend" &&
+          risk.excerpt.includes("no interceptor mechanism"),
+      ),
+    );
+    assert.ok(
+      risks.some(
+        (risk) =>
+          risk.category === "data_loss" &&
+          risk.targetRole === "devops" &&
+          /open data-loss gap/i.test(risk.excerpt),
+      ),
+    );
+  });
 });

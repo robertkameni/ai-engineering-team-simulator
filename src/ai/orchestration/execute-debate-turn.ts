@@ -10,6 +10,10 @@ import {
   isArchitectDeliverableInsufficient,
 } from "@/ai/orchestration/agent-deliverable-quality";
 import { normalizeAgentPersistedText } from "@/ai/orchestration/agent-stream-text";
+import {
+  applyDeepFocusEnforcement,
+  stampDeepFocusFallback,
+} from "@/ai/orchestration/deep-focus-gate";
 import { normalizeSectionDumpOutput } from "@/ai/orchestration/section-dump-normalizer";
 import {
   detectPeerCriticism,
@@ -115,12 +119,32 @@ export async function runDebateTurn(
   assertSimulationWithinBudget(ctx.usageAccumulator);
   fullText = await recoverUnknownReviewerTag(role, fullText, ctx);
 
+  const deepFocus = applyDeepFocusEnforcement({
+    role,
+    text: fullText,
+    transcript: state.transcript,
+    roster: ctx.roster,
+    isCorrection: Boolean(debateContext.correction),
+  });
+  fullText = deepFocus.decisionText;
+  if (deepFocus.evaluation.rejectRole) {
+    console.warn("DEEP-FOCUS GATE: rewritten [APPROVE] to [REJECT]", {
+      runId: ctx.runId,
+      rejectRole: deepFocus.evaluation.rejectRole,
+      violations: deepFocus.evaluation.violations,
+    });
+  }
+
   const normalizedText =
     role === "reviewer"
       ? stripReviewerDecisionTag(normalizeAgentPersistedText(role, fullText))
       : normalizeAgentPersistedText(role, fullText);
   const normalizedOutput = normalizeSectionDumpOutput(normalizedText);
-  const contentToPersist = normalizedOutput.content;
+  const contentToPersist = stampDeepFocusFallback(
+    normalizedOutput.content,
+    deepFocus.evaluation.violations,
+    ctx.roster,
+  );
   state.outputDiagnostics = normalizedOutput.diagnostics;
 
   const gateDirective = await handleArchitectQualityGate(

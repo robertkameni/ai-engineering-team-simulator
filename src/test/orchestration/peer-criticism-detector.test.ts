@@ -146,6 +146,90 @@ describe("buildCritiqueMatrix", () => {
     );
   });
 
+  it("detects a scope-conflict challenge without challenge or gap keywords", () => {
+    const transcript = [
+      {
+        role: "architect" as const,
+        agentName: roster.architect.name,
+        content: `## Risks\n\n**Scope contradiction:** ${roster.pm.name}'s "no offline sync" conflicts with retried background photo uploads — this is a client-side outbox.`,
+      },
+    ];
+
+    const matrix = buildCritiqueMatrix(transcript, roster);
+
+    const architect = matrix.find((entry) => entry.role === "architect")!;
+    assert.ok(
+      architect.critiques.some(
+        (critique) =>
+          critique.targetRole === "pm" &&
+          critique.excerpt.includes("conflicts with"),
+      ),
+    );
+  });
+
+  it("detects a contrastive but-your challenge without challenge or gap keywords", () => {
+    const transcript = [
+      {
+        role: "frontend" as const,
+        agentName: roster.frontend.name,
+        content: `${roster.backend.name}, your split-queue and photo_id idempotency keys are solid — but your POST /api/findings/:id/photos returning 202 with an outbox row forces the client to treat upload as eventually-consistent.`,
+      },
+    ];
+
+    const matrix = buildCritiqueMatrix(transcript, roster);
+
+    const frontend = matrix.find((entry) => entry.role === "frontend")!;
+    assert.ok(
+      frontend.critiques.some(
+        (critique) =>
+          critique.targetRole === "backend" &&
+          critique.excerpt.includes("forces the client"),
+      ),
+    );
+  });
+
+  it("treats a display-name CHALLENGE tag as a critique", () => {
+    const transcript = [
+      {
+        role: "architect" as const,
+        agentName: roster.architect.name,
+        content: `Your 12-minute median assumes vendor toggles are reliable. [CHALLENGE: ${roster.pm.name}] Added a stale-status alert.`,
+      },
+    ];
+
+    const matrix = buildCritiqueMatrix(transcript, roster);
+
+    const architect = matrix.find((entry) => entry.role === "architect")!;
+    assert.ok(
+      architect.critiques.some(
+        (critique) =>
+          critique.targetRole === "pm" &&
+          critique.excerpt.includes(`[CHALLENGE: ${roster.pm.name}]`),
+      ),
+    );
+  });
+
+  it("treats a CHALLENGE tag as a critique without critical-language regex", () => {
+    const transcript = [
+      {
+        role: "architect" as const,
+        agentName: roster.architect.name,
+        content: `${roster.pm.name} left PDF hosting unspecified. [CHALLENGE: pm] Dedicated worker, not serverless.`,
+      },
+    ];
+
+    const matrix = buildCritiqueMatrix(transcript, roster);
+
+    const architect = matrix.find((entry) => entry.role === "architect")!;
+    assert.ok(
+      architect.critiques.some(
+        (critique) =>
+          critique.targetRole === "pm" &&
+          critique.excerpt.includes("[CHALLENGE: pm]"),
+      ),
+    );
+  });
+
   it("does not treat contrastive praise as a critique", () => {
     const transcript = [
       {
