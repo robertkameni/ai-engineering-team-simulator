@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import type { PartialRunArtifacts } from "@/features/artifacts/types";
 
@@ -10,21 +10,35 @@ export function useArtifactPanelState(params: {
   readonly crossValidationFailed: boolean;
 }) {
   const [panelArtifacts, setPanelArtifacts] = useState(params.artifacts);
+  const [previousArtifacts, setPreviousArtifacts] = useState(params.artifacts);
+  if (previousArtifacts !== params.artifacts) {
+    setPreviousArtifacts(params.artifacts);
+    setPanelArtifacts(params.artifacts);
+  }
+
   const [localStackValidationFailed, setLocalStackValidationFailed] = useState(
     params.stackValidationFailed,
   );
   const [localCrossValidationFailed, setLocalCrossValidationFailed] = useState(
     params.crossValidationFailed,
   );
-
-  useEffect(() => {
-    setPanelArtifacts(params.artifacts);
-  }, [params.artifacts]);
-
-  useEffect(() => {
+  const [previousValidationFlags, setPreviousValidationFlags] = useState({
+    stackValidationFailed: params.stackValidationFailed,
+    crossValidationFailed: params.crossValidationFailed,
+  });
+  if (
+    previousValidationFlags.stackValidationFailed !==
+      params.stackValidationFailed ||
+    previousValidationFlags.crossValidationFailed !==
+      params.crossValidationFailed
+  ) {
+    setPreviousValidationFlags({
+      stackValidationFailed: params.stackValidationFailed,
+      crossValidationFailed: params.crossValidationFailed,
+    });
     setLocalStackValidationFailed(params.stackValidationFailed);
     setLocalCrossValidationFailed(params.crossValidationFailed);
-  }, [params.stackValidationFailed, params.crossValidationFailed]);
+  }
 
   const handleBlueprintGenerated = useCallback(
     (

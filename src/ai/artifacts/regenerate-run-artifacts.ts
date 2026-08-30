@@ -61,7 +61,7 @@ type RunWithMessages = NonNullable<Awaited<ReturnType<typeof getRunWithMessages>
 async function loadRunForRegeneration(
   runId: string,
 ): Promise<RunWithMessages | null> {
-  let run = await getRunWithMessages(runId);
+  const run = await getRunWithMessages(runId);
   if (!run) {
     return null;
   }

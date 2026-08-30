@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, FileText, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -57,7 +57,9 @@ export function ExportRunButton({
   const [exportError, setExportError] = useState<string | null>(null);
   const isExporting = exportingFormat != null;
   const templateIdRef = useRef(templateId);
-  templateIdRef.current = templateId;
+  useEffect(() => {
+    templateIdRef.current = templateId;
+  }, [templateId]);
 
   const performExport = useCallback(
     async (targetRun: MockRun, format: ExportFormat) => {
