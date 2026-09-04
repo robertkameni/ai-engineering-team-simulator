@@ -49,6 +49,13 @@ function mapForgePartnerFailure(error: ForgePartnerError): Response {
     );
   }
 
+  if (error.statusCode === 401) {
+    return Response.json(
+      { error: "Could not start Forge pipeline" },
+      { status: 502 },
+    );
+  }
+
   const status =
     error.statusCode >= 400 && error.statusCode < 600 ? error.statusCode : 502;
   return Response.json({ error: "Could not start Forge pipeline" }, { status });

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { MockRun } from "@/lib/types";
+import { ForgePartnerError } from "@/lib/forge/forge-handoff-errors";
 import { rateLimitResponse } from "@/lib/rate-limit-response";
 
 import {
@@ -122,6 +123,22 @@ describe("executeForgeHandoffPost access", () => {
     );
 
     assert.equal(response.status, 503);
+  });
+
+  it("returns 502 when Forge partner rejects with 401", async () => {
+    const response = await executeForgeHandoffPost(
+      new Request("http://localhost/api/runs/run-1/forge-handoff", { method: "POST" }),
+      "run-1",
+      baseHooks({
+        submitPartnerIngest: async () => {
+          throw new ForgePartnerError(401, "unauthorized", "Invalid partner secret");
+        },
+      }),
+    );
+
+    assert.equal(response.status, 502);
+    const body = (await response.json()) as { error: string };
+    assert.equal(body.error, "Could not start Forge pipeline");
   });
 
   it("returns 200 with trackerUrl on success", async () => {

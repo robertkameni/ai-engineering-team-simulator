@@ -80,3 +80,30 @@ feat: add forge handoff orchestration with security tests
 ## Concerns
 
 - Task 3 intentionally stops at injectable orchestration plus tests; HTTP route wiring and concrete dependency assembly remain for Task 4.
+
+## Review Fix — Forge partner 401 mapping
+
+**Status:** DONE
+
+Mapped upstream Forge `401` to Team Sim `502` with `{ error: "Could not start Forge pipeline" }` so partner auth failures are not confused with Team Sim session auth.
+
+### Changes
+
+- `mapForgePartnerFailure()` now returns `502` for `ForgePartnerError` status `401`
+- Added security test asserting partner `401` maps to `502`
+
+### Verification
+
+```bash
+node --conditions=react-server --import tsx --test src/test/security/forge-handoff-access.test.ts src/test/security/forge-handoff-rate-limit.test.ts
+```
+
+Result: **PASS** — 7 tests, 0 failures
+
+### Commit
+
+```text
+fix: map Forge partner 401 to 502 for handoff
+```
+
+SHA: `6333252c768851062fc736ab16ba39b2975c1afa`
