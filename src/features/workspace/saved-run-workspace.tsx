@@ -100,7 +100,11 @@ export function SavedRunWorkspace({
         <WorkspaceMain>
           <MessageThreadStatic messages={run.messages} />
         </WorkspaceMain>
-        <SavedRunFooter userPrompt={run.userPrompt} />
+        <SavedRunFooter
+          userPrompt={run.userPrompt}
+          runId={run.id}
+          isAuthenticated={isAuthenticated}
+        />
       </AppShellFrame>
     </SavedRunMobileSheets>
   );
