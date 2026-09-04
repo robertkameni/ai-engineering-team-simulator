@@ -18,6 +18,8 @@ export type PromptComposerProps = {
   readonly value?: string;
   readonly onChange?: (value: string) => void;
   readonly onSimulate?: (prompt: string) => void | Promise<void>;
+  readonly runId?: string | null;
+  readonly isAuthenticated?: boolean;
   readonly runSession?: PromptComposerRunSession | null;
 };
 

@@ -207,6 +207,8 @@ export function SimulationWorkspace({
         value={currentPrompt}
         onChange={setCurrentPrompt}
         onSimulate={start}
+        runId={runId}
+        isAuthenticated={isAuthenticated}
         runSession={promptRunSession}
       />
     </AppShell>

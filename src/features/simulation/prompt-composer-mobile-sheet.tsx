@@ -7,6 +7,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { OpenInForgeButton } from "@/features/workspace/open-in-forge-button";
 import { PromptComposerForm } from "./prompt-composer-form";
 
 interface PromptComposerMobileSheetProps {
@@ -21,6 +22,8 @@ interface PromptComposerMobileSheetProps {
   title?: string;
   description?: string;
   isRerunMode?: boolean;
+  runId?: string | null;
+  isAuthenticated?: boolean;
 }
 
 export function PromptComposerMobileSheet({
@@ -35,6 +38,8 @@ export function PromptComposerMobileSheet({
   title = "New simulation",
   description = "Describe what you want the team to build.",
   isRerunMode = false,
+  runId = null,
+  isAuthenticated = false,
 }: PromptComposerMobileSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -57,6 +62,14 @@ export function PromptComposerMobileSheet({
           idPrefix="mobile-workspace"
           isRerunMode={isRerunMode}
         />
+        {runId ? (
+          <OpenInForgeButton
+            runId={runId}
+            isAuthenticated={isAuthenticated}
+            disabled={disabled}
+            className="mt-3 w-full"
+          />
+        ) : null}
       </SheetContent>
     </Sheet>
   );

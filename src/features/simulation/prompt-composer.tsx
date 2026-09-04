@@ -11,6 +11,7 @@ import type {
   PromptComposerFabProps,
   PromptComposerRunSession,
 } from "@/features/simulation/prompt-composer-types";
+import { OpenInForgeButton } from "@/features/workspace/open-in-forge-button";
 import { useMinWidth } from "@/hooks/use-media-query";
 import { hasWorkspacePrompt } from "@/lib/workspace-url";
 import { cn } from "@/lib/utils";
@@ -92,6 +93,8 @@ export function PromptComposer({
   value,
   onChange,
   onSimulate,
+  runId = null,
+  isAuthenticated = false,
   runSession = null,
 }: PromptComposerProps) {
   const isDesktop = useMinWidth(720);
@@ -153,16 +156,37 @@ export function PromptComposer({
             isRerunMode={derived.isLiveWorkspace}
           />
           {derived.isLiveWorkspace && (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full gap-2"
-              disabled={!derived.canRerun}
-              onClick={() => handleRerun()}
-            >
-              <RotateCw className="size-4" />
-              {disabled ? "Simulation running…" : "Rerun simulation"}
-            </Button>
+            runId ? (
+              <div className="flex w-full flex-col gap-2 @md/composer:flex-row">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full flex-1 gap-2"
+                  disabled={!derived.canRerun}
+                  onClick={() => handleRerun()}
+                >
+                  <RotateCw className="size-4" />
+                  {disabled ? "Simulation running…" : "Rerun simulation"}
+                </Button>
+                <OpenInForgeButton
+                  runId={runId}
+                  isAuthenticated={isAuthenticated}
+                  disabled={disabled}
+                  className="w-full flex-1"
+                />
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2"
+                disabled={!derived.canRerun}
+                onClick={() => handleRerun()}
+              >
+                <RotateCw className="size-4" />
+                {disabled ? "Simulation running…" : "Rerun simulation"}
+              </Button>
+            )
           )}
         </div>
       </div>
@@ -189,6 +213,8 @@ export function PromptComposer({
               title={derived.sheetTitle}
               description={derived.sheetDescription}
               isRerunMode={derived.isLiveWorkspace}
+              runId={runId}
+              isAuthenticated={isAuthenticated}
             />
           )}
         </>
