@@ -13,7 +13,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:push": "prisma db push",
-    "test": "node --import tsx --test src/test/**/*.test.ts"
+    "test": "node --conditions=react-server --import tsx --test src/test/**/*.test.ts"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.37",
