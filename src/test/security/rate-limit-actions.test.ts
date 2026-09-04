@@ -38,6 +38,16 @@ describe("getRateLimitThreshold", () => {
       if (saved !== undefined) process.env.RATE_LIMIT_REGENERATE_GUEST = saved;
     }
   });
+
+  it("sets forge_handoff to default 5 for authenticated profiles when env is unset", () => {
+    const saved = process.env.RATE_LIMIT_FORGE_HANDOFF_AUTH;
+    delete process.env.RATE_LIMIT_FORGE_HANDOFF_AUTH;
+    try {
+      assert.equal(getRateLimitThreshold("forge_handoff", true), 5);
+    } finally {
+      if (saved !== undefined) process.env.RATE_LIMIT_FORGE_HANDOFF_AUTH = saved;
+    }
+  });
 });
 
 describe("executeRegenerateArtifactsPost rate limiting", () => {

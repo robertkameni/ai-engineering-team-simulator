@@ -7,7 +7,8 @@ export type RateLimitAction =
   | "regenerate"
   | "claim_guest_runs"
   | "auth_login"
-  | "auth_register";
+  | "auth_register"
+  | "forge_handoff";
 
 export type AuthRateLimitAction = "auth_login" | "auth_register";
 
@@ -26,6 +27,7 @@ const DEFAULT_RATE_LIMITS: Record<
   claim_guest_runs: { guest: 10, auth: 10 },
   auth_login: { guest: 10, auth: 10 },
   auth_register: { guest: 10, auth: 10 },
+  forge_handoff: { guest: 5, auth: 5 },
 };
 
 const DEFAULT_AUTH_RATE_LIMIT = 10;
@@ -62,6 +64,10 @@ const LIMIT_ENV_KEYS: Record<
   auth_register: {
     guest: "RATE_LIMIT_AUTH_REGISTER",
     auth: "RATE_LIMIT_AUTH_REGISTER",
+  },
+  forge_handoff: {
+    guest: "RATE_LIMIT_FORGE_HANDOFF_GUEST",
+    auth: "RATE_LIMIT_FORGE_HANDOFF_AUTH",
   },
 };
 
