@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Plus, RotateCw } from "lucide-react";
 
+import { OpenInForgeButton } from "@/components/open-in-forge-button";
 import { Button } from "@/components/ui/button";
 import { PromptComposerForm } from "@/features/simulation/prompt-composer-form";
 import type {
@@ -11,7 +12,6 @@ import type {
   PromptComposerFabProps,
   PromptComposerRunSession,
 } from "@/features/simulation/prompt-composer-types";
-import { OpenInForgeButton } from "@/features/workspace/open-in-forge-button";
 import { useMinWidth } from "@/hooks/use-media-query";
 import { hasWorkspacePrompt } from "@/lib/workspace-url";
 import { cn } from "@/lib/utils";

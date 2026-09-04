@@ -86,11 +86,13 @@ export function OpenInForgeButton({
     if (disabled || isPending) {
       return;
     }
+
     if (!isAuthenticated) {
       setPendingAfterAuth(true);
       setModalOpen(true);
       return;
     }
+
     void startHandoff();
   }, [disabled, isAuthenticated, isPending, startHandoff]);
 
@@ -98,6 +100,7 @@ export function OpenInForgeButton({
     await claimGuestRuns();
     router.refresh();
     setModalOpen(false);
+
     if (pendingAfterAuth) {
       setPendingAfterAuth(false);
       await startHandoff();

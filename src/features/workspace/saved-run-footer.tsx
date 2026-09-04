@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Plus, RotateCw } from "lucide-react";
 
+import { OpenInForgeButton } from "@/components/open-in-forge-button";
 import { Button } from "@/components/ui/button";
-import { OpenInForgeButton } from "@/features/workspace/open-in-forge-button";
 import {
   hasWorkspacePrompt,
   workspaceUrlForRerun,

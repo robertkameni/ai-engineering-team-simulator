@@ -1,5 +1,6 @@
 "use client";
 
+import { OpenInForgeButton } from "@/components/open-in-forge-button";
 import {
   Sheet,
   SheetContent,
@@ -7,7 +8,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { OpenInForgeButton } from "@/features/workspace/open-in-forge-button";
 import { PromptComposerForm } from "./prompt-composer-form";
 
 interface PromptComposerMobileSheetProps {
