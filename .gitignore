@@ -50,4 +50,5 @@ next-env.d.ts
 /.live-verify/*
 
 # deep-focus generated files
-/deep-focus/*
+/.superpowers/
+/docs/
