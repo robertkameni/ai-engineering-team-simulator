@@ -62,7 +62,7 @@ export function PromptComposerMobileSheet({
           idPrefix="mobile-workspace"
           isRerunMode={isRerunMode}
         />
-        {runId ? (
+        {runId && isRerunMode ? (
           <OpenInForgeButton
             runId={runId}
             isAuthenticated={isAuthenticated}

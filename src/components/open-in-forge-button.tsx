@@ -4,6 +4,11 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2 } from "lucide-react";
 
+import {
+  completeForgePopup,
+  isForgeHandoffEnabled,
+  openForgePlaceholder,
+} from "@/components/open-in-forge-button-helpers";
 import { Button } from "@/components/ui/button";
 import { ExportAuthModal } from "@/features/workspace/export-auth-modal";
 import { cn } from "@/lib/utils";
@@ -19,6 +24,9 @@ type HandoffSuccessBody = {
   readonly trackerUrl: string;
 };
 
+const DEFAULT_HANDOFF_ERROR = "Could not start Forge pipeline";
+const POPUP_BLOCKED_ERROR = "Allow pop-ups to open Forge, then try again.";
+
 async function claimGuestRuns(): Promise<void> {
   try {
     await fetch("/api/auth/claim-guest-runs", { method: "POST" });
@@ -33,6 +41,7 @@ export function OpenInForgeButton({
   disabled = false,
   className,
 }: OpenInForgeButtonProps) {
+  const isForgeAvailable = isForgeHandoffEnabled();
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [pendingAfterAuth, setPendingAfterAuth] = useState(false);
@@ -42,7 +51,7 @@ export function OpenInForgeButton({
   const startHandoff = useCallback(async () => {
     setError(null);
     setIsPending(true);
-    const blankTab = window.open("about:blank", "_blank", "noopener,noreferrer");
+    const blankTab = openForgePlaceholder(window.open);
 
     try {
       const response = await fetch(`/api/runs/${runId}/forge-handoff`, {
@@ -58,25 +67,29 @@ export function OpenInForgeButton({
         setError(
           payload && "error" in payload && payload.error
             ? payload.error
-            : "Could not start Forge pipeline",
+            : DEFAULT_HANDOFF_ERROR,
         );
         return;
       }
 
       if (!payload || !("trackerUrl" in payload) || !payload.trackerUrl) {
         blankTab?.close();
-        setError("Could not start Forge pipeline");
+        setError(DEFAULT_HANDOFF_ERROR);
         return;
       }
 
-      if (blankTab) {
-        blankTab.location.href = payload.trackerUrl;
-      } else {
-        window.open(payload.trackerUrl, "_blank", "noopener,noreferrer");
+      const didOpenTracker = completeForgePopup(
+        blankTab,
+        payload.trackerUrl,
+        window.open,
+      );
+      if (!didOpenTracker) {
+        blankTab?.close();
+        setError(POPUP_BLOCKED_ERROR);
       }
     } catch {
       blankTab?.close();
-      setError("Could not start Forge pipeline");
+      setError(DEFAULT_HANDOFF_ERROR);
     } finally {
       setIsPending(false);
     }
@@ -106,6 +119,10 @@ export function OpenInForgeButton({
       await startHandoff();
     }
   }, [pendingAfterAuth, router, startHandoff]);
+
+  if (!isForgeAvailable) {
+    return null;
+  }
 
   return (
     <div className={cn("flex flex-col items-stretch gap-1", className)}>
